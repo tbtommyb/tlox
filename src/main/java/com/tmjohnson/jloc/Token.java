@@ -1,5 +1,7 @@
 package com.tmjohnson.jloc;
 
+import java.util.Objects;
+
 class Token {
     final TokenType type;
     final String lexeme;
@@ -14,6 +16,23 @@ class Token {
     }
 
     public String toString() {
-        return type + " " + lexeme + " " + literal;
+        return type + " " + lexeme + " " + literal + " " + line;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null) {
+            return false;
+        }
+        if (getClass() != o.getClass()) {
+            return false;
+        }
+        Token other = (Token) o;
+
+        return Objects.equals(type, other.type) && Objects.equals(lexeme, other.lexeme)
+                && ((literal == null && other.literal == null) || literal.equals(other.literal)) && line == other.line;
     }
 }
