@@ -1,27 +1,16 @@
 package com.tmjohnson.jloc;
 
-import static com.tmjohnson.jloc.TokenType.BANG;
-import static com.tmjohnson.jloc.TokenType.BANG_EQUAL;
-import static com.tmjohnson.jloc.TokenType.EOF;
-import static com.tmjohnson.jloc.TokenType.EQUAL_EQUAL;
-import static com.tmjohnson.jloc.TokenType.FALSE;
-import static com.tmjohnson.jloc.TokenType.GREATER;
-import static com.tmjohnson.jloc.TokenType.GREATER_EQUAL;
-import static com.tmjohnson.jloc.TokenType.LEFT_PAREN;
-import static com.tmjohnson.jloc.TokenType.LESS;
-import static com.tmjohnson.jloc.TokenType.LESS_EQUAL;
-import static com.tmjohnson.jloc.TokenType.MINUS;
-import static com.tmjohnson.jloc.TokenType.NIL;
-import static com.tmjohnson.jloc.TokenType.NUMBER;
-import static com.tmjohnson.jloc.TokenType.PLUS;
-import static com.tmjohnson.jloc.TokenType.RIGHT_PAREN;
-import static com.tmjohnson.jloc.TokenType.SLASH;
-import static com.tmjohnson.jloc.TokenType.STAR;
-import static com.tmjohnson.jloc.TokenType.STRING;
-import static com.tmjohnson.jloc.TokenType.TRUE;
-
 import java.util.List;
 
+// expression     → equality ( "," expression )*;
+// equality       → comparison ( ( "!=" | "==" ) comparison )* ;
+// comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
+// term           → factor ( ( "-" | "+" ) factor )* | "?" expression ":" term ;
+// factor         → unary ( ( "/" | "*" ) unary )* ;
+// unary          → ( "!" | "-" ) unary
+//                | primary ;
+// primary        → NUMBER | STRING | "true" | "false" | "nil"
+//                | "(" expression ")" ;
 class Parser {
     private static class ParseError extends RuntimeException {
     }
@@ -42,13 +31,20 @@ class Parser {
     }
 
     private Expr expression() {
-        return equality();
+        Expr expr = equality();
+
+        while (match(TokenType.COMMA)) {
+            Token operator = previous();
+            Expr right = expression();
+            expr = new Expr.Binary(expr, operator, right);
+        }
+        return expr;
     }
 
     private Expr equality() {
         Expr expr = comparison();
 
-        while (match(BANG_EQUAL, EQUAL_EQUAL)) {
+        while (match(TokenType.BANG_EQUAL, TokenType.EQUAL_EQUAL)) {
             Token operator = previous();
             Expr right = comparison();
             expr = new Expr.Binary(expr, operator, right);
@@ -60,7 +56,7 @@ class Parser {
     private Expr comparison() {
         Expr expr = term();
 
-        while (match(GREATER, GREATER_EQUAL, LESS, LESS_EQUAL)) {
+        while (match(TokenType.GREATER, TokenType.GREATER_EQUAL, TokenType.LESS, TokenType.LESS_EQUAL)) {
             Token operator = previous();
             Expr right = term();
             expr = new Expr.Binary(expr, operator, right);
@@ -72,10 +68,20 @@ class Parser {
     private Expr term() {
         Expr expr = factor();
 
-        while (match(MINUS, PLUS)) {
+        while (match(TokenType.MINUS, TokenType.PLUS)) {
             Token operator = previous();
             Expr right = factor();
             expr = new Expr.Binary(expr, operator, right);
+        }
+
+        if (match(TokenType.QUESTION_MARK)) {
+            Token operator = previous();
+            Expr thenBranch = expression();
+            Expr cond = new Expr.Binary(expr, operator, thenBranch);
+            consume(TokenType.COLON, "Expected : after ? expression.");
+            Token colon = previous();
+            Expr elseBranch = term();
+            return new Expr.Binary(cond, colon, elseBranch);
         }
 
         return expr;
@@ -84,7 +90,7 @@ class Parser {
     private Expr factor() {
         Expr expr = unary();
 
-        while (match(SLASH, STAR)) {
+        while (match(TokenType.SLASH, TokenType.STAR)) {
             Token operator = previous();
             Expr right = unary();
             expr = new Expr.Binary(expr, operator, right);
@@ -94,7 +100,7 @@ class Parser {
     }
 
     private Expr unary() {
-        if (match(BANG, MINUS)) {
+        if (match(TokenType.BANG, TokenType.MINUS)) {
             Token operator = previous();
             Expr right = unary();
             return new Expr.Unary(operator, right);
@@ -104,21 +110,21 @@ class Parser {
     }
 
     private Expr primary() {
-        if (match(FALSE)) {
+        if (match(TokenType.FALSE)) {
             return new Expr.Literal(false);
         }
-        if (match(TRUE)) {
+        if (match(TokenType.TRUE)) {
             return new Expr.Literal(true);
         }
-        if (match(NIL)) {
+        if (match(TokenType.NIL)) {
             return new Expr.Literal(null);
         }
-        if (match(NUMBER, STRING)) {
+        if (match(TokenType.NUMBER, TokenType.STRING)) {
             return new Expr.Literal(previous().literal);
         }
-        if (match(LEFT_PAREN)) {
+        if (match(TokenType.LEFT_PAREN)) {
             Expr expr = expression();
-            consume(RIGHT_PAREN, "Expected ')' after expression.");
+            consume(TokenType.RIGHT_PAREN, "Expected ')' after expression.");
             return new Expr.Grouping(expr);
         }
         throw error(peek(), "Expected expression.");
@@ -158,7 +164,7 @@ class Parser {
     }
 
     private boolean isAtEnd() {
-        return peek().type == EOF;
+        return peek().type == TokenType.EOF;
     }
 
     private Token peek() {
