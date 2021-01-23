@@ -2,10 +2,11 @@ package com.tmjohnson.jloc;
 
 import java.util.List;
 
-// expression     → equality ( "," expression )*;
+// expression     → conditional ( "," expression )*;
+// conditional    → equality | "?" expression ":" term ;
 // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 // comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
-// term           → factor ( ( "-" | "+" ) factor )* | "?" expression ":" term ;
+// term           → factor ( ( "-" | "+" ) factor )* ;
 // factor         → unary ( ( "/" | "*" ) unary )* ;
 // unary          → ( "!" | "-" ) unary
 //                | primary ;
@@ -31,13 +32,31 @@ class Parser {
     }
 
     private Expr expression() {
-        Expr expr = equality();
+        Expr expr = conditional();
 
         while (match(TokenType.COMMA)) {
             Token operator = previous();
             Expr right = expression();
             expr = new Expr.Binary(expr, operator, right);
         }
+        return expr;
+    }
+
+    private Expr conditional() {
+        Expr expr = equality();
+
+        if (match(TokenType.QUESTION_MARK)) {
+            Token operator = previous();
+            Expr thenBranch = expression();
+            expr = new Expr.Binary(expr, operator, thenBranch);
+
+            consume(TokenType.COLON, "Expected : after ? expression.");
+
+            Token colon = previous();
+            Expr elseBranch = conditional();
+            expr = new Expr.Binary(expr, colon, elseBranch);
+        }
+
         return expr;
     }
 
@@ -72,16 +91,6 @@ class Parser {
             Token operator = previous();
             Expr right = factor();
             expr = new Expr.Binary(expr, operator, right);
-        }
-
-        if (match(TokenType.QUESTION_MARK)) {
-            Token operator = previous();
-            Expr thenBranch = expression();
-            Expr cond = new Expr.Binary(expr, operator, thenBranch);
-            consume(TokenType.COLON, "Expected : after ? expression.");
-            Token colon = previous();
-            Expr elseBranch = term();
-            return new Expr.Binary(cond, colon, elseBranch);
         }
 
         return expr;
