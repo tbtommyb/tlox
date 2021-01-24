@@ -1,5 +1,7 @@
 package com.tmjohnson.jloc;
 
+import java.util.List;
+
 class AstPrinter implements Expr.Visitor<String> {
     String print(Expr expr) {
         return expr.accept(this);
@@ -39,6 +41,19 @@ class AstPrinter implements Expr.Visitor<String> {
         builder.append(")");
 
         return builder.toString();
+    }
+
+    public static void run(String source) {
+        Scanner scanner = new Scanner(source);
+        List<Token> tokens = scanner.scanTokens();
+        Parser parser = new Parser(tokens);
+        Expr expression = parser.parse();
+
+        if (Lox.hadError) {
+            return;
+        }
+
+        System.out.println(new AstPrinter().print(expression));
     }
 
     public static void main(String[] args) {
