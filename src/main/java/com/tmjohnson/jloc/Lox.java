@@ -60,7 +60,6 @@ public class Lox {
             return;
         }
         interpreter.interpret(expression);
-        // System.out.println(new AstPrinter().print(expression));
     }
 
     private static void report(int line, String where, String message) {
