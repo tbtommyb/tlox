@@ -9,6 +9,8 @@ abstract class Expr {
         R visitLiteralExpr(Literal expr);
 
         R visitUnaryExpr(Unary expr);
+
+        R visitTernaryExpr(Ternary expr);
     }
 
     static class Binary extends Expr {
@@ -67,6 +69,23 @@ abstract class Expr {
 
         final Token operator;
         final Expr right;
+    }
+
+    static class Ternary extends Expr {
+        Ternary(Expr condition, Expr thenClause, Expr elseClause) {
+            this.condition = condition;
+            this.thenClause = thenClause;
+            this.elseClause = elseClause;
+        }
+
+        @Override
+        <R> R accept(Visitor<R> visitor) {
+            return visitor.visitTernaryExpr(this);
+        }
+
+        final Expr condition;
+        final Expr thenClause;
+        final Expr elseClause;
     }
 
     abstract <R> R accept(Visitor<R> visitor);

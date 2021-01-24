@@ -25,8 +25,8 @@ public class AstPrinterTest {
 
     @Test
     public void canParseNestedTernaries() {
-        String expected = "(: (? (< 1.0 3.0) (- 1.0)) (: (? false (- 2.0)) (: (? (== 3.0 3.0) true) (- 1.0))))";
         String input = "1 < 3 ? -1 : false ? -2 : 3 == 3 ? true : -1";
+        String expected = "(?: (< 1.0 3.0) (- 1.0) (?: false (- 2.0) (?: (== 3.0 3.0) true (- 1.0))))";
 
         AstPrinter.run(input);
         String output = outputStreamCaptor.toString();

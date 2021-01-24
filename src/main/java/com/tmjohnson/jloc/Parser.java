@@ -2,16 +2,16 @@ package com.tmjohnson.jloc;
 
 import java.util.List;
 
-// expression     → conditional ( "," expression )*;
-// conditional    → equality | "?" expression ":" term ;
-// equality       → comparison ( ( "!=" | "==" ) comparison )* ;
-// comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
-// term           → factor ( ( "-" | "+" ) factor )* ;
-// factor         → unary ( ( "/" | "*" ) unary )* ;
-// unary          → ( "!" | "-" ) unary
-//                | primary ;
-// primary        → NUMBER | STRING | "true" | "false" | "nil"
-//                | "(" expression ")" ;
+// expression   → conditional ( "," expression )*;
+// conditional  → equality | "?" expression ":" term ;
+// equality     → comparison ( ( "!=" | "==" ) comparison )* ;
+// comparison   → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
+// term         → factor ( ( "-" | "+" ) factor )* ;
+// factor       → unary ( ( "/" | "*" ) unary )* ;
+// unary        → ( "!" | "-" ) unary
+//              | primary ;
+// primary      → NUMBER | STRING | "true" | "false" | "nil"
+//              | "(" expression ")" ;
 class Parser {
     private static class ParseError extends RuntimeException {
     }
@@ -39,6 +39,7 @@ class Parser {
             Expr right = expression();
             expr = new Expr.Binary(expr, operator, right);
         }
+
         return expr;
     }
 
@@ -46,15 +47,12 @@ class Parser {
         Expr expr = equality();
 
         if (match(TokenType.QUESTION_MARK)) {
-            Token operator = previous();
             Expr thenBranch = expression();
-            expr = new Expr.Binary(expr, operator, thenBranch);
 
             consume(TokenType.COLON, "Expected : after ? expression.");
 
-            Token colon = previous();
             Expr elseBranch = conditional();
-            expr = new Expr.Binary(expr, colon, elseBranch);
+            expr = new Expr.Ternary(expr, thenBranch, elseBranch);
         }
 
         return expr;
@@ -135,6 +133,28 @@ class Parser {
             Expr expr = expression();
             consume(TokenType.RIGHT_PAREN, "Expected ')' after expression.");
             return new Expr.Grouping(expr);
+        }
+
+        // Error productions
+        if (match(TokenType.BANG_EQUAL, TokenType.EQUAL_EQUAL)) {
+            Token op = previous();
+            comparison();
+            throw error(op, "Expected left-hand operand.");
+        }
+        if (match(TokenType.GREATER, TokenType.GREATER_EQUAL, TokenType.LESS, TokenType.LESS_EQUAL)) {
+            Token op = previous();
+            term();
+            throw error(op, "Expected left-hand operand.");
+        }
+        if (match(TokenType.PLUS)) {
+            Token op = previous();
+            factor();
+            throw error(op, "Expected left-hand operand.");
+        }
+        if (match(TokenType.SLASH, TokenType.STAR)) {
+            Token op = previous();
+            unary();
+            throw error(op, "Expected left-hand operand.");
         }
         throw error(peek(), "Expected expression.");
     }
