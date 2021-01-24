@@ -13,9 +13,11 @@ public class GenerateAst {
         }
         String outputDir = args[0];
         defineAst(outputDir, "Expr",
-                Arrays.asList("Binary : Expr left, Token operator, Expr right", "Grouping : Expr expression",
-                        "Literal : Object value", "Unary : Token operator, Expr right",
-                        "Ternary : Expr condition, Expr thenClause, Expr elseClause"));
+                Arrays.asList("Assign : Token name, Expr value", "Binary : Expr left, Token operator, Expr right",
+                        "Grouping : Expr expression", "Literal : Object value", "Unary : Token operator, Expr right",
+                        "Variable : Token name", "Ternary : Expr condition, Expr thenClause, Expr elseClause"));
+        defineAst(outputDir, "Stmt", Arrays.asList("Block : List<Stmt> statements", "Expression : Expr expression",
+                "Print : Expr expression", "Var : Token name, Expr initializer"));
     }
 
     private static void defineAst(String outputDir, String baseName, List<String> types) throws IOException {
