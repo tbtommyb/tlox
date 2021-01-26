@@ -8,23 +8,27 @@ import java.util.List;
 // declaration    → varDecl
 //                | statement ;
 // statement      → exprStmt
+//                | ifStmt
 //                | printStmt
 //                | block ;
-
+// ifStmt         → "if" "(" expression ")" statement
+//                  ( "else" statement )? ;
 // block          → "{" declaration* "}" ;
 // varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
 // exprStmt       → expression ";" ;
 // printStmt      → "print" expression ";" ;
 // expression     → assignment ;
 // assignment     → IDENTIFIER "=" assignment
-//                | equality ;
-// conditional  → equality | "?" expression ":" term ;
-// equality     → comparison ( ( "!=" | "==" ) comparison )* ;
-// comparison   → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
-// term         → factor ( ( "-" | "+" ) factor )* ;
-// factor       → unary ( ( "/" | "*" ) unary )* ;
-// unary        → ( "!" | "-" ) unary
-//              | primary ;
+//                | conditional;
+// conditional    → logic_or "?" expression ":" conditional ;
+// logic_or       → logic_and ( "or" logic_and )* ;
+// logic_and      → equality ( "and" equality )* ;
+// equality       → comparison ( ( "!=" | "==" ) comparison )* ;
+// comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
+// term           → factor ( ( "-" | "+" ) factor )* ;
+// factor         → unary ( ( "/" | "*" ) unary )* ;
+// unary          → ( "!" | "-" ) unary
+//                | primary ;
 // primary        → "true" | "false" | "nil"
 //                | NUMBER | STRING
 //                | "(" expression ")"
@@ -82,6 +86,9 @@ class Parser {
         if (match(TokenType.LEFT_BRACE)) {
             return new Stmt.Block(block());
         }
+        if (match(TokenType.IF)) {
+            return ifStatement();
+        }
         return expressionStatement();
     }
 
@@ -89,6 +96,20 @@ class Parser {
         Expr value = expression();
         consume(TokenType.SEMICOLON, "Expect ';' after value.");
         return new Stmt.Print(value);
+    }
+
+    private Stmt ifStatement() {
+        consume(TokenType.LEFT_PAREN, "Expect '(' after 'if'.");
+        Expr condition = expression();
+        consume(TokenType.RIGHT_PAREN, "Expect ')' after if condition.");
+
+        Stmt thenBranch = statement();
+        Stmt elseBranch = null;
+        if (match(TokenType.ELSE)) {
+            elseBranch = statement();
+        }
+
+        return new Stmt.If(condition, thenBranch, elseBranch);
     }
 
     private Stmt expressionStatement() {
@@ -139,15 +160,39 @@ class Parser {
     }
 
     private Expr conditional() {
-        Expr expr = equality();
+        Expr expr = or();
 
         if (match(TokenType.QUESTION_MARK)) {
-            Expr thenBranch = expression();
+            Expr thenBranch = conditional();
 
-            consume(TokenType.COLON, "Expected : after ? expression.");
+            consume(TokenType.COLON, "Expected expression and : after ?.");
 
             Expr elseBranch = conditional();
             expr = new Expr.Ternary(expr, thenBranch, elseBranch);
+        }
+
+        return expr;
+    }
+
+    private Expr or() {
+        Expr expr = and();
+
+        while (match(TokenType.OR)) {
+            Token operator = previous();
+            Expr right = and();
+            expr = new Expr.Logical(expr, operator, right);
+        }
+
+        return expr;
+    }
+
+    private Expr and() {
+        Expr expr = equality();
+
+        while (match(TokenType.AND)) {
+            Token operator = previous();
+            Expr right = equality();
+            expr = new Expr.Logical(expr, operator, right);
         }
 
         return expr;
