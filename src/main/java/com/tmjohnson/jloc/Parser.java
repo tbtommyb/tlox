@@ -29,6 +29,7 @@ import java.util.List;
 //                | NUMBER | STRING
 //                | "(" expression ")"
 //                | IDENTIFIER ;
+
 class Parser {
     private static class ParseError extends RuntimeException {
     }
@@ -49,19 +50,17 @@ class Parser {
         return statements;
     }
 
-    private Stmt statement() {
-        if (match(TokenType.PRINT)) {
-            return printStatement();
-        }
-        if (match(TokenType.LEFT_BRACE))
-            return new Stmt.Block(block());
-        return expressionStatement();
-    }
+    private Stmt declaration() {
+        try {
+            if (match(TokenType.VAR)) {
+                return varDeclaration();
+            }
 
-    private Stmt printStatement() {
-        Expr value = expression();
-        consume(TokenType.SEMICOLON, "Expect ';' after value.");
-        return new Stmt.Print(value);
+            return statement();
+        } catch (ParseError error) {
+            synchronize();
+            return null;
+        }
     }
 
     private Stmt varDeclaration() {
@@ -74,6 +73,22 @@ class Parser {
 
         consume(TokenType.SEMICOLON, "Expect ';' after variable declaration.");
         return new Stmt.Var(name, initializer);
+    }
+
+    private Stmt statement() {
+        if (match(TokenType.PRINT)) {
+            return printStatement();
+        }
+        if (match(TokenType.LEFT_BRACE)) {
+            return new Stmt.Block(block());
+        }
+        return expressionStatement();
+    }
+
+    private Stmt printStatement() {
+        Expr value = expression();
+        consume(TokenType.SEMICOLON, "Expect ';' after value.");
+        return new Stmt.Print(value);
     }
 
     private Stmt expressionStatement() {
@@ -94,15 +109,23 @@ class Parser {
     }
 
     private Expr expression() {
-        return assignment();
+        Expr expr = assignment();
+
+        while (match(TokenType.COMMA)) {
+            Token operator = previous();
+            Expr right = expression();
+            expr = new Expr.Binary(expr, operator, right);
+        }
+
+        return expr;
     }
 
     private Expr assignment() {
-        Expr expr = equality();
+        Expr expr = conditional();
 
         if (match(TokenType.EQUAL)) {
             Token equals = previous();
-            Expr value = assignment();
+            Expr value = conditional();
 
             if (expr instanceof Expr.Variable) {
                 Token name = ((Expr.Variable) expr).name;
@@ -113,18 +136,6 @@ class Parser {
         }
 
         return expr;
-    }
-
-    private Stmt declaration() {
-        try {
-            if (match(TokenType.VAR))
-                return varDeclaration();
-
-            return statement();
-        } catch (ParseError error) {
-            synchronize();
-            return null;
-        }
     }
 
     private Expr conditional() {
@@ -314,9 +325,9 @@ class Parser {
                 case PRINT:
                 case RETURN:
                     return;
+                default:
+                    advance();
             }
-
-            advance();
         }
     }
 }
