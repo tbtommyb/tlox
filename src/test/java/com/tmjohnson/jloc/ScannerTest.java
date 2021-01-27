@@ -14,8 +14,9 @@ public class ScannerTest {
                 new Token(TokenType.IDENTIFIER, "myname", null, 1), new Token(TokenType.EOF, "", null, 1) };
 
         String source = "1 + class else myname // comment";
-        Scanner scanner = new Scanner(source);
-        List<Token> output = scanner.scanTokens();
+        Lox lox = new Lox(ExecutionMode.BATCH);
+        Scanner scanner = new Scanner(lox);
+        List<Token> output = scanner.scanTokens(source);
         assertArrayEquals(output.toArray(), expected);
     }
 
@@ -26,8 +27,9 @@ public class ScannerTest {
                 new Token(TokenType.RIGHT_PAREN, ")", null, 4), new Token(TokenType.EOF, "", null, 4) };
 
         String source = "1.23 /* multilinecomment \n lots of text \n on multiple lines \n*/ (class)";
-        Scanner scanner = new Scanner(source);
-        List<Token> output = scanner.scanTokens();
+        Lox lox = new Lox(ExecutionMode.BATCH);
+        Scanner scanner = new Scanner(lox);
+        List<Token> output = scanner.scanTokens(source);
         assertArrayEquals(output.toArray(), expected);
     }
 }

@@ -3,7 +3,12 @@ package com.tmjohnson.jloc;
 import java.util.List;
 
 class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
+    private Lox lox;
     private Environment environment = new Environment();
+
+    public Interpreter(Lox lox) {
+        this.lox = lox;
+    }
 
     void interpret(List<Stmt> statements) {
         try {
@@ -11,7 +16,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
                 execute(statement);
             }
         } catch (RuntimeError error) {
-            Lox.runtimeError(error);
+            this.lox.runtimeError(error);
         }
     }
 
@@ -159,7 +164,10 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     @Override
     public Void visitExpressionStmt(Stmt.Expression stmt) {
         Object output = evaluate(stmt.expression);
-        System.out.println(stringify(output));
+
+        if (this.lox.executionMode == ExecutionMode.REPL) {
+            System.out.println(stringify(output));
+        }
 
         return null;
     }

@@ -48,9 +48,11 @@ class Parser {
     private final List<Token> tokens;
     private int current = 0;
     private boolean inLoop = false;
+    private Lox lox;
 
-    Parser(List<Token> tokens) {
+    Parser(Lox lox, List<Token> tokens) {
         this.tokens = tokens;
+        this.lox = lox;
     }
 
     List<Stmt> parse() {
@@ -435,7 +437,7 @@ class Parser {
     }
 
     private ParseError error(Token token, String message) {
-        Lox.error(token, message);
+        lox.error(token, message);
         return new ParseError();
     }
 

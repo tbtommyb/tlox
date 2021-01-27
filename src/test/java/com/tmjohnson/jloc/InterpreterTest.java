@@ -4,7 +4,6 @@ import static org.junit.Assert.assertEquals;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
-import java.util.List;
 
 import org.junit.After;
 import org.junit.Before;
@@ -13,10 +12,17 @@ import org.junit.Test;
 public class InterpreterTest {
     private final PrintStream standardOut = System.out;
     private final ByteArrayOutputStream outputStreamCaptor = new ByteArrayOutputStream();
+    private Lox lox;
+    private Interpreter interpreter;
+    private Scanner scanner;
 
     @Before
     public void setUp() {
         System.setOut(new PrintStream(outputStreamCaptor));
+
+        lox = new Lox(ExecutionMode.REPL);
+        interpreter = new Interpreter(lox);
+        scanner = new Scanner(lox);
     }
 
     @After
@@ -29,9 +35,7 @@ public class InterpreterTest {
         String input = "2 >= 1 ? 3 * 10 / 2 : -1;";
         String expected = "15";
 
-        Interpreter interpreter = new Interpreter();
-        List<Token> tokens = new Scanner(input).scanTokens();
-        Parser parser = new Parser(tokens);
+        Parser parser = new Parser(lox, scanner.scanTokens(input));
         interpreter.interpret(parser.parse());
 
         String output = outputStreamCaptor.toString();
@@ -43,9 +47,7 @@ public class InterpreterTest {
         String input = "4 + 4 - (-1 * 3);";
         String expected = "11";
 
-        Interpreter interpreter = new Interpreter();
-        List<Token> tokens = new Scanner(input).scanTokens();
-        Parser parser = new Parser(tokens);
+        Parser parser = new Parser(lox, scanner.scanTokens(input));
         interpreter.interpret(parser.parse());
 
         String output = outputStreamCaptor.toString();
@@ -57,9 +59,7 @@ public class InterpreterTest {
         String input = "2 != 3 == !(5 < 10);";
         String expected = "false";
 
-        Interpreter interpreter = new Interpreter();
-        List<Token> tokens = new Scanner(input).scanTokens();
-        Parser parser = new Parser(tokens);
+        Parser parser = new Parser(lox, scanner.scanTokens(input));
         interpreter.interpret(parser.parse());
 
         String output = outputStreamCaptor.toString();
@@ -71,9 +71,7 @@ public class InterpreterTest {
         String input = "(2, 3, 4) == 4;";
         String expected = "true";
 
-        Interpreter interpreter = new Interpreter();
-        List<Token> tokens = new Scanner(input).scanTokens();
-        Parser parser = new Parser(tokens);
+        Parser parser = new Parser(lox, scanner.scanTokens(input));
         interpreter.interpret(parser.parse());
 
         String output = outputStreamCaptor.toString();
@@ -85,9 +83,7 @@ public class InterpreterTest {
         String input = "4 * 4 + \"i love javascript\";";
         String expected = "16i love javascript";
 
-        Interpreter interpreter = new Interpreter();
-        List<Token> tokens = new Scanner(input).scanTokens();
-        Parser parser = new Parser(tokens);
+        Parser parser = new Parser(lox, scanner.scanTokens(input));
         interpreter.interpret(parser.parse());
 
         String output = outputStreamCaptor.toString();
