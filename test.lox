@@ -1,8 +1,10 @@
 var a = 0;
 
-for (var b = 0; b < 1000; b = b + 1) {
-    if (b > 10) {
-        print "b > 10, exit loop";
+while (a < 100) {
+    print a;
+    if (a == 9) {
+        print "break";
         break;
     }
+    a = a + 1;
 }

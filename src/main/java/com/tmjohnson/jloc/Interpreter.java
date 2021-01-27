@@ -205,8 +205,8 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         while (isTruthy(evaluate(stmt.condition))) {
             try {
                 execute(stmt.body);
-            } catch (Break breakStmt) {
-                return null;
+            } catch (BreakException breakStmt) {
+                break;
             }
         }
         return null;
@@ -221,7 +221,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     @Override
     public Void visitBreakStmt(Stmt.Break stmt) {
-        throw new Break();
+        throw new BreakException();
     }
 
     private boolean isTruthy(Object object) {

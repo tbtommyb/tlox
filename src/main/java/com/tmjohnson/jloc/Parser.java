@@ -136,12 +136,13 @@ class Parser {
         Expr condition = expression();
         consume(TokenType.RIGHT_PAREN, "Expect ')' after condition.");
 
-        inLoop = true;
+        this.inLoop = true;
         Stmt body = statement();
-        inLoop = false;
+        this.inLoop = false;
 
         return new Stmt.While(condition, body);
     }
+
 
     private Stmt breakStatement() {
         if (!inLoop) {

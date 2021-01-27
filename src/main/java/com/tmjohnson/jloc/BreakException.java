@@ -1,7 +1,7 @@
 package com.tmjohnson.jloc;
 
-class Break extends RuntimeException {
-    Break() {
+class BreakException extends RuntimeException {
+    BreakException() {
         super("Breaking out of loop");
     }
 }
