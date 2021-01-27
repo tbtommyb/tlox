@@ -12,15 +12,24 @@ public class GenerateAst {
             System.exit(64);
         }
         String outputDir = args[0];
+        // @formatter:off
         defineAst(outputDir, "Expr",
-                Arrays.asList("Assign : Token name, Expr value", "Binary : Expr left, Token operator, Expr right",
-                        "Grouping : Expr expression", "Literal : Object value",
-                        "Logical : Expr left, Token operator, Expr right", "Unary : Token operator, Expr right",
-                        "Variable : Token name", "Ternary : Expr condition, Expr thenClause, Expr elseClause"));
+                Arrays.asList("Assign   : Token name, Expr value",
+                              "Binary   : Expr left, Token operator, Expr right",
+                              "Grouping : Expr expression",
+                              "Literal  : Object value",
+                              "Logical  : Expr left, Token operator, Expr right",
+                              "Unary    : Token operator, Expr right",
+                              "Variable : Token name",
+                              "Ternary  : Expr condition, Expr thenClause, Expr elseClause"));
         defineAst(outputDir, "Stmt",
-                Arrays.asList("Block : List<Stmt> statements", "Expression : Expr expression",
-                        "If : Expr condition, Stmt thenBranch, Stmt elseBranch", "Print : Expr expression",
-                        "Var : Token name, Expr initializer"));
+                Arrays.asList("Block      : List<Stmt> statements",
+                              "Expression : Expr expression",
+                              "If         : Expr condition, Stmt thenBranch, Stmt elseBranch",
+                              "Print      : Expr expression",
+                              "Var        : Token name, Expr initializer",
+                              "While      : Expr condition, Stmt body", "Break : "));
+        // @formatter:on
     }
 
     private static void defineAst(String outputDir, String baseName, List<String> types) throws IOException {
@@ -53,8 +62,12 @@ public class GenerateAst {
         // Constructor
         writer.println("    " + className + "(" + fieldList + ") {");
 
-        // Store parameters in fields
-        String[] fields = fieldList.split(", ");
+        String[] fields;
+        if (fieldList.isEmpty()) {
+            fields = new String[0];
+        } else {
+            fields = fieldList.split(", ");
+        }
         for (String field : fields) {
             String name = field.split(" ")[1];
             writer.println("      this." + name + " = " + name + ";");

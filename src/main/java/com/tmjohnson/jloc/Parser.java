@@ -1,18 +1,25 @@
 package com.tmjohnson.jloc;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
-// TODO: what about comma operator?
 // program        → declaration* EOF ;
 // declaration    → varDecl
 //                | statement ;
 // statement      → exprStmt
+//                | forStmt
 //                | ifStmt
 //                | printStmt
+//                | whileStmt
+//                | breakStmt
 //                | block ;
+// forStmt        → "for" "(" ( varDecl | exprStmt | ";" ) expression?
+//                  ";" expression? ")" statement ;
 // ifStmt         → "if" "(" expression ")" statement
 //                  ( "else" statement )? ;
+// whileStmt      → "while" "(" expression ")" statement ;
+// breakStmt      → "break" ;
 // block          → "{" declaration* "}" ;
 // varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
 // exprStmt       → expression ";" ;
@@ -40,6 +47,7 @@ class Parser {
 
     private final List<Token> tokens;
     private int current = 0;
+    private boolean inLoop = false;
 
     Parser(List<Token> tokens) {
         this.tokens = tokens;
@@ -89,6 +97,15 @@ class Parser {
         if (match(TokenType.IF)) {
             return ifStatement();
         }
+        if (match(TokenType.WHILE)) {
+            return whileStatement();
+        }
+        if (match(TokenType.FOR)) {
+            return forStatement();
+        }
+        if (match(TokenType.BREAK)) {
+            return breakStatement();
+        }
         return expressionStatement();
     }
 
@@ -112,6 +129,67 @@ class Parser {
         return new Stmt.If(condition, thenBranch, elseBranch);
     }
 
+    private Stmt whileStatement() {
+        consume(TokenType.LEFT_PAREN, "Expect '(' after 'while'.");
+        Expr condition = expression();
+        consume(TokenType.RIGHT_PAREN, "Expect ')' after condition.");
+
+        inLoop = true;
+        Stmt body = statement();
+        inLoop = false;
+
+        return new Stmt.While(condition, body);
+    }
+
+    private Stmt breakStatement() {
+        if (!inLoop) {
+            throw error(previous(), "Expect `break` in loop.");
+        }
+        consume(TokenType.SEMICOLON, "Expect ; after break");
+        return new Stmt.Break();
+    }
+
+    private Stmt forStatement() {
+        consume(TokenType.LEFT_PAREN, "Expect '(' after 'for'.");
+
+        Stmt initializer;
+        if (match(TokenType.SEMICOLON)) {
+            initializer = null;
+        } else if (match(TokenType.VAR)) {
+            initializer = varDeclaration();
+        } else {
+            initializer = expressionStatement();
+        }
+
+        Expr condition = null;
+        if (!check(TokenType.SEMICOLON)) {
+            condition = expression();
+        }
+        consume(TokenType.SEMICOLON, "Expect ';' after loop condition.");
+
+        Expr increment = null;
+        if (!check(TokenType.RIGHT_PAREN)) {
+            increment = expression();
+        }
+        consume(TokenType.RIGHT_PAREN, "Expect ')' after for clauses.");
+
+        inLoop = true;
+        Stmt body = statement();
+
+        if (increment != null) {
+            body = new Stmt.Block(Arrays.asList(body, new Stmt.Expression(increment)));
+        }
+        if (condition == null) {
+            condition = new Expr.Literal(true);
+        }
+        body = new Stmt.While(condition, body);
+        if (initializer != null) {
+            body = new Stmt.Block(Arrays.asList(initializer, body));
+        }
+        inLoop = false;
+        return body;
+    }
+
     private Stmt expressionStatement() {
         Expr expr = expression();
         consume(TokenType.SEMICOLON, "Expect ';' after expression.");
@@ -130,6 +208,11 @@ class Parser {
     }
 
     private Expr expression() {
+        return comma();
+
+    }
+
+    private Expr comma() {
         Expr expr = assignment();
 
         while (match(TokenType.COMMA)) {
@@ -298,6 +381,10 @@ class Parser {
             Token op = previous();
             unary();
             throw error(op, "Expected left-hand operand.");
+        }
+        if (match(TokenType.BREAK)) {
+            Token op = previous();
+            throw error(op, "`break` can only be used in `for` or `while` loop");
         }
         throw error(peek(), "Expected expression.");
     }
