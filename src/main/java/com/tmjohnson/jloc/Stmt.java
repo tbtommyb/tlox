@@ -2,13 +2,15 @@ package com.tmjohnson.jloc;
 
 import java.util.List;
 
+import com.tmjohnson.jloc.Expr.Fun;
+
 abstract class Stmt {
     interface Visitor<R> {
         R visitBlockStmt(Block stmt);
 
         R visitExpressionStmt(Expression stmt);
 
-        R visitFunctionStmt(Function stmt);
+        R visitFunDeclStmt(FunDecl stmt);
 
         R visitIfStmt(If stmt);
 
@@ -49,21 +51,19 @@ abstract class Stmt {
         final Expr expression;
     }
 
-    static class Function extends Stmt {
-        Function(Token name, List<Token> params, List<Stmt> body) {
+    static class FunDecl extends Stmt {
+        FunDecl(Token name, Fun body) {
             this.name = name;
-            this.params = params;
             this.body = body;
         }
 
         @Override
         <R> R accept(Visitor<R> visitor) {
-            return visitor.visitFunctionStmt(this);
+            return visitor.visitFunDeclStmt(this);
         }
 
         final Token name;
-        final List<Token> params;
-        final List<Stmt> body;
+        final Fun body;
     }
 
     static class If extends Stmt {

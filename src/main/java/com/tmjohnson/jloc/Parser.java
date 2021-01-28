@@ -225,10 +225,15 @@ class Parser {
         return new Stmt.Expression(expr);
     }
 
-    private Stmt.Function function(String kind) {
+    private Stmt.FunDecl function(String kind) {
         Token name = consume(TokenType.IDENTIFIER, "Expect " + kind + " name.");
 
-        consume(TokenType.LEFT_PAREN, "Expect '(' after " + kind + " name.");
+        Expr.Fun body = funExpr(kind);
+        return new Stmt.FunDecl(name, body);
+    }
+
+    private Expr.Fun funExpr(String kind) {
+        consume(TokenType.LEFT_PAREN, "Expect '(' after" + kind + " name.");
 
         List<Token> parameters = new ArrayList<>();
         if (!check(TokenType.RIGHT_PAREN)) {
@@ -241,10 +246,11 @@ class Parser {
             } while (match(TokenType.COMMA));
         }
         consume(TokenType.RIGHT_PAREN, "Expect ')' after parameters.");
+        consume(TokenType.LEFT_BRACE, "Expect '{' before body.");
 
-        consume(TokenType.LEFT_BRACE, "Expect '{' before " + kind + " body.");
         List<Stmt> body = block();
-        return new Stmt.Function(name, parameters, body);
+
+        return new Expr.Fun(parameters, body);
     }
 
     private List<Stmt> block() {
@@ -261,28 +267,6 @@ class Parser {
     private Expr expression() {
         return comma();
 
-    }
-
-    private Expr funExpr() {
-        // TODO: refactor to remove duplication with function()
-        consume(TokenType.LEFT_PAREN, "Expect '(' after `fun`.");
-
-        List<Token> parameters = new ArrayList<>();
-        if (!check(TokenType.RIGHT_PAREN)) {
-            do {
-                if (parameters.size() >= 255) {
-                    error(peek(), "Can't have more than 255 parameters.");
-                }
-
-                parameters.add(consume(TokenType.IDENTIFIER, "Expect parameter name."));
-            } while (match(TokenType.COMMA));
-        }
-        consume(TokenType.RIGHT_PAREN, "Expect ')' after parameters.");
-
-        consume(TokenType.LEFT_BRACE, "Expect '{' before body.");
-        List<Stmt> body = block();
-
-        return new Expr.Fun(parameters, body);
     }
 
     private Expr comma() {
@@ -464,7 +448,7 @@ class Parser {
             return new Expr.Grouping(expr);
         }
         if (match(TokenType.FUN)) {
-            return funExpr();
+            return funExpr("function");
         }
 
         // Error productions
