@@ -22,6 +22,7 @@ public class GenerateAst {
                               "Logical  : Expr left, Token operator, Expr right",
                               "Unary    : Token operator, Expr right",
                               "Variable : Token name",
+                              "Fun      : List<Token> params, List<Stmt> body",
                               "Ternary  : Expr condition, Expr thenClause, Expr elseClause"));
         defineAst(outputDir, "Stmt",
                 Arrays.asList("Block      : List<Stmt> statements",

@@ -19,6 +19,7 @@ import java.util.List;
 // returnStmt     → "return" expression? ";" ;
 // funDecl        → "fun" function ;
 // function       → IDENTIFIER "(" parameters? ")" block ;
+// funExpr        → "fun" "(" parameters? ")" block ;
 // parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
 // forStmt        → "for" "(" ( varDecl | exprStmt | ";" ) expression?
 //                  ";" expression? ")" statement ;
@@ -31,7 +32,7 @@ import java.util.List;
 // exprStmt       → expression ";" ;
 // printStmt      → "print" expression ";" ;
 // expression     → assignment ;
-// assignment     → IDENTIFIER "=" assignment
+// assignment     → IDENTIFIER "=" expression
 //                | conditional;
 // conditional    → logic_or "?" expression ":" conditional ;
 // logic_or       → logic_and ( "or" logic_and )* ;
@@ -46,6 +47,7 @@ import java.util.List;
 // primary        → "true" | "false" | "nil"
 //                | NUMBER | STRING
 //                | "(" expression ")"
+//                | funExpr
 //                | IDENTIFIER ;
 
 class Parser {
@@ -261,6 +263,28 @@ class Parser {
 
     }
 
+    private Expr funExpr() {
+        // TODO: refactor to remove duplication with function()
+        consume(TokenType.LEFT_PAREN, "Expect '(' after `fun`.");
+
+        List<Token> parameters = new ArrayList<>();
+        if (!check(TokenType.RIGHT_PAREN)) {
+            do {
+                if (parameters.size() >= 255) {
+                    error(peek(), "Can't have more than 255 parameters.");
+                }
+
+                parameters.add(consume(TokenType.IDENTIFIER, "Expect parameter name."));
+            } while (match(TokenType.COMMA));
+        }
+        consume(TokenType.RIGHT_PAREN, "Expect ')' after parameters.");
+
+        consume(TokenType.LEFT_BRACE, "Expect '{' before body.");
+        List<Stmt> body = block();
+
+        return new Expr.Fun(parameters, body);
+    }
+
     private Expr comma() {
         Expr expr = assignment();
 
@@ -278,7 +302,7 @@ class Parser {
 
         if (match(TokenType.EQUAL)) {
             Token equals = previous();
-            Expr value = conditional();
+            Expr value = expression();
 
             if (expr instanceof Expr.Variable) {
                 Token name = ((Expr.Variable) expr).name;
@@ -438,6 +462,9 @@ class Parser {
             Expr expr = expression();
             consume(TokenType.RIGHT_PAREN, "Expected ')' after expression.");
             return new Expr.Grouping(expr);
+        }
+        if (match(TokenType.FUN)) {
+            return funExpr();
         }
 
         // Error productions

@@ -89,4 +89,28 @@ public class InterpreterTest {
         String output = outputStreamCaptor.toString();
         assertEquals(expected, output.substring(0, output.length() - 1));
     }
+
+    @Test
+    public void canPerformSimpleFunction() {
+        String input = "fun add(a, b) { return a + b; }\nadd(3, 4);";
+        String expected = "7";
+
+        Parser parser = new Parser(lox, scanner.scanTokens(input));
+        interpreter.interpret(parser.parse());
+
+        String output = outputStreamCaptor.toString();
+        assertEquals(expected, output.substring(0, output.length() - 1));
+    }
+
+    @Test
+    public void canAssignFunctionExpression() {
+        String input = "var add = fun (a, b) { return a + b; };\nadd(3, 4);";
+        String expected = "7";
+
+        Parser parser = new Parser(lox, scanner.scanTokens(input));
+        interpreter.interpret(parser.parse());
+
+        String output = outputStreamCaptor.toString();
+        assertEquals(expected, output.substring(0, output.length() - 1));
+    }
 }

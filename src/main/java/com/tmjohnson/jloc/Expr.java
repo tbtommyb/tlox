@@ -20,6 +20,8 @@ abstract class Expr {
 
         R visitVariableExpr(Variable expr);
 
+        R visitFunExpr(Fun expr);
+
         R visitTernaryExpr(Ternary expr);
     }
 
@@ -141,6 +143,21 @@ abstract class Expr {
         }
 
         final Token name;
+    }
+
+    static class Fun extends Expr {
+        Fun(List<Token> params, List<Stmt> body) {
+            this.params = params;
+            this.body = body;
+        }
+
+        @Override
+        <R> R accept(Visitor<R> visitor) {
+            return visitor.visitFunExpr(this);
+        }
+
+        final List<Token> params;
+        final List<Stmt> body;
     }
 
     static class Ternary extends Expr {
