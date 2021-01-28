@@ -75,10 +75,10 @@ class Parser {
 
     private Stmt declaration() {
         try {
-            if (match(TokenType.FUN)) {
+            if (check(TokenType.FUN) && checkNext(TokenType.IDENTIFIER)) {
+                consume(TokenType.FUN, null);
                 return function("function");
             }
-
             if (match(TokenType.VAR)) {
                 return varDeclaration();
             }
@@ -503,6 +503,16 @@ class Parser {
             return false;
         }
         return peek().type == type;
+    }
+
+    private boolean checkNext(TokenType tokenType) {
+        if (isAtEnd()) {
+            return false;
+        }
+        if (tokens.get(current + 1).type == TokenType.EOF) {
+            return false;
+        }
+        return tokens.get(current + 1).type == tokenType;
     }
 
     private Token advance() {
