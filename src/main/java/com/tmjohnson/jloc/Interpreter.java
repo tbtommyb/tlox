@@ -14,7 +14,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     public Interpreter(Lox lox) {
         this.lox = lox;
 
-        // TODO Tom: move this out somewhere better
+        // TODO: move this out somewhere better
         globals.define("clock", new LoxCallable() {
             @Override
             public int arity() {
@@ -230,14 +230,14 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     }
 
     @Override
-    public Void visitFunDeclStmt(Stmt.FunDecl stmt) {
-        LoxFunction function = new LoxFunction(stmt.name, stmt.body, environment);
+    public Void visitFunctionStmt(Stmt.Function stmt) {
+        LoxFunction function = new LoxFunction(stmt.name.lexeme, stmt.function, environment);
         environment.define(stmt.name.lexeme, function);
         return null;
     }
 
     @Override
-    public Object visitFunExpr(Expr.Fun expr) {
+    public Object visitFunctionExpr(Expr.Function expr) {
         return new LoxFunction(null, expr, environment);
     }
 

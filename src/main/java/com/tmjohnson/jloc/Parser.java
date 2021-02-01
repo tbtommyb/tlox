@@ -19,7 +19,7 @@ import java.util.List;
 // returnStmt     → "return" expression? ";" ;
 // funDecl        → "fun" function ;
 // function       → IDENTIFIER "(" parameters? ")" block ;
-// funExpr        → "fun" "(" parameters? ")" block ;
+// functionBody   → "fun" "(" parameters? ")" block ;
 // parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
 // forStmt        → "for" "(" ( varDecl | exprStmt | ";" ) expression?
 //                  ";" expression? ")" statement ;
@@ -47,7 +47,7 @@ import java.util.List;
 // primary        → "true" | "false" | "nil"
 //                | NUMBER | STRING
 //                | "(" expression ")"
-//                | funExpr
+//                | functionBody
 //                | IDENTIFIER ;
 
 class Parser {
@@ -225,14 +225,13 @@ class Parser {
         return new Stmt.Expression(expr);
     }
 
-    private Stmt.FunDecl function(String kind) {
+    private Stmt.Function function(String kind) {
         Token name = consume(TokenType.IDENTIFIER, "Expect " + kind + " name.");
 
-        Expr.Fun body = funExpr(kind);
-        return new Stmt.FunDecl(name, body);
+        return new Stmt.Function(name, functionBody(kind));
     }
 
-    private Expr.Fun funExpr(String kind) {
+    private Expr.Function functionBody(String kind) {
         consume(TokenType.LEFT_PAREN, "Expect '(' after" + kind + " name.");
 
         List<Token> parameters = new ArrayList<>();
@@ -250,7 +249,7 @@ class Parser {
 
         List<Stmt> body = block();
 
-        return new Expr.Fun(parameters, body);
+        return new Expr.Function(parameters, body);
     }
 
     private List<Stmt> block() {
@@ -448,7 +447,7 @@ class Parser {
             return new Expr.Grouping(expr);
         }
         if (match(TokenType.FUN)) {
-            return funExpr("function");
+            return functionBody("function");
         }
 
         // Error productions

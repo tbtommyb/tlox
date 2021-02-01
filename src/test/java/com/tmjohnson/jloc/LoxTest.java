@@ -9,14 +9,18 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+// TODO: replace with parameterised tests
 public class LoxTest {
     private final PrintStream standardOut = System.out;
+    private final PrintStream standardErr = System.err;
     private final ByteArrayOutputStream outputStreamCaptor = new ByteArrayOutputStream();
+    private final ByteArrayOutputStream errStreamCaptor = new ByteArrayOutputStream();
     private Lox lox;
 
     @Before
     public void setUp() {
         System.setOut(new PrintStream(outputStreamCaptor));
+        System.setErr(new PrintStream(errStreamCaptor));
 
         lox = new Lox(ExecutionMode.REPL);
     }
@@ -24,6 +28,7 @@ public class LoxTest {
     @After
     public void tearDown() {
         System.setOut(standardOut);
+        System.setOut(standardErr);
     }
 
     @Test
@@ -100,6 +105,17 @@ public class LoxTest {
         lox.run(input);
 
         String output = outputStreamCaptor.toString();
+        assertEquals(expected, output.substring(0, output.length() - 1));
+    }
+
+    @Test
+    public void canDetectUnusedLocalVariables() {
+        String input = "{var a = 1;\nvar b = 2;\nvar c = 3;\nprint a + b;}";
+        String expected = "[line 3] Error at 'c': Variable not used.";
+
+        lox.run(input);
+
+        String output = errStreamCaptor.toString();
         assertEquals(expected, output.substring(0, output.length() - 1));
     }
 }

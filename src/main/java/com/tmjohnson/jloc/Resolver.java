@@ -8,11 +8,29 @@ import java.util.Stack;
 class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     private final Interpreter interpreter;
     private final Lox lox;
-    private final Stack<Map<String, Boolean>> scopes = new Stack<>();
+    private final Stack<Map<String, Variable>> scopes = new Stack<>();
     private FunctionType currentFunction = FunctionType.NONE;
 
     private enum FunctionType {
         NONE, FUNCTION
+    }
+
+    private static class Variable {
+        final Token name;
+        VariableState state;
+
+        private Variable(Token name, VariableState state) {
+            this.name = name;
+            this.state = state;
+        }
+
+        public String toString() {
+            return this.name + ", " + this.state;
+        }
+    }
+
+    private enum VariableState {
+        DECLARED, DEFINED, USED
     }
 
     Resolver(Lox lox, Interpreter interpreter) {
@@ -30,16 +48,34 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         expr.accept(this);
     }
 
-    private void resolveFunction(Stmt.FunDecl function, FunctionType type) {
+    private void resolve(Stmt stmt) {
+        stmt.accept(this);
+    }
+
+    private void beginScope() {
+        scopes.push(new HashMap<String, Variable>());
+    }
+
+    private void endScope() {
+        Map<String, Variable> scope = scopes.pop();
+
+        scope.forEach((k, v) -> {
+            if (v.state != VariableState.USED) {
+                lox.error(v.name, "Variable not used.");
+            }
+        });
+    }
+
+    private void resolveFunction(Stmt.Function function, FunctionType type) {
         FunctionType enclosingFunction = currentFunction;
         currentFunction = type;
 
         beginScope();
-        for (Token param : function.body.params) {
+        for (Token param : function.function.params) {
             declare(param);
             define(param);
         }
-        resolve(function.body);
+        resolve(function.function.body);
         endScope();
         currentFunction = enclosingFunction;
     }
@@ -59,7 +95,7 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     }
 
     @Override
-    public Void visitFunDeclStmt(Stmt.FunDecl stmt) {
+    public Void visitFunctionStmt(Stmt.Function stmt) {
         declare(stmt.name);
         define(stmt.name);
 
@@ -119,18 +155,22 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
     @Override
     public Void visitVariableExpr(Expr.Variable expr) {
-        if (!scopes.isEmpty() && scopes.peek().get(expr.name.lexeme) == Boolean.FALSE) {
-            lox.error(expr.name, "Can't read local variable in its own initializer.");
+        if (!scopes.isEmpty()) {
+            Variable variable = scopes.peek().get(expr.name.lexeme);
+
+            if (variable != null && variable.state == VariableState.DECLARED) {
+                lox.error(expr.name, "Can't read local variable in its own initializer.");
+            }
         }
 
-        resolveLocal(expr, expr.name);
+        resolveLocal(expr, expr.name, VariableState.USED);
         return null;
     }
 
     @Override
     public Void visitAssignExpr(Expr.Assign expr) {
         resolve(expr.value);
-        resolveLocal(expr, expr.name);
+        resolveLocal(expr, expr.name, VariableState.DEFINED);
         return null;
     }
 
@@ -184,8 +224,9 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         return null;
     }
 
+    // TODO: remove duplication
     @Override
-    public Void visitFunExpr(Expr.Fun expr) {
+    public Void visitFunctionExpr(Expr.Function expr) {
         FunctionType enclosingFunction = currentFunction;
         currentFunction = FunctionType.FUNCTION;
 
@@ -200,42 +241,31 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         return null;
     }
 
-    private void resolve(Stmt stmt) {
-        stmt.accept(this);
-    }
-
-    private void beginScope() {
-        scopes.push(new HashMap<String, Boolean>());
-    }
-
-    private void endScope() {
-        scopes.pop();
-    }
-
     private void declare(Token name) {
         if (scopes.isEmpty()) {
             return;
         }
 
-        Map<String, Boolean> scope = scopes.peek();
+        Map<String, Variable> scope = scopes.peek();
         if (scope.containsKey(name.lexeme)) {
             lox.error(name, "Already variable with this name in this scope.");
         }
 
-        scope.put(name.lexeme, false);
+        scope.put(name.lexeme, new Variable(name, VariableState.DECLARED));
     }
 
     private void define(Token name) {
         if (scopes.isEmpty()) {
             return;
         }
-        scopes.peek().put(name.lexeme, true);
+        scopes.peek().get(name.lexeme).state = VariableState.DEFINED;
     }
 
-    private void resolveLocal(Expr expr, Token name) {
+    private void resolveLocal(Expr expr, Token name, VariableState variableState) {
         for (int i = scopes.size() - 1; i >= 0; i--) {
             if (scopes.get(i).containsKey(name.lexeme)) {
                 interpreter.resolve(expr, scopes.size() - 1 - i);
+                scopes.get(i).get(name.lexeme).state = variableState;
                 return;
             }
         }

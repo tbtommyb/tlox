@@ -3,11 +3,11 @@ package com.tmjohnson.jloc;
 import java.util.List;
 
 class LoxFunction implements LoxCallable {
-    private final Token name;
-    private final Expr.Fun declaration;
+    private final String name;
+    private final Expr.Function declaration;
     private final Environment closure;
 
-    LoxFunction(Token name, Expr.Fun declaration, Environment closure) {
+    LoxFunction(String name, Expr.Function declaration, Environment closure) {
         this.name = name;
         this.declaration = declaration;
         this.closure = closure;
@@ -38,6 +38,6 @@ class LoxFunction implements LoxCallable {
         if (name == null) {
             return "<fn>";
         }
-        return "<fn " + name.lexeme + ">";
+        return "<fn " + name + ">";
     }
 }
