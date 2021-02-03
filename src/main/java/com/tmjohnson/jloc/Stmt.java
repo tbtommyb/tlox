@@ -20,6 +20,8 @@ abstract class Stmt {
 
         R visitWhileStmt(While stmt);
 
+        R visitClassStmt(Class stmt);
+
         R visitBreakStmt(Break stmt);
     }
 
@@ -137,6 +139,21 @@ abstract class Stmt {
 
         final Expr condition;
         final Stmt body;
+    }
+
+    static class Class extends Stmt {
+        Class(Token name, List<Stmt.Function> methods) {
+            this.name = name;
+            this.methods = methods;
+        }
+
+        @Override
+        <R> R accept(Visitor<R> visitor) {
+            return visitor.visitClassStmt(this);
+        }
+
+        final Token name;
+        final List<Stmt.Function> methods;
     }
 
     static class Break extends Stmt {

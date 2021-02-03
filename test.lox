@@ -1,8 +1,13 @@
-fun pretendJS(callback) {
-    var a = 123;
-    callback(a);
+
+class Foo {
+  init() {
+    this.name = "Tom";
+  }
+
+  sayHello() {
+    print this.name;
+  }
 }
 
-pretendJS(fun (value) {
-    print value;
-});
+var foo = Foo();
+foo.sayHello();
