@@ -78,6 +78,13 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     public Void visitClassStmt(Stmt.Class stmt) {
         environment.define(stmt.name.lexeme, null);
 
+        Map<String, LoxFunction> classMethods = new HashMap<>();
+        for (Stmt.Function classMethod : stmt.classMethods) {
+            LoxFunction function = new LoxFunction(classMethod, environment, false);
+            classMethods.put(classMethod.name.lexeme, function);
+        }
+        LoxClass metaclass = new LoxClass(null, stmt.name.lexeme + " metaclass", classMethods);
+
         Map<String, LoxFunction> methods = new HashMap<>();
         for (Stmt.Function method : stmt.methods) {
             boolean isInitializer = method.name.lexeme.equals("init");
@@ -85,13 +92,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
             methods.put(method.name.lexeme, function);
         }
 
-        Map<String, LoxFunction> classMethods = new HashMap<>();
-        for (Stmt.Function classMethod : stmt.classMethods) {
-            LoxFunction function = new LoxFunction(classMethod, environment, false);
-            classMethods.put(classMethod.name.lexeme, function);
-        }
-
-        LoxClass klass = new LoxClass(stmt.name.lexeme, methods, classMethods);
+        LoxClass klass = new LoxClass(metaclass, stmt.name.lexeme, methods);
 
         environment.assign(stmt.name, klass);
         return null;

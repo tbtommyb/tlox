@@ -1,33 +1,16 @@
 package com.tmjohnson.jloc;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-class LoxClass implements LoxCallable {
+class LoxClass extends LoxInstance implements LoxCallable {
     final String name;
     private final Map<String, LoxFunction> methods;
-    private final Map<String, LoxFunction> classMethods;
 
-    LoxClass(String name, Map<String, LoxFunction> methods) {
+    LoxClass(LoxClass metaclass, String name, Map<String, LoxFunction> methods) {
+        super(metaclass);
         this.name = name;
         this.methods = methods;
-        this.classMethods = new HashMap<String, LoxFunction>();
-    }
-
-    LoxClass(String name, Map<String, LoxFunction> methods, Map<String, LoxFunction> classMethods) {
-        this.name = name;
-        this.methods = methods;
-        this.classMethods = classMethods;
-    }
-
-    Object get(Token name) {
-        LoxFunction method = classMethods.get(name.lexeme);
-        if (method != null) {
-            return method.bind(this);
-        }
-
-        throw new RuntimeError(name, "Undefined class method '" + name.lexeme + "'.");
     }
 
     LoxFunction findMethod(String name) {
