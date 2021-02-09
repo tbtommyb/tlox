@@ -77,9 +77,11 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         currentFunction = type;
 
         beginScope();
-        for (Token param : function.function.params) {
-            declare(param);
-            define(param);
+        if (function.function.params != null) {
+            for (Token param : function.function.params) {
+                declare(param);
+                define(param);
+            }
         }
         resolve(function.function.body);
         endScope();

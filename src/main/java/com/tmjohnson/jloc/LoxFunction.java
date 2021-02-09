@@ -17,8 +17,10 @@ class LoxFunction implements LoxCallable {
     public Object call(Interpreter interpreter, List<Object> arguments) {
         Environment environment = new Environment(closure);
 
-        for (int i = 0; i < declaration.function.params.size(); i++) {
-            environment.define(declaration.function.params.get(i).lexeme, arguments.get(i));
+        if (declaration.function.params != null) {
+            for (int i = 0; i < declaration.function.params.size(); i++) {
+                environment.define(declaration.function.params.get(i).lexeme, arguments.get(i));
+            }
         }
 
         try {
@@ -58,5 +60,9 @@ class LoxFunction implements LoxCallable {
             return "<fn>";
         }
         return "<fn " + declaration.name + ">";
+    }
+
+    public boolean isGetter() {
+        return declaration.function.params == null;
     }
 }

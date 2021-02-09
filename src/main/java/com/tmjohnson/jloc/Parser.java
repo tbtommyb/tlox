@@ -17,9 +17,10 @@ import java.util.List;
 //                | breakStmt
 //                | return
 //                | block ;
-// classDecl      → "class" IDENTIFIER "{" function* "}" ;
+// classDecl      → "class" IDENTIFIER "{" (function | classFunction) * "}" ;
 // returnStmt     → "return" expression? ";" ;
 // funDecl        → "fun" function ;
+// classFunction  → "class" function ;
 // function       → IDENTIFIER "(" parameters? ")" block ;
 // functionBody   → "fun" "(" parameters? ")" block ;
 // parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
@@ -104,7 +105,9 @@ class Parser {
         List<Stmt.Function> classMethods = new ArrayList<>();
         while (!check(TokenType.RIGHT_BRACE) && !isAtEnd()) {
             if (match(TokenType.CLASS)) {
-                classMethods.add(function("classMethod"));
+                classMethods.add(function("method"));
+            } else if (checkNext(TokenType.LEFT_BRACE)) {
+                methods.add(getter());
             } else {
                 methods.add(function("method"));
             }
@@ -248,6 +251,17 @@ class Parser {
         Expr expr = expression();
         consume(TokenType.SEMICOLON, "Expect ';' after expression.");
         return new Stmt.Expression(expr);
+    }
+
+    private Stmt.Function getter() {
+        Token name = consume(TokenType.IDENTIFIER, "Expect getter name.");
+
+        consume(TokenType.LEFT_BRACE, "Expect '{' before body.");
+
+        List<Stmt> body = block();
+        Expr.Function expr = new Expr.Function(null, body);
+
+        return new Stmt.Function(name, expr);
     }
 
     private Stmt.Function function(String kind) {
