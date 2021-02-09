@@ -1,13 +1,18 @@
-
-class Foo {
-  init() {
-    this.name = "Tom";
-  }
-
-  sayHello() {
-    print this.name;
-  }
+class Math {
+    init(message) {
+        this.message = message;
+    }
+    class PI(a) {
+        return 3.14 + a;
+    }
+    class hello(msg) {
+        return "class " + msg;
+    }
+    hello(input) {
+        return this.message + input;
+    }
 }
-
-var foo = Foo();
-foo.sayHello();
+print Math.PI(2);
+var math = Math("hello, ");
+print math.hello("Tom");
+print Math.hello("wat");

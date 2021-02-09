@@ -101,13 +101,18 @@ class Parser {
         consume(TokenType.LEFT_BRACE, "Expect '{' before class body.");
 
         List<Stmt.Function> methods = new ArrayList<>();
+        List<Stmt.Function> classMethods = new ArrayList<>();
         while (!check(TokenType.RIGHT_BRACE) && !isAtEnd()) {
-            methods.add(function("method"));
+            if (match(TokenType.CLASS)) {
+                classMethods.add(function("classMethod"));
+            } else {
+                methods.add(function("method"));
+            }
         }
 
         consume(TokenType.RIGHT_BRACE, "Expect '}' after class body.");
 
-        return new Stmt.Class(name, methods);
+        return new Stmt.Class(name, methods, classMethods);
     }
 
     private Stmt varDeclaration() {
@@ -252,7 +257,7 @@ class Parser {
     }
 
     private Expr.Function functionBody(String kind) {
-        consume(TokenType.LEFT_PAREN, "Expect '(' after" + kind + " name.");
+        consume(TokenType.LEFT_PAREN, "Expect '(' after " + kind + " name.");
 
         List<Token> parameters = new ArrayList<>();
         if (!check(TokenType.RIGHT_PAREN)) {

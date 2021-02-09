@@ -42,6 +42,11 @@ class LoxFunction implements LoxCallable {
         return new LoxFunction(declaration, environment, isInitializer);
     }
 
+    LoxFunction bind(LoxClass klass) {
+        Environment environment = new Environment(closure);
+        return new LoxFunction(declaration, environment, false);
+    }
+
     @Override
     public int arity() {
         return declaration.function.params.size();

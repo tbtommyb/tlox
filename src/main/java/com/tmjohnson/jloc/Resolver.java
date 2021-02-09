@@ -66,7 +66,7 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         Map<String, Variable> scope = scopes.pop();
 
         scope.forEach((k, v) -> {
-            if (v.state != VariableState.USED) {
+            if (v.name.lexeme != "this" && v.state != VariableState.USED) {
                 lox.error(v.name, "Variable not used.");
             }
         });
@@ -105,6 +105,12 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         beginScope();
         Token thisToken = new Token(TokenType.THIS, "this", null, 0); // TODO line num?
         scopes.peek().put("this", new Variable(thisToken, VariableState.DEFINED));
+
+        for (Stmt.Function classMethod : stmt.classMethods) {
+            FunctionType declaration = FunctionType.METHOD;
+
+            resolveFunction(classMethod, declaration);
+        }
 
         for (Stmt.Function method : stmt.methods) {
             FunctionType declaration = FunctionType.METHOD;

@@ -36,7 +36,7 @@ public class GenerateAst {
                               "Return     : Token keyword, Expr value",
                               "Var        : Token name, Expr initializer",
                               "While      : Expr condition, Stmt body",
-                              "Class      : Token name, List<Stmt.Function> methods",
+                              "Class      : Token name, List<Stmt.Function> methods, List<Stmt.Function> classMethods",
                               "Break : "));
         // @formatter:on
     }
