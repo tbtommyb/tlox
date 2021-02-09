@@ -9,6 +9,9 @@ A simple interpreter based on [Crafting Interpreters](https://craftinginterprete
 - Support for C-style comma operator.
 - Function expressions (lambdas).
 - `break` statements.
+- static classes.
+- getter methods.
+
 
 
 ## TODOs

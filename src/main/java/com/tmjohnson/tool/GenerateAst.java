@@ -19,6 +19,7 @@ public class GenerateAst {
                               "Call     : Expr callee, Token paren, List<Expr> arguments",
                               "Get      : Expr object, Token name",
                               "Set      : Expr object, Token name, Expr value",
+                              "Super    : Token keyword, Token method",
                               "This     : Token keyword",
                               "Grouping : Expr expression",
                               "Literal  : Object value",
@@ -36,7 +37,7 @@ public class GenerateAst {
                               "Return     : Token keyword, Expr value",
                               "Var        : Token name, Expr initializer",
                               "While      : Expr condition, Stmt body",
-                              "Class      : Token name, List<Stmt.Function> methods, List<Stmt.Function> classMethods",
+                              "Class      : Token name, Expr.Variable superclass, List<Stmt.Function> methods, List<Stmt.Function> classMethods",
                               "Break : "));
         // @formatter:on
     }

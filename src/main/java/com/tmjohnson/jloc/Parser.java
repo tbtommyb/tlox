@@ -4,55 +4,58 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-// program        → declaration* EOF ;
-// declaration    → funDecl
-//                | classDecl
-//                | varDecl
-//                | statement ;
-// statement      → exprStmt
-//                | forStmt
-//                | ifStmt
-//                | printStmt
-//                | whileStmt
-//                | breakStmt
-//                | return
-//                | block ;
-// classDecl      → "class" IDENTIFIER "{" (function | classFunction) * "}" ;
-// returnStmt     → "return" expression? ";" ;
-// funDecl        → "fun" function ;
-// classFunction  → "class" function ;
-// function       → IDENTIFIER "(" parameters? ")" block ;
-// functionBody   → "fun" "(" parameters? ")" block ;
-// parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
-// forStmt        → "for" "(" ( varDecl | exprStmt | ";" ) expression?
-//                  ";" expression? ")" statement ;
-// ifStmt         → "if" "(" expression ")" statement
-//                  ( "else" statement )? ;
-// whileStmt      → "while" "(" expression ")" statement ;
-// breakStmt      → "break" ;
-// block          → "{" declaration* "}" ;
-// varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
-// exprStmt       → expression ";" ;
-// printStmt      → "print" expression ";" ;
-// expression     → assignment ;
-// assignment     →  ( call "." )? IDENTIFIER "=" assignment
-//                | conditional;
-// conditional    → logic_or "?" expression ":" conditional ;
-// logic_or       → logic_and ( "or" logic_and )* ;
-// logic_and      → equality ( "and" equality )* ;
-// equality       → comparison ( ( "!=" | "==" ) comparison )* ;
-// comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
-// term           → factor ( ( "-" | "+" ) factor )* ;
-// factor         → unary ( ( "/" | "*" ) unary )* ;
-// unary          → ( "!" | "-" ) unary | call ;
-// call           → primary ( "(" arguments? ")" )* ;
-// call           → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
-// arguments      → expression ( "," expression )* ;
-// primary        → "true" | "false" | "nil"
-//                | NUMBER | STRING
-//                | "(" expression ")"
-//                | functionBody
-//                | IDENTIFIER ;
+/*
+program        → declaration* EOF ;
+declaration    → funDecl
+               | classDecl
+               | varDecl
+               | statement ;
+statement      → exprStmt
+               | forStmt
+               | ifStmt
+               | printStmt
+               | whileStmt
+               | breakStmt
+               | return
+               | block ;
+classDecl      → "class" IDENTIFIER ( "<" IDENTIFIER )?
+                 "{" (function | classFunction) * "}" ;
+returnStmt     → "return" expression? ";" ;
+funDecl        → "fun" function ;
+classFunction  → "class" function ;
+function       → IDENTIFIER "(" parameters? ")" block ;
+functionBody   → "fun" "(" parameters? ")" block ;
+parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
+forStmt        → "for" "(" ( varDecl | exprStmt | ";" ) expression?
+                 ";" expression? ")" statement ;
+ifStmt         → "if" "(" expression ")" statement
+                 ( "else" statement )? ;
+whileStmt      → "while" "(" expression ")" statement ;
+breakStmt      → "break" ;
+block          → "{" declaration* "}" ;
+varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
+exprStmt       → expression ";" ;
+printStmt      → "print" expression ";" ;
+expression     → assignment ;
+assignment     →  ( call "." )? IDENTIFIER "=" assignment
+               | conditional;
+conditional    → logic_or "?" expression ":" conditional ;
+logic_or       → logic_and ( "or" logic_and )* ;
+logic_and      → equality ( "and" equality )* ;
+equality       → comparison ( ( "!=" | "==" ) comparison )* ;
+comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
+term           → factor ( ( "-" | "+" ) factor )* ;
+factor         → unary ( ( "/" | "*" ) unary )* ;
+unary          → ( "!" | "-" ) unary | call ;
+call           → primary ( "(" arguments? ")" )* ;
+call           → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
+arguments      → expression ( "," expression )* ;
+primary        → "true" | "false" | "nil"
+               | NUMBER | STRING | IDENTIFIER
+               | "(" expression ")"
+               | functionBody
+               | "super" "." IDENTIFIER ;
+*/
 
 class Parser {
     private static class ParseError extends RuntimeException {
@@ -99,6 +102,13 @@ class Parser {
 
     private Stmt classDeclaration() {
         Token name = consume(TokenType.IDENTIFIER, "Expect class name.");
+
+        Expr.Variable superclass = null;
+        if (match(TokenType.LESS)) {
+            consume(TokenType.IDENTIFIER, "Expect superclass name.");
+            superclass = new Expr.Variable(previous());
+        }
+
         consume(TokenType.LEFT_BRACE, "Expect '{' before class body.");
 
         List<Stmt.Function> methods = new ArrayList<>();
@@ -115,7 +125,7 @@ class Parser {
 
         consume(TokenType.RIGHT_BRACE, "Expect '}' after class body.");
 
-        return new Stmt.Class(name, methods, classMethods);
+        return new Stmt.Class(name, superclass, methods, classMethods);
     }
 
     private Stmt varDeclaration() {
@@ -496,6 +506,12 @@ class Parser {
         }
         if (match(TokenType.THIS)) {
             return new Expr.This(previous());
+        }
+        if (match(TokenType.SUPER)) {
+            Token keyword = previous();
+            consume(TokenType.DOT, "Expect '.' after 'super'.");
+            Token method = consume(TokenType.IDENTIFIER, "Expect superclass method name.");
+            return new Expr.Super(keyword, method);
         }
         // Error productions
         if (match(TokenType.BANG_EQUAL, TokenType.EQUAL_EQUAL)) {
