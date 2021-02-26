@@ -75,6 +75,23 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     }
 
     @Override
+    public Void visitModuleStmt(Stmt.Module stmt) {
+        environment.define(stmt.name.lexeme, null);
+
+        Map<String, LoxFunction> methods = new HashMap<>();
+        for (Stmt.Function method : stmt.methods) {
+            LoxFunction function = new LoxFunction(method, environment, false);
+            methods.put(method.name.lexeme, function);
+        }
+
+        LoxModule module = new LoxModule(stmt.name.lexeme, methods);
+
+        environment.define(stmt.name.lexeme, module);
+
+        return null;
+    }
+
+    @Override
     public Void visitClassStmt(Stmt.Class stmt) {
         Object superclass = null;
         if (stmt.superclass != null) {
@@ -105,7 +122,16 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
             methods.put(method.name.lexeme, function);
         }
 
-        LoxClass klass = new LoxClass(metaclass, stmt.name.lexeme, (LoxClass) superclass, methods);
+        LoxModule module = null;
+        if (stmt.moduleName != null) {
+            // TODO defer until class initialisation so that module can come after
+            module = (LoxModule) environment.get(stmt.moduleName);
+            if (module == null) {
+                throw new RuntimeError(stmt.moduleName, "Cannot find module.");
+            }
+        }
+
+        LoxClass klass = new LoxClass(metaclass, stmt.name.lexeme, (LoxClass) superclass, methods, module);
 
         if (superclass != null) {
             environment = environment.enclosing;

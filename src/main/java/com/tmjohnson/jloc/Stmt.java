@@ -22,6 +22,8 @@ abstract class Stmt {
 
         R visitClassStmt(Class stmt);
 
+        R visitModuleStmt(Module stmt);
+
         R visitBreakStmt(Break stmt);
     }
 
@@ -142,11 +144,13 @@ abstract class Stmt {
     }
 
     static class Class extends Stmt {
-        Class(Token name, Expr.Variable superclass, List<Stmt.Function> methods, List<Stmt.Function> classMethods) {
+        Class(Token name, Expr.Variable superclass, List<Stmt.Function> methods, List<Stmt.Function> classMethods,
+                Token moduleName) {
             this.name = name;
             this.superclass = superclass;
             this.methods = methods;
             this.classMethods = classMethods;
+            this.moduleName = moduleName;
         }
 
         @Override
@@ -158,6 +162,22 @@ abstract class Stmt {
         final Expr.Variable superclass;
         final List<Stmt.Function> methods;
         final List<Stmt.Function> classMethods;
+        final Token moduleName;
+    }
+
+    static class Module extends Stmt {
+        Module(Token name, List<Stmt.Function> methods) {
+            this.name = name;
+            this.methods = methods;
+        }
+
+        @Override
+        <R> R accept(Visitor<R> visitor) {
+            return visitor.visitModuleStmt(this);
+        }
+
+        final Token name;
+        final List<Stmt.Function> methods;
     }
 
     static class Break extends Stmt {

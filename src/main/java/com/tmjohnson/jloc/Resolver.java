@@ -97,6 +97,23 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     }
 
     @Override
+    public Void visitModuleStmt(Stmt.Module stmt) {
+        declare(stmt.name);
+        define(stmt.name);
+
+        beginScope();
+        for (Stmt.Function method : stmt.methods) {
+            FunctionType declaration = FunctionType.METHOD;
+
+            resolveFunction(method, declaration);
+        }
+
+        endScope();
+
+        return null;
+    }
+
+    @Override
     public Void visitClassStmt(Stmt.Class stmt) {
         ClassType enclosingClass = currentClass;
         currentClass = ClassType.CLASS;

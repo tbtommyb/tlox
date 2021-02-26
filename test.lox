@@ -8,11 +8,11 @@ class Math {
     class hello(msg) {
         return "class " + msg;
     }
+    class printThis() {
+        return this;
+    }
     hello(input) {
         return this.message + input;
     }
 }
-print Math.PI(2);
-var math = Math("hello, ");
-print math.hello("Tom");
-print Math.hello("wat");
+print Math.printThis();

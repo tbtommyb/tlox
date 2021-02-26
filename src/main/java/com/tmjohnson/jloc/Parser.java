@@ -19,7 +19,9 @@ statement      → exprStmt
                | return
                | block ;
 classDecl      → "class" IDENTIFIER ( "<" IDENTIFIER )?
-                 "{" (function | classFunction) * "}" ;
+                 "{" include? (function | classFunction) * "}" ;
+include        → "include" IDENTIFIER ;
+returnStmt     → "return" expression? ";" ;
 returnStmt     → "return" expression? ";" ;
 funDecl        → "fun" function ;
 classFunction  → "class" function ;
@@ -89,6 +91,9 @@ class Parser {
             if (match(TokenType.CLASS)) {
                 return classDeclaration();
             }
+            if (match(TokenType.MODULE)) {
+                return moduleDeclaration();
+            }
             if (match(TokenType.VAR)) {
                 return varDeclaration();
             }
@@ -98,6 +103,21 @@ class Parser {
             synchronize();
             return null;
         }
+    }
+
+    private Stmt moduleDeclaration() {
+        Token name = consume(TokenType.IDENTIFIER, "Expect module name.");
+
+        consume(TokenType.LEFT_BRACE, "Expect '{' before class body.");
+
+        List<Stmt.Function> methods = new ArrayList<>();
+        while (!check(TokenType.RIGHT_BRACE) && !isAtEnd()) {
+            methods.add(function("method"));
+        }
+
+        consume(TokenType.RIGHT_BRACE, "Expect '}' after module body.");
+
+        return new Stmt.Module(name, methods);
     }
 
     private Stmt classDeclaration() {
@@ -110,6 +130,11 @@ class Parser {
         }
 
         consume(TokenType.LEFT_BRACE, "Expect '{' before class body.");
+
+        Token moduleName = null;
+        if (match(TokenType.INCLUDE)) {
+            moduleName = consume(TokenType.IDENTIFIER, "Expect module name.");
+        }
 
         List<Stmt.Function> methods = new ArrayList<>();
         List<Stmt.Function> classMethods = new ArrayList<>();
@@ -125,7 +150,7 @@ class Parser {
 
         consume(TokenType.RIGHT_BRACE, "Expect '}' after class body.");
 
-        return new Stmt.Class(name, superclass, methods, classMethods);
+        return new Stmt.Class(name, superclass, methods, classMethods, moduleName);
     }
 
     private Stmt varDeclaration() {
