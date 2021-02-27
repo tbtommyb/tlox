@@ -110,7 +110,7 @@ public class LoxTest {
 
     @Test
     public void canDetectUnusedLocalVariables() {
-        String input = "{var a = 1;\nvar b = 2;\nvar c = 3;\nprint a + b;}";
+        String input = "{var a = 1;\nvar b = 2;\nvar c = 3;\nprint(a + b);}";
         String expected = "[line 3] Error at 'c': Variable not used.";
 
         lox.run(input);

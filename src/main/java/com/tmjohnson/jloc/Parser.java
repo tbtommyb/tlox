@@ -167,9 +167,6 @@ class Parser {
     }
 
     private Stmt statement() {
-        if (match(TokenType.PRINT)) {
-            return printStatement();
-        }
         if (match(TokenType.LEFT_BRACE)) {
             return new Stmt.Block(block());
         }
@@ -642,7 +639,6 @@ class Parser {
                 case FOR:
                 case IF:
                 case WHILE:
-                case PRINT:
                 case RETURN:
                     return;
                 default:
