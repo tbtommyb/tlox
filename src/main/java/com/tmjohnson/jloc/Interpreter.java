@@ -84,9 +84,9 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
             methods.put(method.name.lexeme, function);
         }
 
-        LoxModule module = new LoxModule(stmt.name.lexeme, methods);
+        LoxModule module = new LoxModule(stmt.name, methods);
 
-        environment.define(stmt.name.lexeme, module);
+        environment.assign(stmt.name, module);
 
         return null;
     }
@@ -99,6 +99,24 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
             if (!(superclass instanceof LoxClass)) {
                 throw new RuntimeError(stmt.superclass.name, "Superclass must be a class.");
             }
+        }
+
+        Map<String, LoxFunction> methods = new HashMap<>();
+        for (Expr moduleName : stmt.modules) {
+            Object moduleObject = evaluate(moduleName);
+            if (!(moduleObject instanceof LoxModule)) {
+                Token name = ((Expr.Variable) moduleObject).name;
+                throw new RuntimeError(name, "'" + name.lexeme + "' is not a module.");
+            }
+
+            LoxModule module = (LoxModule) moduleObject;
+            module.methods.forEach((name, method) -> {
+                if (methods.containsKey(name)) {
+                    throw new RuntimeError(module.name, "A previous module declares a method named '" + name + "'.");
+                }
+                methods.put(name, method);
+            });
+
         }
 
         environment.define(stmt.name.lexeme, null);
@@ -115,23 +133,13 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         }
         LoxClass metaclass = new LoxClass(null, stmt.name.lexeme + " metaclass", (LoxClass) superclass, classMethods);
 
-        Map<String, LoxFunction> methods = new HashMap<>();
         for (Stmt.Function method : stmt.methods) {
             boolean isInitializer = method.name.lexeme.equals("init");
             LoxFunction function = new LoxFunction(method, environment, isInitializer);
             methods.put(method.name.lexeme, function);
         }
 
-        LoxModule module = null;
-        if (stmt.moduleName != null) {
-            // TODO defer until class initialisation so that module can come after
-            module = (LoxModule) environment.get(stmt.moduleName);
-            if (module == null) {
-                throw new RuntimeError(stmt.moduleName, "Cannot find module.");
-            }
-        }
-
-        LoxClass klass = new LoxClass(metaclass, stmt.name.lexeme, (LoxClass) superclass, methods, module);
+        LoxClass klass = new LoxClass(metaclass, stmt.name.lexeme, (LoxClass) superclass, methods);
 
         if (superclass != null) {
             environment = environment.enclosing;

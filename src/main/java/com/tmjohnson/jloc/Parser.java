@@ -131,9 +131,10 @@ class Parser {
 
         consume(TokenType.LEFT_BRACE, "Expect '{' before class body.");
 
-        Token moduleName = null;
-        if (match(TokenType.INCLUDE)) {
-            moduleName = consume(TokenType.IDENTIFIER, "Expect module name.");
+        List<Expr> modules = new ArrayList<>();
+        while (match(TokenType.INCLUDE)) {
+            consume(TokenType.IDENTIFIER, "Expect module name.");
+            modules.add(new Expr.Variable(previous()));
         }
 
         List<Stmt.Function> methods = new ArrayList<>();
@@ -150,7 +151,7 @@ class Parser {
 
         consume(TokenType.RIGHT_BRACE, "Expect '}' after class body.");
 
-        return new Stmt.Class(name, superclass, methods, classMethods, moduleName);
+        return new Stmt.Class(name, superclass, methods, classMethods, modules);
     }
 
     private Stmt varDeclaration() {

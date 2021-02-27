@@ -16,7 +16,7 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     }
 
     private enum ClassType {
-        NONE, CLASS, SUBCLASS
+        NONE, CLASS, SUBCLASS, MODULE
     }
 
     private ClassType currentClass = ClassType.NONE;
@@ -73,6 +73,11 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     }
 
     private void resolveFunction(Stmt.Function function, FunctionType type) {
+        if (currentClass == ClassType.MODULE && function.name.lexeme.equals("init")) {
+            lox.error(function.name, "Can't use 'init' methods in a module.");
+            return;
+        }
+
         FunctionType enclosingFunction = currentFunction;
         currentFunction = type;
 
@@ -101,15 +106,22 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         declare(stmt.name);
         define(stmt.name);
 
+        ClassType enclosingClass = currentClass;
+        currentClass = ClassType.MODULE;
+
         beginScope();
+
+        Token thisToken = new Token(TokenType.THIS, "this", null, 0);
+        scopes.peek().put("this", new Variable(thisToken, VariableState.DEFINED));
+
         for (Stmt.Function method : stmt.methods) {
             FunctionType declaration = FunctionType.METHOD;
-
             resolveFunction(method, declaration);
         }
 
         endScope();
 
+        currentClass = enclosingClass;
         return null;
     }
 
@@ -133,8 +145,13 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         }
 
         beginScope();
+
         Token thisToken = new Token(TokenType.THIS, "this", null, 0); // TODO line num?
         scopes.peek().put("this", new Variable(thisToken, VariableState.DEFINED));
+
+        for (Expr module : stmt.modules) {
+            resolve(module);
+        }
 
         for (Stmt.Function classMethod : stmt.classMethods) {
             FunctionType declaration = FunctionType.METHOD;
@@ -305,6 +322,8 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     public Void visitSuperExpr(Expr.Super expr) {
         if (currentClass == ClassType.NONE) {
             lox.error(expr.keyword, "Can't use 'super' outside of a class.");
+        } else if (currentClass == ClassType.MODULE) {
+            lox.error(expr.keyword, "Can't use 'super' in a module.");
         } else if (currentClass != ClassType.SUBCLASS) {
             lox.error(expr.keyword, "Can't use 'super' in a class with no superclass.");
         }

@@ -3,10 +3,10 @@ package com.tmjohnson.jloc;
 import java.util.Map;
 
 class LoxModule {
-    final String name;
+    final Token name;
     public final Map<String, LoxFunction> methods;
 
-    LoxModule(String name, Map<String, LoxFunction> methods) {
+    LoxModule(Token name, Map<String, LoxFunction> methods) {
         this.name = name;
         this.methods = methods;
     }
@@ -16,5 +16,10 @@ class LoxModule {
             return methods.get(name);
         }
         return null;
+    }
+
+    @Override
+    public String toString() {
+        return name.lexeme;
     }
 }

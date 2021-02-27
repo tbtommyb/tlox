@@ -7,33 +7,17 @@ class LoxClass extends LoxInstance implements LoxCallable {
     final String name;
     final LoxClass superclass;
     private final Map<String, LoxFunction> methods;
-    private final LoxModule module;
 
     LoxClass(LoxClass metaclass, String name, LoxClass superclass, Map<String, LoxFunction> methods) {
         super(metaclass);
         this.name = name;
         this.methods = methods;
         this.superclass = superclass;
-        this.module = null;
-    }
-
-    LoxClass(LoxClass metaclass, String name, LoxClass superclass, Map<String, LoxFunction> methods, LoxModule module) {
-        super(metaclass);
-        this.name = name;
-        this.methods = methods;
-        this.superclass = superclass;
-        this.module = module;
     }
 
     LoxFunction findMethod(String name) {
         if (methods.containsKey(name)) {
             return methods.get(name);
-        }
-        if (module != null) {
-            LoxFunction moduleMethod = module.findMethod(name);
-            if (moduleMethod != null) {
-                return moduleMethod;
-            }
         }
         if (superclass != null) {
             return superclass.findMethod(name);

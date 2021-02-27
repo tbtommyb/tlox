@@ -37,7 +37,7 @@ public class GenerateAst {
                               "Return     : Token keyword, Expr value",
                               "Var        : Token name, Expr initializer",
                               "While      : Expr condition, Stmt body",
-                              "Class      : Token name, Expr.Variable superclass, List<Stmt.Function> methods, List<Stmt.Function> classMethods, Token moduleName",
+                              "Class      : Token name, Expr.Variable superclass, List<Stmt.Function> methods, List<Stmt.Function> classMethods, List<Expr> modules",
                               "Module     : Token name, List<Stmt.Function> methods",
                               "Break : "));
         // @formatter:on
