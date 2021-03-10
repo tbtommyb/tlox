@@ -1,0 +1,25 @@
+module Comparator {
+  compare() {
+    print("Compare" + " " + "this");
+  }
+}
+module Lover {
+  loveTom() {
+    print("Tom is great");
+  }
+}
+
+class Doughnut {
+  include Comparator
+  include Lover
+
+  cook() {
+    print("Fry until golden brown.");
+    print(this.x);
+  }
+}
+
+var doughnut = Doughnut();
+doughnut.compare();
+doughnut.cook();
+doughnut.loveTom();
