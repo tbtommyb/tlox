@@ -1,21 +1,4 @@
-# jloc
+# interpreters
 
-A simple interpreter based on [Crafting Interpreters](https://craftinginterpreters.com).
+Jloc is a tree-walking interpreter. Cloc is a bytecode interpreter. Both based on [Crafting Interpreters](https://craftinginterpreters.com).
 
-## Minor improvements / challenges
-
-- C-style block quotes (not nested).
-- Support for C-style ternary operator (right-associative).
-- Support for C-style comma operator.
-- Function expressions (lambdas).
-- `break` statements.
-- static classes.
-- getter methods.
-
-
-
-## TODOs
-
-- [ ] make `print` a native function.
-- [ ] improve static analysis e.g. `break`.
-- [ ] add a basic type system.
