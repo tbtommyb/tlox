@@ -21,6 +21,11 @@
 },
 {
   "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc  -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/include   -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX10.14.sdk   -g -Wall -Wextra -pedantic -o CMakeFiles/cloc.dir/src/object.c.o   -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/object.c",
+  "file": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/object.c"
+},
+{
+  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/build",
   "command": "/Library/Developer/CommandLineTools/usr/bin/cc  -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/include   -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX10.14.sdk   -g -Wall -Wextra -pedantic -o CMakeFiles/cloc.dir/src/scanner.c.o   -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/scanner.c",
   "file": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/scanner.c"
 },
