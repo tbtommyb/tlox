@@ -7,6 +7,7 @@
 #include "debug.h"
 #include "memory.h"
 #include "object.h"
+#include "table.h"
 #include "vm.h"
 
 VM vm;
@@ -32,10 +33,12 @@ void initVM() {
   vm.stack = GROW_ARRAY(Value, vm.stack, 0, vm.stackCapacity);
   resetStack();
   vm.objects = NULL;
+  initTable(&vm.strings);
 }
 
 void freeVM() {
   FREE_ARRAY(Value, vm.stack, vm.stackCapacity);
+  freeTable(&vm.strings);
   freeObjects();
 }
 
