@@ -1,3 +1,11 @@
-fun function() {
-  return "hello, " + "world " + 43 / 3;
+{
+var tom = "1";
+var tam = "2";
+{
+const tam = "anything";
+tam = "what";
+}
+tam = "nothing";
+
+print tom + " " + tam + " loves compilers.";
 }

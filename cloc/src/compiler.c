@@ -42,6 +42,7 @@ typedef struct {
 typedef struct {
   Token name;
   int depth;
+  bool isConst;
 } Local;
 
 typedef struct {
@@ -181,6 +182,7 @@ static void synchronize() {
     }
     switch (parser.current.type) {
     case TOKEN_CLASS:
+    case TOKEN_CONST:
     case TOKEN_FUN:
     case TOKEN_VAR:
     case TOKEN_FOR:
@@ -221,13 +223,14 @@ static bool identifiersEqual(Token *a, Token *b) {
   return memcmp(a->start, b->start, a->length) == 0;
 }
 
-static int resolveLocal(Compiler *compiler, Token *name) {
+static int resolveLocal(Compiler *compiler, Token *name, Local **foundLocal) {
   for (int i = compiler->localCount - 1; i >= 0; i--) {
     Local *local = &compiler->locals[i];
     if (identifiersEqual(name, &local->name)) {
       if (local->depth == -1) {
         error("Can't read local variable in its own initializer.");
       }
+      *foundLocal = local;
       return i;
     }
   }
@@ -235,7 +238,7 @@ static int resolveLocal(Compiler *compiler, Token *name) {
   return -1;
 }
 
-static void addLocal(Token name) {
+static void addLocal(Token name, bool isConst) {
   if (current->localCount == UINT8_COUNT) {
     error("Too many local variables in function.");
     return;
@@ -244,9 +247,10 @@ static void addLocal(Token name) {
   Local *local = &current->locals[current->localCount++];
   local->name = name;
   local->depth = -1;
+  local->isConst = isConst;
 }
 
-static void declareVariable() {
+static void declareVariable(bool isConst) {
   if (current->scopeDepth == 0) {
     return;
   }
@@ -263,13 +267,13 @@ static void declareVariable() {
     }
   }
 
-  addLocal(*name);
+  addLocal(*name, isConst);
 }
 
-static uint8_t parseVariable(const char *errorMessage) {
+static uint8_t parseVariable(bool isConst, const char *errorMessage) {
   consume(TOKEN_IDENTIFIER, errorMessage);
 
-  declareVariable();
+  declareVariable(isConst);
   if (current->scopeDepth > 0) {
     return 0;
   }
@@ -361,8 +365,8 @@ static void block() {
   consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
 }
 
-static void varDeclaration() {
-  uint8_t global = parseVariable("Expect variable name.");
+static void varDeclaration(bool isConst) {
+  uint8_t global = parseVariable(isConst, "Expect variable name.");
 
   if (match(TOKEN_EQUAL)) {
     expression();
@@ -381,8 +385,14 @@ static void expressionStatement() {
 }
 
 static void declaration() {
-  if (match(TOKEN_VAR)) {
-    varDeclaration();
+  if (match(TOKEN_CONST)) {
+    if (current->scopeDepth == 0) {
+      error("const variables not supported at root level.");
+      return;
+    }
+    varDeclaration(true);
+  } else if (match(TOKEN_VAR)) {
+    varDeclaration(false);
   } else {
     statement();
   }
@@ -420,7 +430,8 @@ static void string(bool canAssign) {
 
 static void namedVariable(Token name, bool canAssign) {
   uint8_t getOp, setOp;
-  int arg = resolveLocal(current, &name);
+  Local *local;
+  int arg = resolveLocal(current, &name, &local);
 
   if (arg != -1) {
     getOp = OP_GET_LOCAL;
@@ -432,6 +443,10 @@ static void namedVariable(Token name, bool canAssign) {
   }
 
   if (canAssign && match(TOKEN_EQUAL)) {
+    if (local != NULL && local->isConst) {
+      error("Cannot reassign constant variable.");
+      return;
+    }
     expression();
     emitBytes(setOp, (uint8_t)arg);
   } else {
