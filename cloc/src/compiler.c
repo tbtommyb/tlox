@@ -293,6 +293,7 @@ static ParseRule *getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 
 static uint8_t identifierConstant(Token *name) {
+  // TODO: this code to implement consts is totally wrong
   /* ObjString *string = copyString(name->start, name->length); */
   /* Value indexValue; */
   /* if (tableGet(&stringConstants, string, &indexValue)) { */
