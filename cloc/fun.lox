@@ -1,11 +1,5 @@
-{
-var tom = "1";
-var tam = "2";
-{
-const tam = "anything";
-tam = "what";
+fun areWeHavingItYet() {
+  print "Yes we are!";
 }
-tam = "nothing";
 
-print tom + " " + tam + " loves compilers.";
-}
+print areWeHavingItYet;
