@@ -8,4 +8,4 @@ include_directories(include)
 
 add_executable(cloc ${sources} main.c)
 
-target_compile_options(cloc PUBLIC -g -Wall -Wextra -pedantic)
+target_compile_options(cloc PUBLIC -g -Wall -Wextra -pedantic -O1)

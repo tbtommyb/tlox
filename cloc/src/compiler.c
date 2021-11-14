@@ -710,7 +710,7 @@ static void ifStatement() {
 
 static void namedVariable(Token name, bool canAssign) {
   uint8_t getOp, setOp;
-  Local *local;
+  Local *local = NULL;
   int arg = resolveLocal(current, &name, &local);
 
   if (arg != -1) {
