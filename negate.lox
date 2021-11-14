@@ -1,0 +1,10 @@
+var start = clock();
+
+var number = 0;
+for (var i = 0; i < 100000000; i = i + 1) {
+  number = number + i;
+  number = -number;
+}
+
+print number;
+print clock() - start;

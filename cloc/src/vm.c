@@ -341,8 +341,8 @@ static InterpretResult run() {
         return INTERPRET_RUNTIME_ERROR;
       }
 
-      push(NUMBER_VAL(-AS_NUMBER(pop())));
-      /* break; */
+      vm.stack[vm.stackCount - 1] =
+          NUMBER_VAL(-AS_NUMBER(vm.stack[vm.stackCount - 1]));
       break;
     case OP_EQUAL: {
       Value b = pop();
