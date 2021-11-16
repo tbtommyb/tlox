@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "chunk.h"
 #include "common.h"
 #include "compiler.h"
 #include "memory.h"
@@ -15,6 +16,7 @@
 typedef struct {
   Token current;
   Token previous;
+  Token previousPrevious;
   bool hadError;
   bool panicMode;
 } Parser;
@@ -109,6 +111,7 @@ static void errorAtCurrent(const char *message) {
 }
 
 static void advance() {
+  parser.previousPrevious = parser.previous;
   parser.previous = parser.current;
 
   for (;;) {
@@ -825,6 +828,7 @@ static void declaration() {
     funDeclaration();
   } else if (match(TOKEN_CONST)) {
     if (current->scopeDepth == 0) {
+      // TODO: support root level consts
       error("const variables not supported at root level.");
       return;
     }
@@ -929,6 +933,40 @@ static void unary(bool canAssign) {
   }
 }
 
+static void postfixModification(bool canAssign, OpCode op) {
+  uint8_t setOp;
+  Local *local = NULL;
+  Token *token = &parser.previousPrevious;
+  int arg = resolveLocal(current, token, &local);
+
+  if (arg != -1) {
+    setOp = OP_SET_LOCAL;
+  } else if ((arg = resolveUpvalue(current, token)) != -1) {
+    setOp = OP_SET_UPVALUE;
+  } else {
+    arg = identifierConstant(token);
+    setOp = OP_SET_GLOBAL;
+  }
+
+  if (canAssign) {
+    if (local != NULL && local->isConst) {
+      error("Cannot reassign constant variable.");
+      return;
+    }
+    emitConstant(NUMBER_VAL(1));
+    emitByte(op);
+    emitBytes(setOp, (uint8_t)arg);
+  }
+}
+
+static void increment(bool canAssign) {
+  postfixModification(canAssign, OP_ADD);
+}
+
+static void decrement(bool canAssign) {
+  postfixModification(canAssign, OP_SUBTRACT);
+}
+
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
@@ -971,6 +1009,8 @@ ParseRule rules[] = {
     [TOKEN_ERROR] = {NULL, NULL, PREC_NONE},
     [TOKEN_EOF] = {NULL, NULL, PREC_NONE},
     [TOKEN_QUESTION] = {NULL, ternary, PREC_OR},
+    [TOKEN_PLUS_PLUS] = {NULL, increment, PREC_CALL},
+    [TOKEN_MINUS_MINUS] = {NULL, decrement, PREC_CALL},
 };
 
 static void parsePrecedence(Precedence precedence) {
