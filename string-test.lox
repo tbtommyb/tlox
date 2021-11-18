@@ -1,0 +1,4 @@
+var first = "Tom";
+var second = "Johnson";
+
+print first + " " + second;

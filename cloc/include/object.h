@@ -60,8 +60,8 @@ typedef struct {
 struct ObjString {
   Obj obj;
   int length;
-  char *chars;
   uint32_t hash;
+  char chars[];
 };
 
 typedef struct ObjUpvalue {
@@ -99,8 +99,9 @@ typedef struct {
 ObjClosure *newClosure(ObjFunction *function);
 ObjFunction *newFunction();
 ObjNative *newNative(NativeFn function);
-ObjString *takeString(char *chars, int length);
+ObjString *makeString(int length);
 ObjString *copyString(const char *chars, int length);
+ObjString *concatenateStrings(ObjString *a, ObjString *b);
 ObjUpvalue *newUpvalue(Value *slot);
 ObjClass *newClass(ObjString *name);
 ObjInstance *newInstance(ObjClass *klass);

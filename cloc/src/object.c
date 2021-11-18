@@ -73,15 +73,10 @@ ObjNative *newNative(NativeFn function) {
   return native;
 }
 
-static ObjString *allocateString(char *chars, int length, uint32_t hash) {
-  ObjString *string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
+ObjString *makeString(int length) {
+  ObjString *string =
+      (ObjString *)allocateObject(sizeof(ObjString) + length + 1, OBJ_STRING);
   string->length = length;
-  string->chars = chars;
-  string->hash = hash;
-
-  push(OBJ_VAL(string));
-  tableSet(&vm.strings, string, NIL_VAL);
-  pop();
 
   return string;
 }
@@ -96,18 +91,6 @@ static uint32_t hashString(const char *key, int length) {
   return hash;
 }
 
-ObjString *takeString(char *chars, int length) {
-  uint32_t hash = hashString(chars, length);
-
-  ObjString *interned = tableFindString(&vm.strings, chars, length, hash);
-  if (interned != NULL) {
-    FREE_ARRAY(char, chars, length + 1);
-    return interned;
-  }
-
-  return allocateString(chars, length, hash);
-}
-
 ObjString *copyString(const char *chars, int length) {
   uint32_t hash = hashString(chars, length);
 
@@ -116,11 +99,43 @@ ObjString *copyString(const char *chars, int length) {
     return interned;
   }
 
-  char *heapChars = ALLOCATE(char, length + 1);
-  memcpy(heapChars, chars, length);
-  heapChars[length] = '\0';
+  ObjString *string = makeString(length);
 
-  return allocateString(heapChars, length, hash);
+  memcpy(string->chars, chars, length);
+  string->chars[length] = '\0';
+  string->hash = hash;
+
+  push(OBJ_VAL(string));
+  tableSet(&vm.strings, string, NIL_VAL);
+  pop();
+
+  return string;
+}
+
+ObjString *concatenateStrings(ObjString *a, ObjString *b) {
+  int length = a->length + b->length;
+
+  ObjString *result = makeString(length);
+  memcpy(result->chars, a->chars, a->length);
+  memcpy(result->chars + a->length, b->chars, b->length);
+  result->chars[length] = '\0';
+
+  uint32_t hash = hashString(result->chars, length);
+  result->hash = hash;
+
+  ObjString *interned =
+      tableFindString(&vm.strings, result->chars, length, hash);
+  if (interned != NULL) {
+    FREE(ObjString, result);
+    return interned;
+  }
+
+  push(OBJ_VAL(result));
+  tableSet(&vm.strings, result, NIL_VAL);
+  pop();
+
+  FREE(ObjString, interned);
+  return result;
 }
 
 ObjUpvalue *newUpvalue(Value *slot) {
