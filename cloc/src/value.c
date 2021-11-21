@@ -24,6 +24,8 @@ bool valuesEqual(Value a, Value b) {
     return AS_NUMBER(a) == AS_NUMBER(b);
   case VAL_OBJ:
     return AS_OBJ(a) == AS_OBJ(b);
+  case VAL_EMPTY:
+    return true;
   default:
     return false; // Unreachable.
   }
@@ -78,6 +80,38 @@ void printValue(Value value) {
   case VAL_OBJ:
     printObject(value);
     break;
+  case VAL_EMPTY:
+    printf("<empty>");
+    break;
   }
 #endif
+}
+
+static uint32_t hashDouble(double value) {
+  union BitCast {
+    double value;
+    uint32_t ints[2];
+  };
+
+  union BitCast cast;
+  cast.value = (value) + 1.0;
+  return cast.ints[0] + cast.ints[1];
+}
+
+uint32_t computeHash(Value value) {
+  if (IS_BOOL(value)) {
+    return AS_BOOL(value) ? 3 : 5;
+  }
+  if (IS_NIL(value)) {
+    return 7;
+  }
+  if (IS_NUMBER(value)) {
+    return hashDouble(AS_NUMBER(value));
+  }
+  if (IS_OBJ(value)) {
+    return AS_STRING(value)->hash;
+  }
+  if (IS_EMPTY(value)) {
+    return 0;
+  }
 }

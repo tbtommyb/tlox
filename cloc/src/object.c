@@ -106,7 +106,7 @@ ObjString *copyString(const char *chars, int length) {
   string->hash = hash;
 
   push(OBJ_VAL(string));
-  tableSet(&vm.strings, string, NIL_VAL);
+  tableSet(&vm.strings, OBJ_VAL(string), NIL_VAL);
   pop();
 
   return string;
@@ -131,7 +131,7 @@ ObjString *concatenateStrings(ObjString *a, ObjString *b) {
   }
 
   push(OBJ_VAL(result));
-  tableSet(&vm.strings, result, NIL_VAL);
+  tableSet(&vm.strings, OBJ_VAL(result), NIL_VAL);
   pop();
 
   FREE(ObjString, interned);
