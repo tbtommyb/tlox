@@ -2,6 +2,7 @@
 #define clox_value_h
 
 #include "common.h"
+#include <stdio.h>
 #include <string.h>
 
 typedef struct Obj Obj;
@@ -90,7 +91,7 @@ bool valuesEqual(Value a, Value b);
 void initValueArray(ValueArray *array);
 void writeValueArray(ValueArray *array, Value value);
 void freeValueArray(ValueArray *array);
-void printValue(Value value);
+void printValue(FILE *stream, Value value);
 uint32_t computeHash(Value value);
 
 #endif

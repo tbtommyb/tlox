@@ -1,2 +1,11 @@
 .cache
-build
+.log
+build/cloc
+**/*/CMakeFiles/
+CMakeFiles/
+CMakeCache.txt
+Testing/Temporary/*
+cmake_install.txt
+CTestTestfile.cmake
+src/libcloc.a
+tests/check_cloc

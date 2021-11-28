@@ -1,52 +1,57 @@
 [
 {
-  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/build",
-  "command": "/Library/Developer/CommandLineTools/usr/bin/cc  -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/include    -g -Wall -Wextra -pedantic -o CMakeFiles/cloc.dir/src/chunk.c.o   -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/chunk.c",
+  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/cloc -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/chunk.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/chunk.c",
   "file": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/chunk.c"
 },
 {
-  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/build",
-  "command": "/Library/Developer/CommandLineTools/usr/bin/cc  -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/include    -g -Wall -Wextra -pedantic -o CMakeFiles/cloc.dir/src/compiler.c.o   -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/compiler.c",
+  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/cloc -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/compiler.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/compiler.c",
   "file": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/compiler.c"
 },
 {
-  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/build",
-  "command": "/Library/Developer/CommandLineTools/usr/bin/cc  -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/include    -g -Wall -Wextra -pedantic -o CMakeFiles/cloc.dir/src/debug.c.o   -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/debug.c",
+  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/cloc -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/debug.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/debug.c",
   "file": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/debug.c"
 },
 {
-  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/build",
-  "command": "/Library/Developer/CommandLineTools/usr/bin/cc  -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/include    -g -Wall -Wextra -pedantic -o CMakeFiles/cloc.dir/src/memory.c.o   -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/memory.c",
+  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/cloc -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/memory.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/memory.c",
   "file": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/memory.c"
 },
 {
-  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/build",
-  "command": "/Library/Developer/CommandLineTools/usr/bin/cc  -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/include    -g -Wall -Wextra -pedantic -o CMakeFiles/cloc.dir/src/object.c.o   -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/object.c",
+  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/cloc -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/object.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/object.c",
   "file": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/object.c"
 },
 {
-  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/build",
-  "command": "/Library/Developer/CommandLineTools/usr/bin/cc  -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/include    -g -Wall -Wextra -pedantic -o CMakeFiles/cloc.dir/src/scanner.c.o   -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/scanner.c",
+  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/cloc -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/scanner.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/scanner.c",
   "file": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/scanner.c"
 },
 {
-  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/build",
-  "command": "/Library/Developer/CommandLineTools/usr/bin/cc  -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/include    -g -Wall -Wextra -pedantic -o CMakeFiles/cloc.dir/src/table.c.o   -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/table.c",
+  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/cloc -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/table.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/table.c",
   "file": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/table.c"
 },
 {
-  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/build",
-  "command": "/Library/Developer/CommandLineTools/usr/bin/cc  -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/include    -g -Wall -Wextra -pedantic -o CMakeFiles/cloc.dir/src/value.c.o   -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/value.c",
+  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/cloc -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/value.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/value.c",
   "file": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/value.c"
 },
 {
-  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/build",
-  "command": "/Library/Developer/CommandLineTools/usr/bin/cc  -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/include    -g -Wall -Wextra -pedantic -o CMakeFiles/cloc.dir/src/vm.c.o   -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/vm.c",
+  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/cloc -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/vm.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/vm.c",
   "file": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/vm.c"
 },
 {
+  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/tests",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/cloc -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/tests/../src -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/tests/../include -I/usr/local/Cellar/check/0.15.2/include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/check_cloc.dir/check_cloc.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/tests/check_cloc.c",
+  "file": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/tests/check_cloc.c"
+},
+{
   "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/build",
-  "command": "/Library/Developer/CommandLineTools/usr/bin/cc  -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/include    -g -Wall -Wextra -pedantic -o CMakeFiles/cloc.dir/main.c.o   -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/main.c",
-  "file": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/main.c"
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/cloc -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/build/../src -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/build/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -g -Wall -Wextra -pedantic -O1 -o CMakeFiles/cloc-bin.dir/main.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/build/main.c",
+  "file": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/build/main.c"
 }
 ]

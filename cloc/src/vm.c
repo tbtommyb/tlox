@@ -254,7 +254,7 @@ static void concatenate() {
   push(OBJ_VAL(result));
 }
 
-static InterpretResult run() {
+static InterpretResult run(FILE *stream) {
   CallFrame *frame = &vm.frames[vm.frameCount - 1];
 
 #define READ_BYTE() (*frame->ip++)
@@ -351,8 +351,8 @@ static InterpretResult run() {
       BINARY_OP(BOOL_VAL, <);
       break;
     case OP_PRINT: {
-      printValue(pop());
-      printf("\n");
+      printValue(stream, pop());
+      fprintf(stream, "\n");
       break;
     }
     case OP_JUMP: {
@@ -549,7 +549,7 @@ static InterpretResult run() {
 #undef BINARY_OP
 }
 
-InterpretResult interpret(const char *source) {
+InterpretResult interpret(const char *source, FILE *stream) {
   ObjFunction *function = compile(source);
   if (function == NULL) {
     return INTERPRET_COMPILE_ERROR;
@@ -561,5 +561,5 @@ InterpretResult interpret(const char *source) {
   push(OBJ_VAL(closure));
   call(closure, 0);
 
-  return run();
+  return run(stream);
 }

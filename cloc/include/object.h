@@ -6,6 +6,8 @@
 #include "table.h"
 #include "value.h"
 
+#include <stdio.h>
+
 #define OBJ_TYPE(value) (AS_OBJ(value)->type)
 
 #define IS_FUNCTION(value) isObjType(value, OBJ_FUNCTION)
@@ -107,7 +109,7 @@ ObjClass *newClass(ObjString *name);
 ObjInstance *newInstance(ObjClass *klass);
 ObjBoundMethod *newBoundMethod(Value receiver, ObjClosure *method);
 
-void printObject(Value value);
+void printObject(FILE *stream, Value value);
 
 static inline bool isObjType(Value value, ObjType type) {
   return IS_OBJ(value) && AS_OBJ(value)->type == type;
