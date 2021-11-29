@@ -8,20 +8,20 @@ START_TEST(sanity_check) {
   initVM();
 
   const char *input = "print 5 + 5;\n";
-  FILE *tmp = tmpfile();
+  FILE *temp = tmpfile();
+
+  interpret(input, temp);
+
+  const int temp_length = ftell(temp);
   char buffer[100];
+  rewind(temp);
+  fgets(buffer, temp_length, temp);
+  fclose(temp);
 
-  interpret(input, tmp);
+  char actual[temp_length + 1];
+  sprintf(actual, "expected output: 10, got: %.*s\n", temp_length, buffer);
 
-  const int tmp_length = ftell(tmp);
-  printf("tmp_length %d\n", tmp_length);
-  rewind(tmp);
-
-  fgets(buffer, tmp_length, tmp);
-  fclose(tmp);
-  // printf("%.*s\n", tmp_length, buffer);
-
-  ck_assert_msg(strcmp(buffer, "10\0") == 0, "expected output '10'");
+  ck_assert_msg(strcmp(buffer, "10\0") == 0, actual);
   freeVM();
 }
 END_TEST
