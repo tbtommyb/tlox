@@ -8,3 +8,7 @@ $ make
 $ make build # or make test
 $ ./build/cloc
 ```
+
+## TODOs
+
+- [ ] fix line numbers in error messages

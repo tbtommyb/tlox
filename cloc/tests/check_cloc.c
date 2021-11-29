@@ -4,40 +4,146 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-START_TEST(sanity_check) {
+static char *readFile(const char *path) {
+  FILE *file = fopen(path, "rb");
+  if (file == NULL) {
+    fprintf(stderr, "Could not open file \"%s\".\n", path);
+    exit(74);
+  }
+
+  fseek(file, 0L, SEEK_END);
+  size_t fileSize = ftell(file);
+  rewind(file);
+
+  char *buffer = (char *)malloc(fileSize + 1);
+  if (buffer == NULL) {
+    fprintf(stderr, "Not enough memory to read \"%s\".\n", path);
+    exit(75);
+  }
+
+  size_t bytesRead = fread(buffer, sizeof(char), fileSize, file);
+  if (bytesRead < fileSize) {
+    fprintf(stderr, "Could not read file \"%s\".\n", path);
+    exit(76);
+  }
+  buffer[bytesRead] = '\0';
+
+  fclose(file);
+  return buffer;
+}
+
+START_TEST(simpleAddition) {
   initVM();
 
   const char *input = "print 5 + 5;\n";
-  FILE *temp = tmpfile();
+  FILE *output = tmpfile();
 
-  interpret(input, temp);
+  interpret(input, output);
 
-  const int temp_length = ftell(temp);
-  char buffer[100];
-  rewind(temp);
-  fgets(buffer, temp_length, temp);
-  fclose(temp);
+  const int outputLength = ftell(output);
+  char *outputBuffer = calloc(outputLength + 1, sizeof(char));
+  rewind(output);
+  fgets(outputBuffer, outputLength, output);
+  fclose(output);
 
-  char actual[temp_length + 1];
-  sprintf(actual, "expected output: 10, got: %.*s\n", temp_length, buffer);
-
-  ck_assert_msg(strcmp(buffer, "10\0") == 0, actual);
+  const char *expected = "10\0";
+  ck_assert_msg(strcmp(outputBuffer, expected) == 0,
+                "Expected %s, but got %.*s", expected, outputLength,
+                outputBuffer);
   freeVM();
 }
 END_TEST
 
+START_TEST(simpleConcatenation) {
+  initVM();
+
+  const char *input = "print \"hello \" + \"world\";";
+  FILE *output = tmpfile();
+
+  interpret(input, output);
+
+  const int outputLength = ftell(output);
+  char *outputBuffer = calloc(outputLength + 1, sizeof(char));
+  rewind(output);
+  fgets(outputBuffer, outputLength, output);
+  fclose(output);
+
+  const char *expected = "hello world\0";
+  ck_assert_msg(strcmp(outputBuffer, expected) == 0,
+                "Expected %s, but got %.*s", expected, outputLength,
+                outputBuffer);
+  freeVM();
+}
+END_TEST
+
+START_TEST(fileInheritance) {
+  initVM();
+
+  const char *input = readFile("./tests/testCases/simpleInheritance.lox");
+  FILE *output = tmpfile();
+
+  interpret(input, output);
+
+  const int outputLength = ftell(output);
+  char *outputBuffer = calloc(outputLength + 1, sizeof(char));
+  rewind(output);
+  fgets(outputBuffer, outputLength, output);
+  fclose(output);
+  const char *expected = "Dunk in the fryer. Finish with icing\0";
+
+  ck_assert_msg(strcmp(outputBuffer, expected) == 0,
+                "Expected '%s', but got '%.*s'", expected, outputLength,
+                outputBuffer);
+  freeVM();
+}
+END_TEST
+
+Suite * singleLineInputSuite(void)
+{
+    Suite *s;
+    TCase *arithmeticTestCases;
+    TCase *stringsTestCases;
+
+    s = suite_create("SingleLineInputs");
+
+    // Arithmetic tests
+    arithmeticTestCases = tcase_create("Arithmetic");
+
+    tcase_add_test(arithmeticTestCases, simpleAddition);
+    suite_add_tcase(s, arithmeticTestCases);
+
+    // Strings tests
+    stringsTestCases = tcase_create("Strings");
+
+    tcase_add_test(stringsTestCases, simpleConcatenation);
+    suite_add_tcase(s, stringsTestCases);
+
+    return s;
+}
+
+Suite * fileInputSuite(void)
+{
+    Suite *s;
+    TCase *classesTestCases;
+
+    s = suite_create("FileInputs");
+
+    // Classes tests
+    classesTestCases = tcase_create("Classes");
+
+    tcase_add_test(classesTestCases, fileInheritance);
+    suite_add_tcase(s, classesTestCases);
+
+    return s;
+}
+
 int main(void) {
-  Suite *s1 = suite_create("Core");
-  TCase *tc1_1 = tcase_create("Core");
-  SRunner *sr = srunner_create(s1);
-  int nf;
+  SRunner *suiteRunner = srunner_create(singleLineInputSuite());
+  srunner_add_suite(suiteRunner, fileInputSuite());
 
-  suite_add_tcase(s1, tc1_1);
-  tcase_add_test(tc1_1, sanity_check);
+  srunner_run_all(suiteRunner, CK_ENV);
+  int testFailCount = srunner_ntests_failed(suiteRunner);
+  srunner_free(suiteRunner);
 
-  srunner_run_all(sr, CK_ENV);
-  nf = srunner_ntests_failed(sr);
-  srunner_free(sr);
-
-  return nf == 0 ? 0 : 1;
+  return testFailCount == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
