@@ -8,6 +8,8 @@
 #include "compiler.h"
 #include "memory.h"
 #include "scanner.h"
+#include "table.h"
+#include "value.h"
 
 #ifdef DEBUG_PRINT_CODE
 #include "debug.h"
@@ -83,6 +85,7 @@ Parser parser;
 Compiler *current = NULL;
 ClassCompiler *currentClass = NULL;
 Table stringConstants;
+Table globalConsts;
 
 static Chunk *currentChunk() { return &current->function->chunk; }
 
@@ -436,12 +439,24 @@ static void declareVariable(bool isConst) {
 static uint8_t parseVariable(bool isConst, const char *errorMessage) {
   consume(TOKEN_IDENTIFIER, errorMessage);
 
+  Token token = parser.previous;
+  if (tableFindString(&globalConsts, token.start, token.length)) {
+    error("Cannot redeclare a const variable");
+    return 0;
+  }
+
   declareVariable(isConst);
+
   if (current->scopeDepth > 0) {
     return 0;
   }
 
-  return identifierConstant(&parser.previous);
+  if (isConst) {
+    ObjString *varName = makeString(token.start, token.length);
+    tableSet(&globalConsts, OBJ_VAL(varName), TRUE_VAL);
+  }
+
+  return identifierConstant(&token);
 }
 
 static void markInitialized() {
@@ -716,6 +731,7 @@ static void namedVariable(Token name, bool canAssign) {
   uint8_t getOp, setOp;
   Local *local = NULL;
   int arg = resolveLocal(current, &name, &local);
+  bool isGlobalConstant = false;
 
   if (arg != -1) {
     getOp = OP_GET_LOCAL;
@@ -725,12 +741,14 @@ static void namedVariable(Token name, bool canAssign) {
     setOp = OP_SET_UPVALUE;
   } else {
     arg = identifierConstant(&name);
+    isGlobalConstant =
+        tableFindString(&globalConsts, name.start, name.length) != NULL;
     getOp = OP_GET_GLOBAL;
     setOp = OP_SET_GLOBAL;
   }
 
   if (canAssign && match(TOKEN_EQUAL)) {
-    if (local != NULL && local->isConst) {
+    if ((local != NULL && local->isConst) || isGlobalConstant) {
       error("Cannot reassign constant variable.");
       return;
     }
@@ -827,11 +845,6 @@ static void declaration() {
   } else if (match(TOKEN_FUN)) {
     funDeclaration();
   } else if (match(TOKEN_CONST)) {
-    if (current->scopeDepth == 0) {
-      // TODO: support root level consts
-      error("const variables not supported at root level.");
-      return;
-    }
     varDeclaration(true);
   } else if (match(TOKEN_VAR)) {
     varDeclaration(false);
@@ -938,18 +951,21 @@ static void postfixModification(bool canAssign, OpCode op) {
   Local *local = NULL;
   Token *token = &parser.previousPrevious;
   int arg = resolveLocal(current, token, &local);
+  bool isGlobalConstant = false;
 
   if (arg != -1) {
     setOp = OP_SET_LOCAL;
   } else if ((arg = resolveUpvalue(current, token)) != -1) {
     setOp = OP_SET_UPVALUE;
   } else {
+    isGlobalConstant =
+        tableFindString(&globalConsts, token->start, token->length) != NULL;
     arg = identifierConstant(token);
     setOp = OP_SET_GLOBAL;
   }
 
   if (canAssign) {
-    if (local != NULL && local->isConst) {
+    if ((local != NULL && local->isConst) || isGlobalConstant) {
       error("Cannot reassign constant variable.");
       return;
     }
@@ -1047,6 +1063,7 @@ ObjFunction *compile(const char *source) {
   parser.panicMode = false;
 
   initTable(&stringConstants);
+  initTable(&globalConsts);
 
   advance();
 
@@ -1056,6 +1073,7 @@ ObjFunction *compile(const char *source) {
 
   ObjFunction *function = endCompiler();
   freeTable(&stringConstants);
+  freeTable(&globalConsts);
 
   return parser.hadError ? NULL : function;
 }

@@ -124,12 +124,12 @@ void tableAddAll(Table *from, Table *to) {
   }
 }
 
-ObjString *tableFindString(Table *table, const char *chars, int length,
-                           uint32_t hash) {
+ObjString *tableFindString(Table *table, const char *chars, int length) {
   if (table->count == 0) {
     return NULL;
   }
 
+  uint32_t hash = hashString(chars, length);
   uint32_t index = hash & (table->capacity - 1);
   for (;;) {
     Entry *entry = &table->entries[index];

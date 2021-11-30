@@ -101,13 +101,14 @@ typedef struct {
 ObjClosure *newClosure(ObjFunction *function);
 ObjFunction *newFunction();
 ObjNative *newNative(NativeFn function);
-ObjString *makeString(int length);
+ObjString *makeString(const char *chars, int length);
 ObjString *copyString(const char *chars, int length);
 ObjString *concatenateStrings(ObjString *a, ObjString *b);
 ObjUpvalue *newUpvalue(Value *slot);
 ObjClass *newClass(ObjString *name);
 ObjInstance *newInstance(ObjClass *klass);
 ObjBoundMethod *newBoundMethod(Value receiver, ObjClosure *method);
+uint32_t hashString(const char *key, int length);
 
 void printObject(FILE *stream, Value value);
 

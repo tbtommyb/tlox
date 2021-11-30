@@ -72,6 +72,7 @@ START_TEST(simpleConcatenation) {
   ck_assert_msg(strcmp(outputBuffer, expected) == 0,
                 "Expected %s, but got %.*s", expected, outputLength,
                 outputBuffer);
+
   freeVM();
 }
 END_TEST
@@ -89,11 +90,12 @@ START_TEST(fileInheritance) {
   rewind(output);
   fgets(outputBuffer, outputLength, output);
   fclose(output);
-  const char *expected = "Dunk in the fryer. Finish with icing\0";
 
+  const char *expected = "Dunk in the fryer. Finish with icing\0";
   ck_assert_msg(strcmp(outputBuffer, expected) == 0,
                 "Expected '%s', but got '%.*s'", expected, outputLength,
                 outputBuffer);
+
   freeVM();
 }
 END_TEST

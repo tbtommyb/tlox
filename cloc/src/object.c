@@ -73,16 +73,8 @@ ObjNative *newNative(NativeFn function) {
   return native;
 }
 
-ObjString *makeString(int length) {
-  ObjString *string =
-      (ObjString *)allocateObject(sizeof(ObjString) + length + 1, OBJ_STRING);
-  string->length = length;
-
-  return string;
-}
-
 // FNV-1a hash function
-static uint32_t hashString(const char *key, int length) {
+uint32_t hashString(const char *key, int length) {
   uint32_t hash = 2166136261u;
   for (int i = 0; i < length; i++) {
     hash ^= (uint8_t)key[i];
@@ -91,19 +83,32 @@ static uint32_t hashString(const char *key, int length) {
   return hash;
 }
 
-ObjString *copyString(const char *chars, int length) {
-  uint32_t hash = hashString(chars, length);
+ObjString *makeString(const char *chars, int length) {
+  ObjString *string =
+      (ObjString *)allocateObject(sizeof(ObjString) + length + 1, OBJ_STRING);
+  string->length = length;
+  memcpy(string->chars, chars, length);
+  string->chars[length] = '\0';
+  string->hash = hashString(chars, length);
 
-  ObjString *interned = tableFindString(&vm.strings, chars, length, hash);
+  return string;
+}
+
+static ObjString *allocString(int length) {
+  ObjString *string =
+      (ObjString *)allocateObject(sizeof(ObjString) + length + 1, OBJ_STRING);
+  string->length = length;
+
+  return string;
+}
+
+ObjString *copyString(const char *chars, int length) {
+  ObjString *interned = tableFindString(&vm.strings, chars, length);
   if (interned != NULL) {
     return interned;
   }
 
-  ObjString *string = makeString(length);
-
-  memcpy(string->chars, chars, length);
-  string->chars[length] = '\0';
-  string->hash = hash;
+  ObjString *string = makeString(chars, length);
 
   push(OBJ_VAL(string));
   tableSet(&vm.strings, OBJ_VAL(string), NIL_VAL);
@@ -115,7 +120,7 @@ ObjString *copyString(const char *chars, int length) {
 ObjString *concatenateStrings(ObjString *a, ObjString *b) {
   int length = a->length + b->length;
 
-  ObjString *result = makeString(length);
+  ObjString *result = allocString(length);
   memcpy(result->chars, a->chars, a->length);
   memcpy(result->chars + a->length, b->chars, b->length);
   result->chars[length] = '\0';
@@ -123,8 +128,7 @@ ObjString *concatenateStrings(ObjString *a, ObjString *b) {
   uint32_t hash = hashString(result->chars, length);
   result->hash = hash;
 
-  ObjString *interned =
-      tableFindString(&vm.strings, result->chars, length, hash);
+  ObjString *interned = tableFindString(&vm.strings, result->chars, length);
   if (interned != NULL) {
     FREE(ObjString, result);
     return interned;
