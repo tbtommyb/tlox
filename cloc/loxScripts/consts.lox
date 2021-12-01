@@ -1,11 +1,17 @@
 const myVar = 123;
 
 fun ctionsAreFun(myVar2) {
+  const localParam = 7;
   myVar2 = "This amends a local argument.";
+  fun innerClause() {
+    print myVar2;
+    myVar2 = "valid";
+  }
+  innerClause();
+  print localParam;
   print myVar2;
 }
 
+const myVar2 = 3;
 
 ctionsAreFun(myVar);
-print myVar;
-myVar++; // errors

@@ -182,13 +182,6 @@ static void emitReturn() {
 }
 
 static uint8_t makeConstant(Value value) {
-  ValueArray constants = currentChunk()->constants;
-  for (int i = 0; i < constants.count; i++) {
-    Value constant = constants.values[i];
-    if (valuesEqual(constant, value)) {
-      return i;
-    }
-  }
   int constant = addConstant(currentChunk(), value);
   if (constant > UINT8_MAX) {
     error("Too many constants in one chunk.");
@@ -344,8 +337,25 @@ static ParseRule *getRule(TokenType type);
 
 static void parsePrecedence(Precedence precedence);
 
+static int searchConstantsFor(Value value) {
+  ValueArray constants = currentChunk()->constants;
+  for (int i = 0; i < constants.count; i++) {
+    Value constant = constants.values[i];
+    if (valuesEqual(constant, value)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 static uint8_t identifierConstant(Token *name) {
-  return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
+  Value value = OBJ_VAL(copyString(name->start, name->length));
+
+  int constantIndex = searchConstantsFor(value);
+  if (constantIndex != -1) {
+    return constantIndex;
+  }
+  return makeConstant(value);
 }
 
 static bool identifiersEqual(Token *a, Token *b) {
@@ -390,19 +400,18 @@ static int addUpvalue(Compiler *compiler, uint8_t index, bool isLocal) {
   return compiler->function->upvalueCount++;
 }
 
-static int resolveUpvalue(Compiler *compiler, Token *name) {
+static int resolveUpvalue(Compiler *compiler, Token *name, Local **localVar) {
   if (compiler->enclosing == NULL) {
     return -1;
   }
-  Local *localVar;
 
-  int local = resolveLocal(compiler->enclosing, name, &localVar);
+  int local = resolveLocal(compiler->enclosing, name, localVar);
   if (local != -1) {
     compiler->enclosing->locals[local].isCaptured = true;
     return addUpvalue(compiler, (uint8_t)local, true);
   }
 
-  int upvalue = resolveUpvalue(compiler->enclosing, name);
+  int upvalue = resolveUpvalue(compiler->enclosing, name, localVar);
   if (upvalue != -1) {
     return addUpvalue(compiler, (uint8_t)upvalue, false);
   }
@@ -424,11 +433,12 @@ static void addLocal(Token name, bool isConst) {
 }
 
 static void declareVariable(bool isConst) {
+  Token *name = &parser.previous;
+
   if (current->scopeDepth == 0) {
     return;
   }
 
-  Token *name = &parser.previous;
   for (int i = current->localCount - 1; i >= 0; i--) {
     Local *local = &current->locals[i];
     if (local->depth != -1 && local->depth < current->scopeDepth) {
@@ -455,6 +465,12 @@ static uint8_t parseVariable(bool isConst, const char *errorMessage) {
   declareVariable(isConst);
 
   if (current->scopeDepth > 0) {
+    return 0;
+  }
+  // we are in global scope. Check for a global variable with the same name
+  if (searchConstantsFor(OBJ_VAL(copyString(token.start, token.length))) !=
+      -1) {
+    error("Already a variable with this name in this scope");
     return 0;
   }
 
@@ -743,13 +759,13 @@ static void namedVariable(Token name, bool canAssign) {
   if (arg != -1) {
     getOp = OP_GET_LOCAL;
     setOp = OP_SET_LOCAL;
-  } else if ((arg = resolveUpvalue(current, &name)) != -1) {
+  } else if ((arg = resolveUpvalue(current, &name, &local)) != -1) {
     getOp = OP_GET_UPVALUE;
     setOp = OP_SET_UPVALUE;
   } else {
-    arg = identifierConstant(&name);
     isGlobalConstant =
         tableFindString(&globalConsts, name.start, name.length) != NULL;
+    arg = identifierConstant(&name);
     getOp = OP_GET_GLOBAL;
     setOp = OP_SET_GLOBAL;
   }
@@ -962,7 +978,7 @@ static void postfixModification(bool canAssign, OpCode op) {
 
   if (arg != -1) {
     setOp = OP_SET_LOCAL;
-  } else if ((arg = resolveUpvalue(current, token)) != -1) {
+  } else if ((arg = resolveUpvalue(current, token, &local)) != -1) {
     setOp = OP_SET_UPVALUE;
   } else {
     isGlobalConstant =
