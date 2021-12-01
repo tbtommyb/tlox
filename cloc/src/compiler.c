@@ -182,6 +182,13 @@ static void emitReturn() {
 }
 
 static uint8_t makeConstant(Value value) {
+  ValueArray constants = currentChunk()->constants;
+  for (int i = 0; i < constants.count; i++) {
+    Value constant = constants.values[i];
+    if (valuesEqual(constant, value)) {
+      return i;
+    }
+  }
   int constant = addConstant(currentChunk(), value);
   if (constant > UINT8_MAX) {
     error("Too many constants in one chunk.");

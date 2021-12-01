@@ -1,0 +1,8 @@
+var varA = "this is a string";
+varA = 555;
+
+varB varB;
+varB = "";
+
+print varA;
+print varB;
