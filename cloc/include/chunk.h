@@ -13,6 +13,7 @@ typedef enum {
   OP_DEFINE_GLOBAL,
   OP_DIVIDE,
   OP_EQUAL,
+  OP_EQUAL_PEEK,
   OP_FALSE,
   OP_GREATER,
   OP_JUMP,

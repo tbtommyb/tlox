@@ -36,8 +36,10 @@ typedef enum {
 
   // Keywords.
   TOKEN_AND,
+  TOKEN_CASE,
   TOKEN_CLASS,
   TOKEN_CONST,
+  TOKEN_DEFAULT,
   TOKEN_ELSE,
   TOKEN_FALSE,
   TOKEN_FOR,
@@ -48,6 +50,7 @@ typedef enum {
   TOKEN_PRINT,
   TOKEN_RETURN,
   TOKEN_SUPER,
+  TOKEN_SWITCH,
   TOKEN_THIS,
   TOKEN_TRUE,
   TOKEN_VAR,

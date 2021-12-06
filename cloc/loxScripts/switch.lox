@@ -1,0 +1,15 @@
+var x = 0;
+switch (3 * 2) {
+  case 1: {
+    print "True!";
+  }
+  case 2: print "False!";
+  case 3: {
+    print "setting x";
+    x = 12;
+  }
+  case 9: print "nine";
+  default: print "unknown";
+}
+print "Afterwards";
+print x;

@@ -280,7 +280,7 @@ static InterpretResult run(FILE *stream) {
     for (int i = 0; i < vm.stackCount; i++) {
       Value slot = vm.stack[i];
       printf("[ ");
-      printValue(slot);
+      printValue(stream, slot);
       printf(" ]");
     }
     printf("\n");
@@ -341,6 +341,12 @@ static InterpretResult run(FILE *stream) {
     case OP_EQUAL: {
       Value b = pop();
       Value a = pop();
+      push(BOOL_VAL(valuesEqual(a, b)));
+      break;
+    }
+    case OP_EQUAL_PEEK: {
+      Value b = pop();
+      Value a = peek(0);
       push(BOOL_VAL(valuesEqual(a, b)));
       break;
     }

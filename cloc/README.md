@@ -11,4 +11,9 @@ $ ./build/cloc
 
 ## TODOs
 
+- [x] switch statement
+- [ ] continue statement
 - [ ] fix line numbers in error messages
+- [ ] remove hardcoded array limits
+- [ ] challenges from calls and functions
+- [ ] challenges from closures

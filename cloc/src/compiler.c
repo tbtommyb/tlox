@@ -1,4 +1,3 @@
-// TODO: challenges from calls and functions, closures chapters
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -750,6 +749,62 @@ static void ifStatement() {
   patchJump(elseJump);
 }
 
+static void switchStatement() {
+  consume(TOKEN_LEFT_PAREN, "Expect '(' after 'switch'.");
+  expression();
+  consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
+  consume(TOKEN_LEFT_BRACE, "Expect '{' after parenthesis.");
+
+  beginScope();
+
+  int endJumps[UINT8_COUNT];
+  int caseCount = 0;
+
+  while (match(TOKEN_CASE) && !check(TOKEN_EOF)) {
+    if (caseCount == UINT8_COUNT) {
+      error("Too many case branches in switch statement.");
+      return;
+    }
+
+    expression();
+    consume(TOKEN_COLON, "Expect ':' after 'case'.");
+    emitByte(OP_EQUAL_PEEK);
+
+    // Jump to next case if false
+    int nextJump = emitJump(OP_JUMP_IF_FALSE);
+
+    // Pop result of comparison, leave switched-on value on stack
+    emitByte(OP_POP);
+
+    statement();
+
+    // Pop switched-on value
+    emitByte(OP_POP);
+
+    int endJump = emitJump(OP_JUMP);
+    endJumps[caseCount] = endJump;
+
+    patchJump(nextJump);
+    // Pop switched-on value
+    emitByte(OP_POP);
+
+    caseCount++;
+  }
+
+  if (match(TOKEN_DEFAULT)) {
+    consume(TOKEN_COLON, "Expect ':' after 'default'.");
+    statement();
+    emitByte(OP_POP);
+  }
+
+  for (int i = 0; i < caseCount; i++) {
+    patchJump(endJumps[i]);
+  }
+
+  endScope();
+  consume(TOKEN_RIGHT_BRACE, "Expect '}' after switch statement.");
+}
+
 static void namedVariable(Token name, bool canAssign) {
   uint8_t getOp, setOp;
   Local *local = NULL;
@@ -890,6 +945,8 @@ static void statement() {
     ifStatement();
   } else if (match(TOKEN_WHILE)) {
     whileStatement();
+  } else if (match(TOKEN_SWITCH)) {
+    switchStatement();
   } else if (match(TOKEN_LEFT_BRACE)) {
     beginScope();
     block();
