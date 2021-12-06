@@ -8,6 +8,8 @@ while (x > 0) {
   }
   for (var i = x; i > 0; i--) {
     if (i == 3) {
+      var unreal = "low";
+      var another;
       continue;
     }
     print i;

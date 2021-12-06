@@ -75,6 +75,7 @@ typedef struct Compiler {
   int scopeDepth;
 
   int loopOffset;
+  int currentStackDepth;
 } Compiler;
 
 typedef struct ClassCompiler {
@@ -291,25 +292,6 @@ static void returnStatement() {
     consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
     emitByte(OP_RETURN);
   }
-}
-
-static void whileStatement() {
-  int loopStart = currentChunk()->count;
-  int oldLoopOffset = current->loopOffset;
-  current->loopOffset = loopStart;
-
-  consume(TOKEN_LEFT_PAREN, "Expect '(' after 'while'.");
-  expression();
-  consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
-
-  int exitJump = emitJump(OP_JUMP_IF_FALSE);
-  emitByte(OP_POP);
-  statement();
-  emitLoop(loopStart);
-
-  patchJump(exitJump);
-  emitByte(OP_POP);
-  current->loopOffset = oldLoopOffset;
 }
 
 static void synchronize() {
@@ -687,11 +669,33 @@ static void expressionStatement() {
   emitByte(OP_POP);
 }
 
+static void whileStatement() {
+  int oldLoopOffset = current->loopOffset;
+  int oldStackDepth = current->currentStackDepth;
+  current->loopOffset = currentChunk()->count;
+  current->currentStackDepth = current->scopeDepth;
+
+  consume(TOKEN_LEFT_PAREN, "Expect '(' after 'while'.");
+  expression();
+  consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
+
+  int exitJump = emitJump(OP_JUMP_IF_FALSE);
+  emitByte(OP_POP);
+  statement();
+  emitLoop(current->loopOffset);
+
+  patchJump(exitJump);
+  emitByte(OP_POP);
+  current->loopOffset = oldLoopOffset;
+  current->currentStackDepth = oldStackDepth;
+}
+
 static void forStatement() {
   beginScope();
   consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
 
   int oldLoopOffset = current->loopOffset;
+  int oldStackDepth = current->currentStackDepth;
 
   if (match(TOKEN_SEMICOLON)) {
     // No initializer.
@@ -701,7 +705,9 @@ static void forStatement() {
     expressionStatement();
   }
 
-  int loopStart = currentChunk()->count;
+  current->loopOffset = currentChunk()->count;
+  current->currentStackDepth = current->scopeDepth;
+
   int exitJump = -1;
   if (!match(TOKEN_SEMICOLON)) {
     expression();
@@ -720,15 +726,14 @@ static void forStatement() {
     emitByte(OP_POP);
     consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
 
-    emitLoop(loopStart);
-    loopStart = incrementStart;
+    emitLoop(current->loopOffset);
+    current->loopOffset = incrementStart;
     patchJump(bodyJump);
   }
 
-  current->loopOffset = loopStart;
   statement();
 
-  emitLoop(loopStart);
+  emitLoop(current->loopOffset);
 
   if (exitJump != -1) {
     patchJump(exitJump);
@@ -736,6 +741,8 @@ static void forStatement() {
   }
 
   current->loopOffset = oldLoopOffset;
+  current->currentStackDepth = oldStackDepth;
+
   endScope();
 }
 
@@ -821,6 +828,11 @@ static void continueStatement() {
     return;
   }
   consume(TOKEN_SEMICOLON, "Expect ';' after 'continue'.");
+
+  for (int i = current->localCount - 1;
+       i >= 0 && current->locals[i].depth > current->currentStackDepth; i--) {
+    emitByte(OP_POP);
+  }
 
   emitLoop(current->loopOffset);
 }
