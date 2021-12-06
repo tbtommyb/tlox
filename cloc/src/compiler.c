@@ -73,6 +73,8 @@ typedef struct Compiler {
   Local locals[UINT8_COUNT];
   int localCount;
   int scopeDepth;
+
+  int loopOffset;
 } Compiler;
 
 typedef struct ClassCompiler {
@@ -214,6 +216,7 @@ static void initCompiler(Compiler *compiler, FunctionType type) {
   compiler->localCount = 0;
   compiler->scopeDepth = 0;
   compiler->function = newFunction();
+  compiler->loopOffset = -1;
   current = compiler;
 
   if (type != TYPE_SCRIPT) {
@@ -292,6 +295,8 @@ static void returnStatement() {
 
 static void whileStatement() {
   int loopStart = currentChunk()->count;
+  int oldLoopOffset = current->loopOffset;
+  current->loopOffset = loopStart;
 
   consume(TOKEN_LEFT_PAREN, "Expect '(' after 'while'.");
   expression();
@@ -304,6 +309,7 @@ static void whileStatement() {
 
   patchJump(exitJump);
   emitByte(OP_POP);
+  current->loopOffset = oldLoopOffset;
 }
 
 static void synchronize() {
@@ -685,11 +691,12 @@ static void forStatement() {
   beginScope();
   consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
 
+  int oldLoopOffset = current->loopOffset;
+
   if (match(TOKEN_SEMICOLON)) {
     // No initializer.
   } else if (match(TOKEN_VAR)) {
     varDeclaration(false);
-    // TODO: add support for `const` here
   } else {
     expressionStatement();
   }
@@ -708,6 +715,7 @@ static void forStatement() {
   if (!match(TOKEN_RIGHT_PAREN)) {
     int bodyJump = emitJump(OP_JUMP);
     int incrementStart = currentChunk()->count;
+
     expression();
     emitByte(OP_POP);
     consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
@@ -717,6 +725,7 @@ static void forStatement() {
     patchJump(bodyJump);
   }
 
+  current->loopOffset = loopStart;
   statement();
 
   emitLoop(loopStart);
@@ -726,6 +735,7 @@ static void forStatement() {
     emitByte(OP_POP); // Condition.
   }
 
+  current->loopOffset = oldLoopOffset;
   endScope();
 }
 
@@ -803,6 +813,16 @@ static void switchStatement() {
 
   endScope();
   consume(TOKEN_RIGHT_BRACE, "Expect '}' after switch statement.");
+}
+
+static void continueStatement() {
+  if (current->loopOffset == -1) {
+    error("Cannot use 'continue' outside a loop");
+    return;
+  }
+  consume(TOKEN_SEMICOLON, "Expect ';' after 'continue'.");
+
+  emitLoop(current->loopOffset);
 }
 
 static void namedVariable(Token name, bool canAssign) {
@@ -951,6 +971,8 @@ static void statement() {
     beginScope();
     block();
     endScope();
+  } else if (match(TOKEN_CONTINUE)) {
+    continueStatement();
   } else {
     expressionStatement();
   }

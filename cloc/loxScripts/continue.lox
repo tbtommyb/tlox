@@ -1,0 +1,15 @@
+
+var x = 7;
+
+while (x > 0) {
+  x--;
+  if (x == 5) {
+    continue;
+  }
+  for (var i = x; i > 0; i--) {
+    if (i == 3) {
+      continue;
+    }
+    print i;
+  }
+}
