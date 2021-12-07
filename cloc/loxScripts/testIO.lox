@@ -1,0 +1,7 @@
+
+var data = "This is some test data.";
+
+var result = write("tomsTextFile.txt", data, "w", "whatever");
+
+print result;
+

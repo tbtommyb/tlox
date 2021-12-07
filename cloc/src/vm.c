@@ -1,5 +1,7 @@
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -12,10 +14,6 @@
 #include "vm.h"
 
 VM vm;
-
-static Value clockNative(int argCount, Value *args) {
-  return NUMBER_VAL((double)clock() / CLOCKS_PER_SEC);
-}
 
 static void resetStack() {
   vm.stackCount = 0;
@@ -45,9 +43,40 @@ static void runtimeError(const char *format, ...) {
   resetStack();
 }
 
-static void defineNative(const char *name, NativeFn function) {
+static Value clockNative(int argCount, Value *args) {
+  return NUMBER_VAL((double)clock() / CLOCKS_PER_SEC);
+}
+
+static Value writeNative(int argCount, Value *args) {
+  const char *path = AS_CSTRING(args[1]);
+  const char *data = AS_CSTRING(args[2]);
+  const char *mode = AS_CSTRING(args[3]);
+
+  FILE *handle = fopen(path, mode);
+  if (handle == NULL) {
+    runtimeError("Could not open file %s. Error %d.", path, errno);
+    return NIL_VAL;
+  }
+
+  int res = fputs(data, handle);
+  if (res < 0) {
+    runtimeError("Could not write to file %s. Error %d", path, errno);
+    fclose(handle);
+    return NIL_VAL;
+  }
+
+  res = fclose(handle);
+  if (res != 0) {
+    runtimeError("Could not close file %s. Error %d.", path, errno);
+    return NIL_VAL;
+  }
+
+  return BOOL_VAL(true);
+}
+
+static void defineNative(const char *name, NativeFn function, int arity) {
   push(OBJ_VAL(copyString(name, (int)strlen(name))));
-  push(OBJ_VAL(newNative(function)));
+  push(OBJ_VAL(newNative(function, arity)));
   tableSet(&vm.globals, OBJ_VAL(vm.stack[0]), vm.stack[1]);
   pop();
   pop();
@@ -72,7 +101,8 @@ void initVM() {
   vm.initString = NULL;
   vm.initString = copyString("init", 4);
 
-  defineNative("clock", clockNative);
+  defineNative("clock", clockNative, 0);
+  defineNative("write", writeNative, 3);
 }
 
 void freeVM() {
@@ -138,8 +168,14 @@ static bool callValue(Value callee, int argCount) {
     case OBJ_CLOSURE:
       return call(AS_CLOSURE(callee), argCount);
     case OBJ_NATIVE: {
-      NativeFn native = AS_NATIVE(callee);
-      Value result = native(argCount, &vm.stack[vm.stackCount - argCount - 1]);
+      ObjNative *native = AS_NATIVE(callee);
+      if (argCount < native->arity) {
+        runtimeError("Expected %d arguments but got %d.", native->arity,
+                     argCount);
+        return false;
+      }
+      Value result =
+          native->function(argCount, &vm.stack[vm.stackCount - argCount - 1]);
       vm.stackCount -= argCount + 1;
       push(result);
       return true;
