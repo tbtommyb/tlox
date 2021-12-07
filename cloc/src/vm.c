@@ -43,35 +43,62 @@ static void runtimeError(const char *format, ...) {
   resetStack();
 }
 
-static Value clockNative(int argCount, Value *args) {
-  return NUMBER_VAL((double)clock() / CLOCKS_PER_SEC);
+static bool clockNative(int argCount, Value *args) {
+  args[-1] = NUMBER_VAL((double)clock() / CLOCKS_PER_SEC);
+  return true;
 }
 
-static Value writeNative(int argCount, Value *args) {
-  const char *path = AS_CSTRING(args[1]);
-  const char *data = AS_CSTRING(args[2]);
-  const char *mode = AS_CSTRING(args[3]);
+static bool writeNative(int argCount, Value *args) {
+  const char *path = AS_CSTRING(args[0]);
+  const char *data = AS_CSTRING(args[1]);
+  const char *mode = AS_CSTRING(args[2]);
 
   FILE *handle = fopen(path, mode);
   if (handle == NULL) {
     runtimeError("Could not open file %s. Error %d.", path, errno);
-    return NIL_VAL;
+    return false;
   }
 
   int res = fputs(data, handle);
   if (res < 0) {
     runtimeError("Could not write to file %s. Error %d", path, errno);
     fclose(handle);
-    return NIL_VAL;
+    return false;
   }
 
-  res = fclose(handle);
-  if (res != 0) {
+  int closeRes = fclose(handle);
+  if (closeRes != 0) {
     runtimeError("Could not close file %s. Error %d.", path, errno);
-    return NIL_VAL;
+    return false;
   }
 
-  return BOOL_VAL(true);
+  args[-1] = NUMBER_VAL((double)res);
+  return true;
+}
+
+static bool readNative(int argCount, Value *args) {
+  const char *path = AS_CSTRING(args[0]);
+
+  FILE *handle = fopen(path, "r");
+  if (handle == NULL) {
+    runtimeError("Could not open file %s. Error %d.", path, errno);
+    return false;
+  }
+
+  fseek(handle, 0L, SEEK_END);
+  int bytesToRead = ftell(handle);
+  fseek(handle, 0L, SEEK_SET);
+  char *buffer = ALLOCATE(char, bytesToRead);
+  if (buffer == NULL) {
+    runtimeError("Could not open file %s. Out of memory.", path);
+    return false;
+  }
+
+  int charsRead = fread(buffer, sizeof(char), bytesToRead, handle);
+  fclose(handle);
+
+  args[-1] = OBJ_VAL(copyString(buffer, charsRead));
+  return true;
 }
 
 static void defineNative(const char *name, NativeFn function, int arity) {
@@ -103,6 +130,7 @@ void initVM() {
 
   defineNative("clock", clockNative, 0);
   defineNative("write", writeNative, 3);
+  defineNative("read", readNative, 1);
 }
 
 void freeVM() {
@@ -174,11 +202,12 @@ static bool callValue(Value callee, int argCount) {
                      argCount);
         return false;
       }
-      Value result =
-          native->function(argCount, &vm.stack[vm.stackCount - argCount - 1]);
-      vm.stackCount -= argCount + 1;
-      push(result);
-      return true;
+      if (native->function(argCount, &vm.stack[vm.stackCount - argCount])) {
+        vm.stackCount -= argCount;
+        return true;
+      } else {
+        return false;
+      }
     }
     case OBJ_CLASS: {
       ObjClass *klass = AS_CLASS(callee);

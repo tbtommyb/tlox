@@ -1,7 +1,6 @@
 
-var data = "This is some test data.";
+var secretCode = read("tomsTextFile.txt");
 
-var result = write("tomsTextFile.txt", data, "w", "whatever");
+var output = secretCode + "so sekret";
 
-print result;
-
+write("tomsTextFile.txt", output, "a");
