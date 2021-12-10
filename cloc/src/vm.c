@@ -180,7 +180,6 @@ static bool call(ObjClosure *closure, int argCount) {
   frame->closure = closure;
   frame->ip = closure->function->chunk.code;
   frame->slots = &vm.stack[vm.stackCount - argCount - 1];
-  frame->slotCount = argCount + 1;
 
   return true;
 }
@@ -454,7 +453,7 @@ static InterpretResult run(FILE *stream) {
         return INTERPRET_OK;
       }
 
-      vm.stackCount -= frame->slotCount;
+      vm.stackCount -= vm.stack + vm.stackCount - frame->slots;
       push(result);
       frame = &vm.frames[vm.frameCount - 1];
       ip = frame->ip;
@@ -497,7 +496,6 @@ static InterpretResult run(FILE *stream) {
     }
     case OP_SET_LOCAL: {
       uint8_t slot = READ_BYTE();
-      frame->slotCount++;
       frame->slots[slot] = peek(0);
       break;
     }

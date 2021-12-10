@@ -1,0 +1,23 @@
+
+var startTime = clock();
+
+for (var i = 0; i < 2; i = i + 1) {
+  var start = 999;
+  var end = 777;
+  var other = 4444;
+  fun createClosure(value, wat) {
+    var output = start + end + other + value;
+    var what = output + wat;
+    fun res() {
+      return output + start - end - what;
+    }
+    return res;
+  }
+
+  var getOutput = createClosure(4545, 700);
+  print getOutput();
+}
+
+var endTime = clock();
+
+print (endTime - startTime) / 1000;

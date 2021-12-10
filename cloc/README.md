@@ -17,3 +17,4 @@ $ ./build/cloc
 - [ ] remove hardcoded array limits
 - [ ] challenges from calls and functions
 - [ ] challenges from closures
+- [ ] function expressions

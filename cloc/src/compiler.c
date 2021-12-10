@@ -1192,6 +1192,7 @@ ObjFunction *compile(const char *source) {
   return parser.hadError ? NULL : function;
 }
 
+// TODO: add constants to this
 void markCompilerRoots() {
   Compiler *compiler = current;
   while (compiler != NULL) {
