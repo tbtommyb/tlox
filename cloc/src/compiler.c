@@ -622,11 +622,14 @@ static void function(FunctionType type) {
   block();
 
   ObjFunction *function = endCompiler();
-  emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
-
-  for (int i = 0; i < function->upvalueCount; i++) {
-    emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
-    emitByte(compiler.upvalues[i].index);
+  if (function->upvalueCount > 0) {
+    emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
+    for (int i = 0; i < function->upvalueCount; i++) {
+      emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
+      emitByte(compiler.upvalues[i].index);
+    }
+  } else {
+    emitBytes(OP_CONSTANT, makeConstant(OBJ_VAL(function)));
   }
 }
 

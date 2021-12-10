@@ -22,14 +22,15 @@ var closureEndTime = clock();
 print (closureEndTime - startTime) * 1000;
 
 for (var i = 0; i < 10000; i = i + 1) {
-  var start = 999;
-  var end = 777;
-  var other = 4444;
-  var value = 4545;
-  var wat = 700;
-  var output = start + end + other + value;
-  var what = output + wat;
-  var res =  output + start - end - what;
+  fun noClosure(value, wat) {
+    var start = 999;
+    var end = 777;
+    var other = 4444;
+    var output = start + end + other + value;
+    var what = output + wat;
+    return output + start - end - what;
+  }
+  noClosure(4545, 700);
 }
 
 var loopEndTime = clock();
