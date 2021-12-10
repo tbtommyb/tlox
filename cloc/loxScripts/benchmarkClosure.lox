@@ -1,7 +1,7 @@
 
 var startTime = clock();
 
-for (var i = 0; i < 1000; i = i + 1) {
+for (var i = 0; i < 10000; i = i + 1) {
   var start = 999;
   var end = 777;
   var other = 4444;
@@ -21,7 +21,7 @@ var closureEndTime = clock();
 
 print (closureEndTime - startTime) * 1000;
 
-for (var i = 0; i < 1000; i = i + 1) {
+for (var i = 0; i < 10000; i = i + 1) {
   var start = 999;
   var end = 777;
   var other = 4444;

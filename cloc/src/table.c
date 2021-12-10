@@ -158,7 +158,7 @@ void tableRemoveWhite(Table *table) {
 void markTable(Table *table) {
   for (int i = 0; i < table->capacity; i++) {
     Entry *entry = &table->entries[i];
-    markObject((Obj *)entry->key);
+    markObject(AS_OBJ(entry->key));
     markValue(entry->value);
   }
 }
