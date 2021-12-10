@@ -1,7 +1,7 @@
 
 var startTime = clock();
 
-for (var i = 0; i < 2; i = i + 1) {
+for (var i = 0; i < 1000; i = i + 1) {
   var start = 999;
   var end = 777;
   var other = 4444;
@@ -15,9 +15,23 @@ for (var i = 0; i < 2; i = i + 1) {
   }
 
   var getOutput = createClosure(4545, 700);
-  print getOutput();
 }
 
-var endTime = clock();
+var closureEndTime = clock();
 
-print (endTime - startTime) / 1000;
+print (closureEndTime - startTime) * 1000;
+
+for (var i = 0; i < 1000; i = i + 1) {
+  var start = 999;
+  var end = 777;
+  var other = 4444;
+  var value = 4545;
+  var wat = 700;
+  var output = start + end + other + value;
+  var what = output + wat;
+  var res =  output + start - end - what;
+}
+
+var loopEndTime = clock();
+
+print (loopEndTime - closureEndTime) * 1000;
