@@ -593,6 +593,7 @@ static InterpretResult run(FILE *stream) {
     case OP_INVOKE: {
       ObjString *method = READ_STRING();
       int argCount = READ_BYTE();
+      frame->ip = ip;
       if (!invoke(method, argCount)) {
         return INTERPRET_RUNTIME_ERROR;
       }
@@ -625,6 +626,7 @@ static InterpretResult run(FILE *stream) {
       ObjString *method = READ_STRING();
       int argCount = READ_BYTE();
       ObjClass *superclass = AS_CLASS(pop());
+      frame->ip = ip;
       if (!invokeFromClass(superclass, method, argCount)) {
         return INTERPRET_RUNTIME_ERROR;
       }
