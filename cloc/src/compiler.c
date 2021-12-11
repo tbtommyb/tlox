@@ -622,7 +622,8 @@ static void function(FunctionType type) {
   block();
 
   ObjFunction *function = endCompiler();
-  if (function->upvalueCount > 0) {
+  if (function->upvalueCount > 0 ||
+      (type == TYPE_INITIALIZER || type == TYPE_METHOD)) {
     emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
     for (int i = 0; i < function->upvalueCount; i++) {
       emitByte(compiler.upvalues[i].isLocal ? 1 : 0);

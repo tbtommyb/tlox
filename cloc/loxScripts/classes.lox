@@ -17,4 +17,5 @@ class Cruller < Doughnut {
 }
 
 var donut = Cruller();
+// donut.name = "Lovely donut";
 print donut.cook();
