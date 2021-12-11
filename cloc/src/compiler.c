@@ -33,7 +33,7 @@ typedef enum {
   PREC_TERM,       // + -
   PREC_FACTOR,     // * /
   PREC_UNARY,      // ! -
-  PREC_CALL,       // . ()
+  PREC_CALL,       // . () []
   PREC_PRIMARY
 } Precedence;
 
@@ -575,6 +575,18 @@ static void dot(bool canAssign) {
   }
 }
 
+static void leftBracket(bool canAssign) {
+  expression();
+  consume(TOKEN_RIGHT_BRACKET, "Expect ']' after expression.");
+
+  if (canAssign && match(TOKEN_EQUAL)) {
+    expression();
+    emitByte(OP_SET_COMPUTED_PROPERTY);
+  } else {
+    emitByte(OP_GET_COMPUTED_PROPERTY);
+  }
+}
+
 static void literal(bool canAssign) {
   switch (parser.previous.type) {
   case TOKEN_FALSE:
@@ -1106,6 +1118,8 @@ ParseRule rules[] = {
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
     [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
+    [TOKEN_LEFT_BRACKET] = {NULL, leftBracket, PREC_CALL},
+    [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
     [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
     [TOKEN_DOT] = {NULL, dot, PREC_CALL},
     [TOKEN_MINUS] = {unary, binary, PREC_TERM},

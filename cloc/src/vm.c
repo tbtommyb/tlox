@@ -112,7 +112,7 @@ static bool readNative(int argCount, Value *args) {
 static void defineNative(const char *name, NativeFn function, int arity) {
   push(OBJ_VAL(copyString(name, (int)strlen(name))));
   push(OBJ_VAL(newNative(function, arity)));
-  tableSet(&vm.globals, OBJ_VAL(AS_OBJ(vm.stack[0])), vm.stack[1]);
+  tableSet(&vm.globals, vm.stack[0], vm.stack[1]);
   pop();
   pop();
 }
@@ -367,7 +367,7 @@ static InterpretResult run(FILE *stream) {
     }
     printf("\n");
     disassembleInstruction(&getFrameFunction(frame)->chunk,
-                           (int)(ip - func->chunk.code));
+                           (int)(ip - getFrameFunction(frame)->chunk.code));
 #endif
     uint8_t instruction;
     switch (instruction = READ_BYTE()) {
@@ -577,6 +577,32 @@ static InterpretResult run(FILE *stream) {
       }
       break;
     }
+    case OP_GET_COMPUTED_PROPERTY: {
+      if (!IS_INSTANCE(peek(1))) {
+        frame->ip = ip;
+        runtimeError("Only instances have properties.");
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      ObjInstance *instance = AS_INSTANCE(peek(1));
+      Value name = pop();
+
+      if (!IS_STRING(name)) {
+        frame->ip = ip;
+        runtimeError("Only strings supported as computed property names");
+        return INTERPRET_RUNTIME_ERROR;
+      }
+
+      Value value;
+      if (tableGet(&instance->fields, name, &value)) {
+        pop(); // Instance.
+        push(value);
+        break;
+      }
+      if (!bindMethod(instance->klass, AS_STRING(name))) {
+        push(NIL_VAL);
+      }
+      break;
+    }
     case OP_SET_PROPERTY: {
       if (!IS_INSTANCE(peek(1))) {
         frame->ip = ip;
@@ -587,6 +613,20 @@ static InterpretResult run(FILE *stream) {
       tableSet(&instance->fields, OBJ_VAL(READ_STRING()), peek(0));
       Value value = pop();
       pop();
+      push(value);
+      break;
+    }
+    case OP_SET_COMPUTED_PROPERTY: {
+      if (!IS_INSTANCE(peek(2))) {
+        frame->ip = ip;
+        runtimeError("Only instances have fields.");
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      ObjInstance *instance = AS_INSTANCE(peek(2));
+      tableSet(&instance->fields, peek(1), peek(0));
+      Value value = pop();
+      pop(); // Computed
+      pop(); // Instance
       push(value);
       break;
     }

@@ -131,7 +131,6 @@ ObjString *concatenateStrings(ObjString *a, ObjString *b) {
 
   ObjString *interned = tableFindString(&vm.strings, result->chars, length);
   if (interned != NULL) {
-    FREE(ObjString, result);
     return interned;
   }
 
@@ -139,7 +138,6 @@ ObjString *concatenateStrings(ObjString *a, ObjString *b) {
   tableSet(&vm.strings, OBJ_VAL(result), NIL_VAL);
   pop();
 
-  FREE(ObjString, interned);
   return result;
 }
 

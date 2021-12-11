@@ -17,7 +17,12 @@ class Cruller < Doughnut {
 }
 
 var donut = Cruller();
-if (donut.name == nil) {
-  print "donut has no name";
-}
-print donut.cook();
+donut.name = "Donny";
+
+var fieldToQuery = "name";
+var otherField = "na" + "me";
+
+print donut.name;
+print donut["na"+"me"];
+donut[otherField] = "new name";
+print donut.name;

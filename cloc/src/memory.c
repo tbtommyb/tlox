@@ -57,7 +57,8 @@ static void freeObject(Obj *object) {
     break;
   case OBJ_STRING: {
     ObjString *string = (ObjString *)object;
-    reallocate(object, sizeof(ObjString) + string->length + 1, 0);
+    FREE_ARRAY(char, string->chars, string->length + 1);
+    FREE(ObjString, object);
     break;
   }
   case OBJ_CLOSURE: {
@@ -90,7 +91,7 @@ void markObject(Obj *object) {
   }
 #ifdef DEBUG_LOG_GC
   printf("%p mark ", (void *)object);
-  printValue(OBJ_VAL(object));
+  printValue(stdout, OBJ_VAL(object));
   printf("\n");
 #endif
   object->isMarked = true;
@@ -122,7 +123,7 @@ static void markArray(ValueArray *array) {
 static void blackenObject(Obj *object) {
 #ifdef DEBUG_LOG_GC
   printf("%p blacken ", (void *)object);
-  printValue(OBJ_VAL(object));
+  printValue(stdout, OBJ_VAL(object));
   printf("\n");
 #endif
 
