@@ -277,7 +277,6 @@ static bool invoke(ObjString *name, int argCount) {
 static bool bindMethod(ObjClass *klass, ObjString *name) {
   Value method;
   if (!tableGet(&klass->methods, OBJ_VAL(name), &method)) {
-    runtimeError("Undefined property '%s'.", name->chars);
     return false;
   }
 
@@ -573,7 +572,8 @@ static InterpretResult run(FILE *stream) {
         break;
       }
       if (!bindMethod(instance->klass, name)) {
-        return INTERPRET_RUNTIME_ERROR;
+        push(NIL_VAL);
+        break;
       }
       break;
     }
@@ -618,6 +618,7 @@ static InterpretResult run(FILE *stream) {
       ObjClass *superclass = AS_CLASS(pop());
 
       if (!bindMethod(superclass, name)) {
+        runtimeError("Undefined property '%s'.", name->chars);
         return INTERPRET_RUNTIME_ERROR;
       }
       break;

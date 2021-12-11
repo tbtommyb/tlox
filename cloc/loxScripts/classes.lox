@@ -17,5 +17,7 @@ class Cruller < Doughnut {
 }
 
 var donut = Cruller();
-// donut.name = "Lovely donut";
+if (donut.name == nil) {
+  print "donut has no name";
+}
 print donut.cook();
