@@ -2,6 +2,7 @@
 
 #include "compiler.h"
 #include "memory.h"
+#include "value.h"
 #include "vm.h"
 
 #ifdef DEBUG_LOG_GC
@@ -57,8 +58,7 @@ static void freeObject(Obj *object) {
     break;
   case OBJ_STRING: {
     ObjString *string = (ObjString *)object;
-    FREE_ARRAY(char, string->chars, string->length + 1);
-    FREE(ObjString, object);
+    reallocate(object, sizeof(ObjString) + string->length + 1, 0);
     break;
   }
   case OBJ_CLOSURE: {
@@ -79,6 +79,12 @@ static void freeObject(Obj *object) {
   case OBJ_UPVALUE:
     FREE(ObjUpvalue, object);
     break;
+  case OBJ_ARRAY: {
+    ObjArray *array = (ObjArray *)object;
+    freeValueArray(&array->items);
+    FREE(ObjArray, object);
+    break;
+  }
   }
 }
 
@@ -163,6 +169,11 @@ static void blackenObject(Obj *object) {
   case OBJ_UPVALUE:
     markValue(((ObjUpvalue *)object)->closed);
     break;
+  case OBJ_ARRAY: {
+    ObjArray *array = (ObjArray *)object;
+    markArray(&array->items);
+    break;
+  }
   case OBJ_NATIVE:
   case OBJ_STRING:
     break;

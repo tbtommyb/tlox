@@ -11,6 +11,7 @@
 #include "memory.h"
 #include "object.h"
 #include "table.h"
+#include "value.h"
 #include "vm.h"
 
 VM vm;
@@ -335,6 +336,21 @@ static void concatenate() {
   push(OBJ_VAL(result));
 }
 
+static void createArray(int len) {
+  ObjArray *array = newArray(len);
+
+  int startingPoint = vm.stackCount - len;
+  for (int i = startingPoint; i < vm.stackCount; i++) {
+    Value item = vm.stack[i];
+    writeValueArray(&array->items, item);
+  }
+  for (int i = 0; i < len; i++) {
+    pop();
+  }
+
+  push(OBJ_VAL(array));
+}
+
 static InterpretResult run(FILE *stream) {
   CallFrame *frame = &vm.frames[vm.frameCount - 1];
   register uint8_t *ip = frame->ip;
@@ -556,6 +572,10 @@ static InterpretResult run(FILE *stream) {
       push(OBJ_VAL(newClass(READ_STRING())));
       break;
     }
+    case OP_ARRAY: {
+      createArray(READ_BYTE());
+      break;
+    }
     case OP_GET_PROPERTY: {
       if (!IS_INSTANCE(peek(0))) {
         frame->ip = ip;
@@ -578,6 +598,12 @@ static InterpretResult run(FILE *stream) {
       break;
     }
     case OP_GET_COMPUTED_PROPERTY: {
+      if (IS_ARRAY(peek(1))) {
+        double index = AS_NUMBER(pop());
+        ObjArray *array = AS_ARRAY(pop());
+        push(array->items.values[(int)index]);
+        break;
+      }
       if (!IS_INSTANCE(peek(1))) {
         frame->ip = ip;
         runtimeError("Only instances have properties.");

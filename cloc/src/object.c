@@ -149,6 +149,13 @@ ObjUpvalue *newUpvalue(Value *slot) {
   return upvalue;
 }
 
+ObjArray *newArray(int len) {
+  ObjArray *array = ALLOCATE_OBJ(ObjArray, OBJ_ARRAY);
+  initValueArray(&array->items);
+  /* GROW_ARRAY(Value, &array->items, 0, len); */
+  return array;
+}
+
 static void printFunction(ObjFunction *function) {
   if (function->name == NULL) {
     printf("<script>");
@@ -182,6 +189,9 @@ void printObject(FILE *stream, Value value) {
     break;
   case OBJ_UPVALUE:
     fprintf(stream, "upvalue");
+    break;
+  case OBJ_ARRAY:
+    fprintf(stream, "array len %d", AS_ARRAY(value)->items.count);
     break;
   }
 }

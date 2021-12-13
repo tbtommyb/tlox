@@ -6,7 +6,6 @@
 #include <stdint.h>
 
 #define DEBUG_TRACE_EXECUTION
-#undef DEBUG_TRACE_EXECUTION
 #define DEBUG_PRINT_CODE
 #undef DEBUG_PRINT_CODE
 #define DEBUG_LOG_GC

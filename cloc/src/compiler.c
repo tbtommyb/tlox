@@ -1113,12 +1113,27 @@ static void decrement(bool canAssign) {
   postfixModification(canAssign, OP_SUBTRACT);
 }
 
+static void arrayLiteral(bool canAssign) {
+  uint8_t argCount = 0;
+  if (!check(TOKEN_RIGHT_BRACKET)) {
+    do {
+      expression();
+      if (argCount == 255) {
+        error("Can't have more than 255 array literal elements.");
+      }
+      argCount++;
+    } while (match(TOKEN_COMMA));
+  }
+  consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array items.");
+  emitBytes(OP_ARRAY, argCount);
+}
+
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
     [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
-    [TOKEN_LEFT_BRACKET] = {NULL, leftBracket, PREC_CALL},
+    [TOKEN_LEFT_BRACKET] = {arrayLiteral, leftBracket, PREC_CALL},
     [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
     [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
     [TOKEN_DOT] = {NULL, dot, PREC_CALL},
