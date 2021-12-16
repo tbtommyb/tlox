@@ -3,6 +3,7 @@ set(LIB_SOURCES
   compiler.c
   debug.c
   memory.c
+  lox_array.c
   object.c
   scanner.c
   table.c

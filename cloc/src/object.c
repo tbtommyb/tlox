@@ -85,12 +85,21 @@ uint32_t hashString(const char *key, int length) {
 }
 
 ObjString *makeString(const char *chars, int length) {
+  /* ObjString *interned = tableFindString(&vm.strings, chars, length); */
+  /* if (interned != NULL) { */
+  /*   return interned; */
+  /* } */
+
   ObjString *string =
       (ObjString *)allocateObject(sizeof(ObjString) + length + 1, OBJ_STRING);
   string->length = length;
   memcpy(string->chars, chars, length);
   string->chars[length] = '\0';
   string->hash = hashString(chars, length);
+
+  /* push(OBJ_VAL(string)); */
+  /* tableSet(&vm.strings, OBJ_VAL(string), NIL_VAL); */
+  /* pop(); */
 
   return string;
 }

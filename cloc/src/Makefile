@@ -257,6 +257,30 @@ debug.c.s:
 	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/debug.c.s
 .PHONY : debug.c.s
 
+lox_array.o: lox_array.c.o
+.PHONY : lox_array.o
+
+# target to build an object file
+lox_array.c.o:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/lox_array.c.o
+.PHONY : lox_array.c.o
+
+lox_array.i: lox_array.c.i
+.PHONY : lox_array.i
+
+# target to preprocess a source file
+lox_array.c.i:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/lox_array.c.i
+.PHONY : lox_array.c.i
+
+lox_array.s: lox_array.c.s
+.PHONY : lox_array.s
+
+# target to generate assembly for a file
+lox_array.c.s:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/lox_array.c.s
+.PHONY : lox_array.c.s
+
 memory.o: memory.c.o
 .PHONY : memory.o
 
@@ -424,6 +448,9 @@ help:
 	@echo "... debug.o"
 	@echo "... debug.i"
 	@echo "... debug.s"
+	@echo "... lox_array.o"
+	@echo "... lox_array.i"
+	@echo "... lox_array.s"
 	@echo "... memory.o"
 	@echo "... memory.i"
 	@echo "... memory.s"

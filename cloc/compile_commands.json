@@ -21,6 +21,11 @@
 },
 {
   "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/cloc -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/lox_array.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/lox_array.c",
+  "file": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/lox_array.c"
+},
+{
+  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src",
   "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/cloc -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/object.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/object.c",
   "file": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/object.c"
 },

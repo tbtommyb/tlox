@@ -50,5 +50,6 @@ void freeVM();
 InterpretResult interpret(const char *source, FILE *stream);
 void push(Value value);
 Value pop();
+void runtimeError(const char *format, ...);
 
 #endif

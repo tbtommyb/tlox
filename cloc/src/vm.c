@@ -8,6 +8,7 @@
 #include "common.h"
 #include "compiler.h"
 #include "debug.h"
+#include "lox_array.h"
 #include "memory.h"
 #include "object.h"
 #include "table.h"
@@ -30,7 +31,7 @@ static inline ObjFunction *getFrameFunction(CallFrame *frame) {
   }
 }
 
-static void runtimeError(const char *format, ...) {
+void runtimeError(const char *format, ...) {
   va_list args;
   va_start(args, format);
   vfprintf(stderr, format, args);
@@ -118,6 +119,14 @@ static void defineNative(const char *name, NativeFn function, int arity) {
   pop();
 }
 
+static void defineNativeClass(const char *name, ObjClass *klass) {
+  push(OBJ_VAL(copyString(name, (int)strlen(name))));
+  push(OBJ_VAL(klass));
+  tableSet(&vm.globals, vm.stack[0], vm.stack[1]);
+  pop();
+  pop();
+}
+
 void initVM() {
   resetStack();
   vm.stackCapacity = 256;
@@ -140,6 +149,8 @@ void initVM() {
   defineNative("clock", clockNative, 0);
   defineNative("write", writeNative, 3);
   defineNative("read", readNative, 1);
+
+  defineNativeClass("Array", createArrayClass(vm.initString));
 }
 
 void freeVM() {
@@ -175,7 +186,7 @@ static bool isFalsey(Value value) {
 
 static bool call(Obj *callee, ObjFunction *function, int argCount) {
   if (argCount != function->arity) {
-    runtimeError("Expected %d arguments but got %d.", function->arity,
+    runtimeError("Expected %d arguments but got %d 1.", function->arity,
                  argCount);
     return false;
   }
@@ -232,6 +243,23 @@ static bool callValue(Value callee, int argCount) {
       vm.stack[vm.stackCount - argCount - 1] = OBJ_VAL(newInstance(klass));
       Value initializer;
       if (tableGet(&klass->methods, OBJ_VAL(vm.initString), &initializer)) {
+        /* Begin ugly native handling code */
+        if (IS_NATIVE(initializer)) {
+          ObjNative *native = AS_NATIVE(initializer);
+          if (argCount < native->arity) {
+            runtimeError("Expected %d arguments but got %d in native call.",
+                         native->arity, argCount);
+            return false;
+          }
+          if (native->function(argCount,
+                               &vm.stack[vm.stackCount - argCount - 1])) {
+            vm.stackCount -= argCount;
+            return true;
+          } else {
+            return false;
+          }
+        }
+        /* End ugly native handling code */
         return callClosure(AS_CLOSURE(initializer), argCount);
       } else if (argCount != 0) {
         runtimeError("Expected 0 arguments but got %d.", argCount);
@@ -252,6 +280,20 @@ static bool invokeFromClass(ObjClass *klass, ObjString *name, int argCount) {
   if (!tableGet(&klass->methods, OBJ_VAL(name), &method)) {
     runtimeError("Undefined property '%s'.", name->chars);
     return false;
+  }
+  if (IS_NATIVE(method)) {
+    ObjNative *native = AS_NATIVE(method);
+    if (argCount < native->arity) {
+      runtimeError("Expected %d arguments but got %d.", native->arity,
+                   argCount);
+      return false;
+    }
+    if (native->function(argCount, &vm.stack[vm.stackCount - argCount - 1])) {
+      vm.stackCount -= argCount;
+      return true;
+    } else {
+      return false;
+    }
   }
   return callClosure(AS_CLOSURE(method), argCount);
 }
@@ -402,6 +444,7 @@ static InterpretResult run(FILE *stream) {
       push(BOOL_VAL(false));
       break;
     case OP_ADD: {
+      // TODO support array concatenation
       if (IS_STRING(peek(0)) && IS_STRING(peek(1))) {
         concatenate();
       } else if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
@@ -598,6 +641,7 @@ static InterpretResult run(FILE *stream) {
       break;
     }
     case OP_GET_COMPUTED_PROPERTY: {
+      // TODO: check index is valid and within bounds
       if (IS_ARRAY(peek(1))) {
         double index = AS_NUMBER(pop());
         ObjArray *array = AS_ARRAY(pop());
@@ -643,6 +687,7 @@ static InterpretResult run(FILE *stream) {
       break;
     }
     case OP_SET_COMPUTED_PROPERTY: {
+      // TODO: handle assignment
       if (!IS_INSTANCE(peek(2))) {
         frame->ip = ip;
         runtimeError("Only instances have fields.");
