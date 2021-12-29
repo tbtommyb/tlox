@@ -150,7 +150,8 @@ void initVM() {
   defineNative("write", writeNative, 3);
   defineNative("read", readNative, 1);
 
-  defineNativeClass("Array", createArrayClass(vm.initString));
+  vm.classes.array = createArrayClass(vm.initString);
+  defineNativeClass("Array", vm.classes.array);
 }
 
 void freeVM() {
@@ -666,20 +667,38 @@ static InterpretResult run(FILE *stream) {
       break;
     }
     case OP_GET_COMPUTED_PROPERTY: {
-      // TODO: check index is valid and within bounds
-      if (IS_ARRAY(peek(1))) {
-        double index = AS_NUMBER(pop());
-        ObjArray *array = AS_ARRAY(pop());
-        push(array->items.values[(int)index]);
-        break;
-      }
       if (!IS_INSTANCE(peek(1))) {
         frame->ip = ip;
         runtimeError("Only instances have properties.");
         return INTERPRET_RUNTIME_ERROR;
       }
-      ObjInstance *instance = AS_INSTANCE(peek(1));
       Value name = pop();
+      ObjInstance *instance = AS_INSTANCE(pop());
+
+      if (instance->klass == vm.classes.array) {
+        if (!IS_NUMBER(name)) {
+          frame->ip = ip;
+          runtimeError("Only numbers supported as array indexes");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        /* Begin duplicated items access code */
+        ObjString *itemsField = copyString("items", 5);
+
+        Value value;
+        if (!tableGet(&instance->fields, OBJ_VAL(itemsField), &value)) {
+          runtimeError("Failed to access array items");
+          return false;
+        }
+        ObjArray *array = AS_ARRAY(value);
+        int idx = (int)AS_NUMBER(name);
+        if (idx < 0 || idx >= array->items.count) {
+          runtimeError("Index out of bounds");
+          return false;
+        }
+        /* End duplicated items access code */
+        push(array->items.values[idx]);
+        break;
+      }
 
       if (!IS_STRING(name)) {
         frame->ip = ip;
@@ -712,14 +731,37 @@ static InterpretResult run(FILE *stream) {
       break;
     }
     case OP_SET_COMPUTED_PROPERTY: {
-      // TODO: handle assignment
       if (!IS_INSTANCE(peek(2))) {
         frame->ip = ip;
         runtimeError("Only instances have fields.");
         return INTERPRET_RUNTIME_ERROR;
       }
       ObjInstance *instance = AS_INSTANCE(peek(2));
-      tableSet(&instance->fields, peek(1), peek(0));
+      if (instance->klass == vm.classes.array) {
+        if (!IS_NUMBER(peek(1))) {
+          frame->ip = ip;
+          runtimeError("Index must be a number");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        /* Begin duplicated items access code */
+        ObjString *itemsField = copyString("items", 5);
+
+        Value items;
+        if (!tableGet(&instance->fields, OBJ_VAL(itemsField), &items)) {
+          runtimeError("Failed to access array items");
+          return false;
+        }
+        ObjArray *array = AS_ARRAY(items);
+        int idx = (int)AS_NUMBER(peek(1));
+        if (idx < 0 || idx >= array->items.count) {
+          runtimeError("Index out of bounds");
+          return false;
+        }
+        /* End duplicated items access code */
+        array->items.values[idx] = peek(0);
+      } else {
+        tableSet(&instance->fields, peek(1), peek(0));
+      }
       Value value = pop();
       pop(); // Computed
       pop(); // Instance

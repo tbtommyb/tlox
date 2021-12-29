@@ -17,6 +17,10 @@ typedef struct {
 } CallFrame;
 
 typedef struct {
+  ObjClass *array;
+} NativeClassReferences;
+
+typedef struct {
   CallFrame frames[FRAMES_MAX];
   int frameCount;
 
@@ -35,6 +39,9 @@ typedef struct {
   int grayCount;
   int grayCapacity;
   Obj **grayStack;
+
+  NativeClassReferences classes;
+
 } VM;
 
 typedef enum {

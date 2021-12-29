@@ -6,3 +6,12 @@ print myArray.length();
 
 var myMethod = myArray.length;
 print myMethod();
+
+
+myArray.push(3);
+
+print myArray.length();
+
+const val = myArray.pop();
+print myArray.length();
+print val == 3;
