@@ -1115,7 +1115,6 @@ static void decrement(bool canAssign) {
 
 static void arrayLiteral(bool canAssign) {
   uint8_t argCount = 0;
-  namedVariable(syntheticToken("Array"), false);
   if (!check(TOKEN_RIGHT_BRACKET)) {
     do {
       expression();
@@ -1127,7 +1126,6 @@ static void arrayLiteral(bool canAssign) {
   }
   consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array items.");
   emitBytes(OP_ARRAY, argCount);
-  emitBytes(OP_CALL, 1);
 }
 
 ParseRule rules[] = {

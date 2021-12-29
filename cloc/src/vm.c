@@ -260,23 +260,6 @@ static bool callValue(Value callee, int argCount) {
       vm.stack[vm.stackCount - argCount - 1] = OBJ_VAL(newInstance(klass));
       Value initializer;
       if (tableGet(&klass->methods, OBJ_VAL(vm.initString), &initializer)) {
-        /* Begin ugly native handling code */
-        if (IS_NATIVE(initializer)) {
-          ObjNative *native = AS_NATIVE(initializer);
-          if (argCount < native->arity) {
-            runtimeError("Expected %d arguments but got %d in native call.",
-                         native->arity, argCount);
-            return false;
-          }
-          if (native->function(argCount,
-                               &vm.stack[vm.stackCount - argCount - 1])) {
-            vm.stackCount -= argCount;
-            return true;
-          } else {
-            return false;
-          }
-        }
-        /* End ugly native handling code */
         return callClosure(AS_CLOSURE(initializer), argCount);
       } else if (argCount != 0) {
         runtimeError("Expected 0 arguments but got %d.", argCount);
@@ -320,7 +303,7 @@ static bool invokeFromClass(ObjClass *klass, ObjString *name, int argCount) {
 static bool invoke(ObjString *name, int argCount) {
   Value receiver = peek(argCount);
 
-  if (!IS_INSTANCE(receiver)) {
+  if (!IS_INSTANCE(receiver) && !IS_ARRAY_INSTANCE(receiver)) {
     runtimeError("Only instances have methods.");
     return false;
   }
@@ -405,18 +388,18 @@ static void concatenate() {
 }
 
 static void createArray(int len) {
-  ObjPrimitiveArray *array = newPrimitiveArray(len);
+  ObjArrayInstance *instance = newArrayInstance(vm.classes.array);
 
   int startingPoint = vm.stackCount - len;
   for (int i = startingPoint; i < vm.stackCount; i++) {
     Value item = vm.stack[i];
-    writeValueArray(&array->items, item);
+    writeValueArray(&instance->elements, item);
   }
   for (int i = 0; i < len; i++) {
     pop();
   }
 
-  push(OBJ_VAL(array));
+  push(OBJ_VAL(instance));
 }
 
 static InterpretResult run(FILE *stream) {
@@ -646,7 +629,7 @@ static InterpretResult run(FILE *stream) {
       break;
     }
     case OP_GET_PROPERTY: {
-      if (!IS_INSTANCE(peek(0))) {
+      if (!IS_INSTANCE(peek(0)) && !IS_ARRAY_INSTANCE(peek(0))) {
         frame->ip = ip;
         runtimeError("Only instances have properties.");
         return INTERPRET_RUNTIME_ERROR;
@@ -667,6 +650,25 @@ static InterpretResult run(FILE *stream) {
       break;
     }
     case OP_GET_COMPUTED_PROPERTY: {
+      if (IS_ARRAY_INSTANCE(peek(1))) {
+        Value property = pop();
+        ObjArrayInstance *instance = AS_ARRAY_INSTANCE(pop());
+        if (!IS_NUMBER(property)) {
+          frame->ip = ip;
+          runtimeError("Only numbers supported as array indexes");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        ValueArray *array = &instance->elements;
+        int idx = (int)AS_NUMBER(property);
+        if (idx < 0 || idx >= array->count) {
+          frame->ip = ip;
+          runtimeError("Index out of bounds");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        push(array->values[idx]);
+        break;
+      }
+
       if (!IS_INSTANCE(peek(1))) {
         frame->ip = ip;
         runtimeError("Only instances have properties.");
@@ -674,31 +676,6 @@ static InterpretResult run(FILE *stream) {
       }
       Value name = pop();
       ObjInstance *instance = AS_INSTANCE(pop());
-
-      if (instance->klass == vm.classes.array) {
-        if (!IS_NUMBER(name)) {
-          frame->ip = ip;
-          runtimeError("Only numbers supported as array indexes");
-          return INTERPRET_RUNTIME_ERROR;
-        }
-        /* Begin duplicated items access code */
-        ObjString *itemsField = copyString("items", 5);
-
-        Value value;
-        if (!tableGet(&instance->fields, OBJ_VAL(itemsField), &value)) {
-          runtimeError("Failed to access array items");
-          return false;
-        }
-        ObjPrimitiveArray *array = AS_PRIMITIVE_ARRAY(value);
-        int idx = (int)AS_NUMBER(name);
-        if (idx < 0 || idx >= array->items.count) {
-          runtimeError("Index out of bounds");
-          return false;
-        }
-        /* End duplicated items access code */
-        push(array->items.values[idx]);
-        break;
-      }
 
       if (!IS_STRING(name)) {
         frame->ip = ip;
@@ -718,7 +695,7 @@ static InterpretResult run(FILE *stream) {
       break;
     }
     case OP_SET_PROPERTY: {
-      if (!IS_INSTANCE(peek(1))) {
+      if (!IS_INSTANCE(peek(1)) && !IS_ARRAY_INSTANCE(peek(1))) {
         frame->ip = ip;
         runtimeError("Only instances have fields.");
         return INTERPRET_RUNTIME_ERROR;
@@ -731,35 +708,28 @@ static InterpretResult run(FILE *stream) {
       break;
     }
     case OP_SET_COMPUTED_PROPERTY: {
-      if (!IS_INSTANCE(peek(2))) {
-        frame->ip = ip;
-        runtimeError("Only instances have fields.");
-        return INTERPRET_RUNTIME_ERROR;
-      }
-      ObjInstance *instance = AS_INSTANCE(peek(2));
-      if (instance->klass == vm.classes.array) {
+      if (IS_ARRAY_INSTANCE(peek(2))) {
+        ObjArrayInstance *instance = AS_ARRAY_INSTANCE(peek(2));
         if (!IS_NUMBER(peek(1))) {
           frame->ip = ip;
           runtimeError("Index must be a number");
           return INTERPRET_RUNTIME_ERROR;
         }
-        /* Begin duplicated items access code */
-        ObjString *itemsField = copyString("items", 5);
-
-        Value items;
-        if (!tableGet(&instance->fields, OBJ_VAL(itemsField), &items)) {
-          runtimeError("Failed to access array items");
-          return false;
-        }
-        ObjPrimitiveArray *array = AS_PRIMITIVE_ARRAY(items);
+        ValueArray *array = &instance->elements;
         int idx = (int)AS_NUMBER(peek(1));
-        if (idx < 0 || idx >= array->items.count) {
+        if (idx < 0 || idx >= array->count) {
+          frame->ip = ip;
           runtimeError("Index out of bounds");
-          return false;
+          return INTERPRET_RUNTIME_ERROR;
         }
-        /* End duplicated items access code */
-        array->items.values[idx] = peek(0);
+        array->values[idx] = peek(0);
       } else {
+        if (!IS_INSTANCE(peek(2))) {
+          frame->ip = ip;
+          runtimeError("Only instances have fields.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        ObjInstance *instance = AS_INSTANCE(peek(2));
         tableSet(&instance->fields, peek(1), peek(0));
       }
       Value value = pop();

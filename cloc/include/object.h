@@ -18,7 +18,7 @@
 #define IS_INSTANCE(value) isObjType(value, OBJ_INSTANCE)
 #define IS_BOUND_METHOD(value) isObjType(value, OBJ_BOUND_METHOD)
 #define IS_BOUND_NATIVE_METHOD(value) isObjType(value, OBJ_BOUND_NATIVE_METHOD)
-#define IS_PRIMITIVE_ARRAY(value) isObjType(value, OBJ_PRIMITIVE_ARRAY)
+#define IS_ARRAY_INSTANCE(value) isObjType(value, OBJ_ARRAY_INSTANCE)
 
 #define AS_CLOSURE(value) ((ObjClosure *)AS_OBJ(value))
 #define AS_FUNCTION(value) ((ObjFunction *)AS_OBJ(value))
@@ -29,7 +29,7 @@
 #define AS_INSTANCE(value) ((ObjInstance *)AS_OBJ(value))
 #define AS_BOUND_METHOD(value) ((ObjBoundMethod *)AS_OBJ(value))
 #define AS_BOUND_NATIVE_METHOD(value) ((ObjBoundNativeMethod *)AS_OBJ(value))
-#define AS_PRIMITIVE_ARRAY(value) ((ObjPrimitiveArray *)AS_OBJ(value))
+#define AS_ARRAY_INSTANCE(value) ((ObjArrayInstance *)AS_OBJ(value))
 
 typedef enum {
   OBJ_FUNCTION,
@@ -41,7 +41,7 @@ typedef enum {
   OBJ_INSTANCE,
   OBJ_BOUND_METHOD,
   OBJ_BOUND_NATIVE_METHOD,
-  OBJ_PRIMITIVE_ARRAY
+  OBJ_ARRAY_INSTANCE
 } ObjType;
 
 struct Obj {
@@ -113,8 +113,10 @@ typedef struct {
 
 typedef struct {
   Obj obj;
-  ValueArray items;
-} ObjPrimitiveArray;
+  ObjClass *klass;
+  Table fields;
+  ValueArray elements;
+} ObjArrayInstance;
 
 ObjClosure *newClosure(ObjFunction *function);
 ObjFunction *newFunction();
@@ -127,7 +129,7 @@ ObjClass *newClass(ObjString *name);
 ObjInstance *newInstance(ObjClass *klass);
 ObjBoundMethod *newBoundMethod(Value receiver, ObjClosure *method);
 ObjBoundNativeMethod *newBoundNativeMethod(Value receiver, ObjNative *method);
-ObjPrimitiveArray *newPrimitiveArray();
+ObjArrayInstance *newArrayInstance(ObjClass *klass);
 uint32_t hashString(const char *key, int length);
 
 void printObject(FILE *stream, Value value);

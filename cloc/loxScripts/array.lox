@@ -15,3 +15,6 @@ print myArray.length();
 const val = myArray.pop();
 print myArray.length();
 print val == 3;
+
+myArray[1] = "Test this" + " " + "out!!";
+print myArray[1];

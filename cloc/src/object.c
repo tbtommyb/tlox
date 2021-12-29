@@ -157,11 +157,13 @@ ObjUpvalue *newUpvalue(Value *slot) {
   return upvalue;
 }
 
-ObjPrimitiveArray *newPrimitiveArray(int len) {
-  ObjPrimitiveArray *array =
-      ALLOCATE_OBJ(ObjPrimitiveArray, OBJ_PRIMITIVE_ARRAY);
-  initValueArray(&array->items);
-  return array;
+ObjArrayInstance *newArrayInstance(ObjClass *klass) {
+  ObjArrayInstance *instance =
+      ALLOCATE_OBJ(ObjArrayInstance, OBJ_ARRAY_INSTANCE);
+  instance->klass = klass;
+  initTable(&instance->fields);
+  initValueArray(&instance->elements);
+  return instance;
 }
 
 static void printFunction(ObjFunction *function) {
@@ -201,8 +203,8 @@ void printObject(FILE *stream, Value value) {
   case OBJ_UPVALUE:
     fprintf(stream, "upvalue");
     break;
-  case OBJ_PRIMITIVE_ARRAY:
-    fprintf(stream, "array len %d", AS_PRIMITIVE_ARRAY(value)->items.count);
+  case OBJ_ARRAY_INSTANCE:
+    fprintf(stream, "array len %d", AS_ARRAY_INSTANCE(value)->elements.count);
     break;
   }
 }

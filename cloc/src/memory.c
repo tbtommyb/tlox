@@ -82,10 +82,11 @@ static void freeObject(Obj *object) {
   case OBJ_UPVALUE:
     FREE(ObjUpvalue, object);
     break;
-  case OBJ_PRIMITIVE_ARRAY: {
-    ObjPrimitiveArray *array = (ObjPrimitiveArray *)object;
-    freeValueArray(&array->items);
-    FREE(ObjPrimitiveArray, object);
+  case OBJ_ARRAY_INSTANCE: {
+    ObjArrayInstance *instance = (ObjArrayInstance *)object;
+    FREE(ObjInstance, object);
+    freeTable(&instance->fields);
+    freeValueArray(&instance->elements);
     break;
   }
   }
@@ -172,15 +173,16 @@ static void blackenObject(Obj *object) {
   case OBJ_BOUND_NATIVE_METHOD: {
     ObjBoundNativeMethod *bound = (ObjBoundNativeMethod *)object;
     markValue(bound->receiver);
-    /* markObject((Obj *)bound->method); */
     break;
   }
   case OBJ_UPVALUE:
     markValue(((ObjUpvalue *)object)->closed);
     break;
-  case OBJ_PRIMITIVE_ARRAY: {
-    ObjPrimitiveArray *array = (ObjPrimitiveArray *)object;
-    markArray(&array->items);
+  case OBJ_ARRAY_INSTANCE: {
+    ObjArrayInstance *instance = (ObjArrayInstance *)object;
+    markObject((Obj *)instance->klass);
+    markTable(&instance->fields);
+    markArray(&instance->elements);
     break;
   }
   case OBJ_NATIVE:
