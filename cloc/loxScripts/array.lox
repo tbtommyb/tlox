@@ -1,21 +1,8 @@
 fun myFunction() {
   print "inside the function";
 }
-// class MyClass {
-// }
-// var cl = MyClass();
 var myArray = [1, "hello, Tom", 3 * 2, myFunction];
 print myArray.length();
-// print myArray[1];
-// print myArray[2];
-// print myArray[3];
-// print myArray[3]();
 
-
-// fun returnArray() {
-//   return [1, 2];
-// }
-
-// var result = returnArray();
-// print result[0];
-// print result[1];
+var myMethod = myArray.length;
+print myMethod();

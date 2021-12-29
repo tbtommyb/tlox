@@ -7,7 +7,7 @@ static bool loxArrayLength(int argCount, Value *args) {
 
   Value value;
   if (!tableGet(&instance->fields, OBJ_VAL(itemsField), &value)) {
-    runtimeError("Failed to read items length");
+    runtimeError("Failed to read array length");
     return false;
   }
 

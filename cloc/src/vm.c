@@ -220,6 +220,22 @@ static bool callValue(Value callee, int argCount) {
       vm.stack[vm.stackCount - argCount - 1] = bound->receiver;
       return callClosure(bound->method, argCount);
     }
+    case OBJ_BOUND_NATIVE_METHOD: {
+      ObjBoundNativeMethod *bound = AS_BOUND_NATIVE_METHOD(callee);
+      ObjNative *native = bound->method;
+      vm.stack[vm.stackCount - argCount - 1] = bound->receiver;
+      if (argCount < native->arity) {
+        runtimeError("Expected %d arguments but got %d.", native->arity,
+                     argCount);
+        return false;
+      }
+      if (native->function(argCount, &vm.stack[vm.stackCount - argCount - 1])) {
+        vm.stackCount -= argCount;
+        return true;
+      } else {
+        return false;
+      }
+    }
     case OBJ_FUNCTION:
       return callFunction(AS_FUNCTION(callee), argCount);
     case OBJ_CLOSURE:
@@ -281,6 +297,7 @@ static bool invokeFromClass(ObjClass *klass, ObjString *name, int argCount) {
     runtimeError("Undefined property '%s'.", name->chars);
     return false;
   }
+  /* Begin ugly native handling code */
   if (IS_NATIVE(method)) {
     ObjNative *native = AS_NATIVE(method);
     if (argCount < native->arity) {
@@ -295,6 +312,7 @@ static bool invokeFromClass(ObjClass *klass, ObjString *name, int argCount) {
       return false;
     }
   }
+  /* End ugly native handling code */
   return callClosure(AS_CLOSURE(method), argCount);
 }
 
@@ -323,9 +341,16 @@ static bool bindMethod(ObjClass *klass, ObjString *name) {
     return false;
   }
 
-  ObjBoundMethod *bound = newBoundMethod(peek(0), AS_CLOSURE(method));
-  pop();
-  push(OBJ_VAL(bound));
+  if (IS_NATIVE(method)) {
+    ObjBoundNativeMethod *bound =
+        newBoundNativeMethod(peek(0), AS_NATIVE(method));
+    pop();
+    push(OBJ_VAL(bound));
+  } else {
+    ObjBoundMethod *bound = newBoundMethod(peek(0), AS_CLOSURE(method));
+    pop();
+    push(OBJ_VAL(bound));
+  }
   return true;
 }
 

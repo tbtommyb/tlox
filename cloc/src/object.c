@@ -24,6 +24,14 @@ static Obj *allocateObject(size_t size, ObjType type) {
   return object;
 }
 
+ObjBoundNativeMethod *newBoundNativeMethod(Value receiver, ObjNative *method) {
+  ObjBoundNativeMethod *bound =
+      ALLOCATE_OBJ(ObjBoundNativeMethod, OBJ_BOUND_NATIVE_METHOD);
+  bound->receiver = receiver;
+  bound->method = method;
+  return bound;
+}
+
 ObjBoundMethod *newBoundMethod(Value receiver, ObjClosure *method) {
   ObjBoundMethod *bound = ALLOCATE_OBJ(ObjBoundMethod, OBJ_BOUND_METHOD);
   bound->receiver = receiver;
@@ -195,6 +203,9 @@ void printObject(FILE *stream, Value value) {
     break;
   case OBJ_BOUND_METHOD:
     printFunction(AS_BOUND_METHOD(value)->method->function);
+    break;
+  case OBJ_BOUND_NATIVE_METHOD:
+    fprintf(stream, "<native method>");
     break;
   case OBJ_UPVALUE:
     fprintf(stream, "upvalue");
