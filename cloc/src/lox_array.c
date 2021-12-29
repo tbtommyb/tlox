@@ -12,7 +12,7 @@ static bool loxArrayLength(int argCount, Value *args) {
     return false;
   }
 
-  int length = AS_ARRAY(value)->items.count;
+  int length = AS_PRIMITIVE_ARRAY(value)->items.count;
   args[0] = NUMBER_VAL(length);
 
   return true;
@@ -29,7 +29,7 @@ static bool loxArrayPush(int argCount, Value *args) {
     return false;
   }
 
-  ObjArray *arr = AS_ARRAY(value);
+  ObjPrimitiveArray *arr = AS_PRIMITIVE_ARRAY(value);
 
   if (arr->items.capacity < arr->items.count + argCount) {
     int oldCapacity = arr->items.capacity;
@@ -59,7 +59,7 @@ static bool loxArrayPop(int argCount, Value *args) {
     return false;
   }
 
-  ObjArray *arr = AS_ARRAY(value);
+  ObjPrimitiveArray *arr = AS_PRIMITIVE_ARRAY(value);
 
   if (arr->items.count == 0) {
     args[0] = NIL_VAL;

@@ -82,10 +82,10 @@ static void freeObject(Obj *object) {
   case OBJ_UPVALUE:
     FREE(ObjUpvalue, object);
     break;
-  case OBJ_ARRAY: {
-    ObjArray *array = (ObjArray *)object;
+  case OBJ_PRIMITIVE_ARRAY: {
+    ObjPrimitiveArray *array = (ObjPrimitiveArray *)object;
     freeValueArray(&array->items);
-    FREE(ObjArray, object);
+    FREE(ObjPrimitiveArray, object);
     break;
   }
   }
@@ -178,8 +178,8 @@ static void blackenObject(Obj *object) {
   case OBJ_UPVALUE:
     markValue(((ObjUpvalue *)object)->closed);
     break;
-  case OBJ_ARRAY: {
-    ObjArray *array = (ObjArray *)object;
+  case OBJ_PRIMITIVE_ARRAY: {
+    ObjPrimitiveArray *array = (ObjPrimitiveArray *)object;
     markArray(&array->items);
     break;
   }

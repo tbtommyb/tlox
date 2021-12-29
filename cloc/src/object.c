@@ -93,21 +93,12 @@ uint32_t hashString(const char *key, int length) {
 }
 
 ObjString *makeString(const char *chars, int length) {
-  /* ObjString *interned = tableFindString(&vm.strings, chars, length); */
-  /* if (interned != NULL) { */
-  /*   return interned; */
-  /* } */
-
   ObjString *string =
       (ObjString *)allocateObject(sizeof(ObjString) + length + 1, OBJ_STRING);
   string->length = length;
   memcpy(string->chars, chars, length);
   string->chars[length] = '\0';
   string->hash = hashString(chars, length);
-
-  /* push(OBJ_VAL(string)); */
-  /* tableSet(&vm.strings, OBJ_VAL(string), NIL_VAL); */
-  /* pop(); */
 
   return string;
 }
@@ -166,10 +157,10 @@ ObjUpvalue *newUpvalue(Value *slot) {
   return upvalue;
 }
 
-ObjArray *newArray(int len) {
-  ObjArray *array = ALLOCATE_OBJ(ObjArray, OBJ_ARRAY);
+ObjPrimitiveArray *newPrimitiveArray(int len) {
+  ObjPrimitiveArray *array =
+      ALLOCATE_OBJ(ObjPrimitiveArray, OBJ_PRIMITIVE_ARRAY);
   initValueArray(&array->items);
-  /* GROW_ARRAY(Value, &array->items, 0, len); */
   return array;
 }
 
@@ -210,8 +201,8 @@ void printObject(FILE *stream, Value value) {
   case OBJ_UPVALUE:
     fprintf(stream, "upvalue");
     break;
-  case OBJ_ARRAY:
-    fprintf(stream, "array len %d", AS_ARRAY(value)->items.count);
+  case OBJ_PRIMITIVE_ARRAY:
+    fprintf(stream, "array len %d", AS_PRIMITIVE_ARRAY(value)->items.count);
     break;
   }
 }

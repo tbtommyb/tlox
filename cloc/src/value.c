@@ -114,4 +114,5 @@ uint32_t computeHash(Value value) {
   if (IS_EMPTY(value)) {
     return 0;
   }
+  // TODO: support arrays?
 }

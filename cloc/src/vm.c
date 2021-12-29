@@ -405,7 +405,7 @@ static void concatenate() {
 }
 
 static void createArray(int len) {
-  ObjArray *array = newArray(len);
+  ObjPrimitiveArray *array = newPrimitiveArray(len);
 
   int startingPoint = vm.stackCount - len;
   for (int i = startingPoint; i < vm.stackCount; i++) {
@@ -689,7 +689,7 @@ static InterpretResult run(FILE *stream) {
           runtimeError("Failed to access array items");
           return false;
         }
-        ObjArray *array = AS_ARRAY(value);
+        ObjPrimitiveArray *array = AS_PRIMITIVE_ARRAY(value);
         int idx = (int)AS_NUMBER(name);
         if (idx < 0 || idx >= array->items.count) {
           runtimeError("Index out of bounds");
@@ -751,7 +751,7 @@ static InterpretResult run(FILE *stream) {
           runtimeError("Failed to access array items");
           return false;
         }
-        ObjArray *array = AS_ARRAY(items);
+        ObjPrimitiveArray *array = AS_PRIMITIVE_ARRAY(items);
         int idx = (int)AS_NUMBER(peek(1));
         if (idx < 0 || idx >= array->items.count) {
           runtimeError("Index out of bounds");
