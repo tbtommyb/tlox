@@ -20,6 +20,7 @@ typedef enum {
   TOKEN_STAR,
   TOKEN_COLON,
   TOKEN_QUESTION,
+  TOKEN_PERCENT,
 
   // One or two character tokens.
   TOKEN_BANG,

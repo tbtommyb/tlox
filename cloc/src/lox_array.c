@@ -17,7 +17,7 @@ static bool loxArrayPush(int argCount, Value *args) {
   if (arr->capacity < arr->count + argCount) {
     int oldCapacity = arr->capacity;
     arr->capacity = GROW_CAPACITY(oldCapacity + argCount);
-    arr->values = GROW_ARRAY(Value, &arr->values, oldCapacity, arr->capacity);
+    arr->values = GROW_ARRAY(Value, arr->values, oldCapacity, arr->capacity);
   }
 
   for (int i = 0; i < argCount; i++) {

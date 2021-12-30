@@ -32,13 +32,12 @@ static char *readFile(const char *path) {
   return buffer;
 }
 
-START_TEST(simpleAddition) {
-  initVM();
-
-  const char *input = "print 5 + 5;\n";
+void runReplTest(const char *input, const char *expected) {
   FILE *output = tmpfile();
+  FILE *err = tmpfile();
+  initVM(output, err);
 
-  interpret(input, output);
+  interpret(input);
 
   const int outputLength = ftell(output);
   char *outputBuffer = calloc(outputLength + 1, sizeof(char));
@@ -46,97 +45,208 @@ START_TEST(simpleAddition) {
   fgets(outputBuffer, outputLength, output);
   fclose(output);
 
-  const char *expected = "10\0";
   ck_assert_msg(strcmp(outputBuffer, expected) == 0,
                 "Expected %s, but got %.*s", expected, outputLength,
                 outputBuffer);
+
   freeVM();
 }
-END_TEST
 
 START_TEST(simpleConcatenation) {
-  initVM();
+  runReplTest("print \"hello \" + \"world\";", "hello world\0");
+}
+END_TEST
+START_TEST(simpleAddition) { runReplTest("print 5 + 5;\n", "10\0"); }
+END_TEST
 
-  const char *input = "print \"hello \" + \"world\";";
-  FILE *output = tmpfile();
-
-  interpret(input, output);
-
-  const int outputLength = ftell(output);
-  char *outputBuffer = calloc(outputLength + 1, sizeof(char));
-  rewind(output);
-  fgets(outputBuffer, outputLength, output);
-  fclose(output);
-
-  const char *expected = "hello world\0";
-  ck_assert_msg(strcmp(outputBuffer, expected) == 0,
-                "Expected %s, but got %.*s", expected, outputLength,
-                outputBuffer);
-
-  freeVM();
+START_TEST(ternary) {
+  runReplTest("print 3 < 2 ? \"broken\" : 4 == 5 ? 55 : 99;\n", "99\0");
 }
 END_TEST
 
-START_TEST(fileInheritance) {
-  initVM();
+START_TEST(moduloOdd) { runReplTest("print 5 % 2;\n", "1\0"); }
+END_TEST
 
-  const char *input = readFile("./tests/testCases/simpleInheritance.lox");
+START_TEST(moduloEven) { runReplTest("print 4 % 2;\n", "0\0"); }
+END_TEST
+
+Suite *singleLineInputSuite(void) {
+  Suite *s;
+  TCase *testCases;
+
+  s = suite_create("SingleLineInputs");
+  testCases = tcase_create("Cases");
+
+  tcase_add_test(testCases, simpleAddition);
+  tcase_add_test(testCases, simpleConcatenation);
+  tcase_add_test(testCases, ternary);
+  tcase_add_test(testCases, moduloOdd);
+  tcase_add_test(testCases, moduloEven);
+
+  suite_add_tcase(s, testCases);
+
+  return s;
+}
+
+void runFileTest(const char *path, const char *expected) {
+  const char *input = readFile(path);
   FILE *output = tmpfile();
+  FILE *err = tmpfile();
 
-  interpret(input, output);
+  initVM(output, err);
+  interpret(input);
 
+  fseek(output, 0, SEEK_END);
   const int outputLength = ftell(output);
+  rewind(output);
+
   char *outputBuffer = calloc(outputLength + 1, sizeof(char));
   rewind(output);
   fgets(outputBuffer, outputLength, output);
-  fclose(output);
 
-  const char *expected = "Dunk in the fryer. Finish with icing\0";
+  fclose(output);
+  fclose(err);
+
   ck_assert_msg(strcmp(outputBuffer, expected) == 0,
                 "Expected '%s', but got '%.*s'", expected, outputLength,
                 outputBuffer);
 
   freeVM();
 }
-END_TEST
 
-Suite * singleLineInputSuite(void)
-{
-    Suite *s;
-    TCase *arithmeticTestCases;
-    TCase *stringsTestCases;
+void runFileExpectedErrorTest(const char *path, const char *expected) {
+  const char *input = readFile(path);
+  FILE *output = tmpfile();
+  FILE *err = tmpfile();
 
-    s = suite_create("SingleLineInputs");
+  initVM(output, err);
+  interpret(input);
 
-    // Arithmetic tests
-    arithmeticTestCases = tcase_create("Arithmetic");
+  const int errLength = ftell(err);
+  rewind(err);
 
-    tcase_add_test(arithmeticTestCases, simpleAddition);
-    suite_add_tcase(s, arithmeticTestCases);
+  char *errBuffer = calloc(errLength + 1, sizeof(char));
+  fgets(errBuffer, errLength, err);
 
-    // Strings tests
-    stringsTestCases = tcase_create("Strings");
+  fclose(err);
+  fclose(output);
 
-    tcase_add_test(stringsTestCases, simpleConcatenation);
-    suite_add_tcase(s, stringsTestCases);
+  ck_assert_msg(strcmp(errBuffer, expected) == 0,
+                "Expected '%s', but got '%.*s'", expected, errLength,
+                errBuffer);
 
-    return s;
+  freeVM();
 }
 
-Suite * fileInputSuite(void)
-{
-    Suite *s;
-    TCase *classesTestCases;
+START_TEST(fileInheritance) {
+  runFileTest("./tests/testCases/simpleInheritance.lox",
+              "Dunk in the fryer. Finish with icing\0");
+}
+END_TEST
 
-    s = suite_create("FileInputs");
+START_TEST(arrays) { runFileTest("./tests/testCases/arrays.lox", "27\0"); }
+END_TEST
 
-    // Classes tests
-    classesTestCases = tcase_create("Classes");
+START_TEST(fibonacci) { runFileTest("./tests/testCases/fibonacci.lox", "8\0"); }
+END_TEST
 
-    tcase_add_test(classesTestCases, fileInheritance);
-    suite_add_tcase(s, classesTestCases);
+START_TEST(closures) {
+  runFileTest("./tests/testCases/closures.lox", "3030\0");
+}
+END_TEST
 
-    return s;
+START_TEST(computedProperties) {
+  runFileTest("./tests/testCases/computedProperties.lox",
+              "Louise Armstrong plays the super trumpet\0");
+}
+END_TEST
+
+START_TEST(continueTest) {
+  runFileTest("./tests/testCases/continue.lox", "165\0");
+}
+END_TEST
+
+START_TEST(increment) {
+  runFileTest("./tests/testCases/increment.lox", "105\0");
+}
+END_TEST
+
+START_TEST(switchTest) {
+  runFileTest("./tests/testCases/switch.lox", "One Two unknown number\0");
+}
+END_TEST
+
+START_TEST(reassignConstTest) {
+  runFileExpectedErrorTest(
+      "./tests/testCases/errors/const.lox",
+      "[line 2] Error at '=': Cannot reassign constant variable.\0");
+}
+END_TEST
+
+START_TEST(continueOutsideLoopTest) {
+  runFileExpectedErrorTest(
+      "./tests/testCases/errors/continue.lox",
+      "[line 2] Error at 'continue': Cannot use 'continue' outside a loop\0");
+}
+END_TEST
+
+START_TEST(returnOutsideFunctionTest) {
+  runFileExpectedErrorTest(
+      "./tests/testCases/errors/return.lox",
+      "[line 1] Error at 'return': Can't return from top-level code.\0");
+}
+END_TEST
+
+START_TEST(returnFromInitialiserTest) {
+  runFileExpectedErrorTest("./tests/testCases/errors/returnFromInitialiser.lox",
+                           "[line 4] Error at 'return': Can't return a value "
+                           "from an initializer.\0");
+}
+END_TEST
+
+START_TEST(duplicateConstTest) {
+  runFileExpectedErrorTest("./tests/testCases/errors/duplicateConst.lox",
+                           "[line 2] Error at 'a': Already a variable with "
+                           "this name in this scope\0");
+}
+END_TEST
+
+START_TEST(constOverrideTest) {
+  runFileExpectedErrorTest(
+      "./tests/testCases/errors/constOverride.lox",
+      "[line 2] Error at 'b': Cannot redeclare a const variable\0");
+}
+END_TEST
+
+Suite *fileInputSuite(void) {
+  Suite *s;
+  TCase *testCases;
+  TCase *errorTestCases;
+
+  s = suite_create("FileInputs");
+  testCases = tcase_create("Cases");
+
+  tcase_add_test(testCases, fileInheritance);
+  tcase_add_test(testCases, arrays);
+  tcase_add_test(testCases, fibonacci);
+  tcase_add_test(testCases, closures);
+  tcase_add_test(testCases, computedProperties);
+  tcase_add_test(testCases, continueTest);
+  tcase_add_test(testCases, increment);
+  tcase_add_test(testCases, switchTest);
+
+  errorTestCases = tcase_create("Expected error cases");
+  tcase_add_test(errorTestCases, reassignConstTest);
+  tcase_add_test(errorTestCases, continueOutsideLoopTest);
+  tcase_add_test(errorTestCases, returnOutsideFunctionTest);
+  tcase_add_test(errorTestCases, returnFromInitialiserTest);
+  tcase_add_test(errorTestCases, duplicateConstTest);
+  tcase_add_test(errorTestCases, constOverrideTest);
+
+  suite_add_tcase(s, testCases);
+  suite_add_tcase(s, errorTestCases);
+
+  return s;
 }
 
 int main(void) {

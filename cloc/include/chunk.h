@@ -32,6 +32,7 @@ typedef enum {
   OP_LESS,
   OP_LOOP,
   OP_METHOD,
+  OP_MODULO,
   OP_MULTIPLY,
   OP_NEGATE,
   OP_NIL,

@@ -20,6 +20,8 @@ typedef struct {
   Token previousPrevious;
   bool hadError;
   bool panicMode;
+  FILE *ostream;
+  FILE *errstream;
 } Parser;
 
 typedef enum {
@@ -95,17 +97,17 @@ static void errorAt(Token *token, const char *message) {
   if (parser.panicMode)
     return;
   parser.panicMode = true;
-  fprintf(stderr, "[line %d] Error", token->line);
+  fprintf(parser.errstream, "[line %d] Error", token->line);
 
   if (token->type == TOKEN_EOF) {
-    fprintf(stderr, " at end");
+    fprintf(parser.errstream, " at end");
   } else if (token->type == TOKEN_ERROR) {
     // Nothing.
   } else {
-    fprintf(stderr, " at '%.*s'", token->length, token->start);
+    fprintf(parser.errstream, " at '%.*s'", token->length, token->start);
   }
 
-  fprintf(stderr, ": %s\n", message);
+  fprintf(parser.errstream, ": %s\n", message);
   parser.hadError = true;
 }
 
@@ -548,6 +550,9 @@ static void binary(bool canAssign) {
     break;
   case TOKEN_LESS_EQUAL:
     emitBytes(OP_GREATER, OP_NOT);
+    break;
+  case TOKEN_PERCENT:
+    emitByte(OP_MODULO);
     break;
   default:
     return; // Unreachable.
@@ -1142,6 +1147,7 @@ ParseRule rules[] = {
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
     [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
     [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
+    [TOKEN_PERCENT] = {NULL, binary, PREC_FACTOR},
     [TOKEN_BANG] = {unary, NULL, PREC_NONE},
     [TOKEN_EQUAL] = {NULL, NULL, PREC_NONE},
     [TOKEN_BANG_EQUAL] = {NULL, binary, PREC_EQUALITY},
@@ -1200,7 +1206,7 @@ static void parsePrecedence(Precedence precedence) {
 
 static ParseRule *getRule(TokenType type) { return &rules[type]; }
 
-ObjFunction *compile(const char *source) {
+ObjFunction *compile(const char *source, FILE *ostream, FILE *errstream) {
   initScanner(source);
 
   Compiler compiler;
@@ -1208,6 +1214,8 @@ ObjFunction *compile(const char *source) {
 
   parser.hadError = false;
   parser.panicMode = false;
+  parser.ostream = ostream;
+  parser.errstream = errstream;
 
   initTable(&stringConstants);
   initTable(&globalConsts);

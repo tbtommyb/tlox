@@ -1,0 +1,8 @@
+class TestClass {
+  init() {
+    this.name = "Broken";
+    return this;
+  }
+}
+
+var myInstance = TestClass();

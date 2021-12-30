@@ -1,0 +1,2 @@
+const a = 1;
+a = 2; // Expected "[line 2] Error at '=': Cannot reassign constant variable."

@@ -1,0 +1,25 @@
+fun square(n) {
+  return n * n;
+}
+
+var testArrayOne = [1, "2", 3 * 3, square];
+var testArrayTwo = [0, 0, 0, 0, 0];
+
+var testArrayOneLength = testArrayOne.length;
+
+var len = testArrayOneLength();
+
+for (var i = 0; i < 5; i++) {
+  testArrayOne.push(i);
+  testArrayTwo[i] = i;
+}
+
+len = len + testArrayOne.length();
+
+for (var i = 0; i < 5; i++) {
+  testArrayOne.push(testArrayTwo.pop());
+}
+
+len = len + testArrayOne.length();
+len = len + testArrayTwo.length();
+print len; // expected 27

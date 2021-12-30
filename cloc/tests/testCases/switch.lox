@@ -1,0 +1,10 @@
+fun printNum(n) {
+  switch(n) {
+    case 1: return "One";
+    case 2: return "Two";
+    case 3: return "Three";
+    default: return "unknown number";
+  }
+}
+
+print printNum(1) + " " + printNum(2) + " " + printNum(123); // Expected "One Two unknown number"

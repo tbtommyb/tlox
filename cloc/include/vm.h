@@ -42,6 +42,8 @@ typedef struct {
 
   NativeClassReferences classes;
 
+  FILE *ostream;
+  FILE *errstream;
 } VM;
 
 typedef enum {
@@ -52,9 +54,9 @@ typedef enum {
 
 extern VM vm;
 
-void initVM();
+void initVM(FILE *ostream, FILE *errstream);
 void freeVM();
-InterpretResult interpret(const char *source, FILE *stream);
+InterpretResult interpret(const char *source);
 void push(Value value);
 Value pop();
 void runtimeError(const char *format, ...);

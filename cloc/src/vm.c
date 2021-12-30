@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,19 +35,20 @@ static inline ObjFunction *getFrameFunction(CallFrame *frame) {
 void runtimeError(const char *format, ...) {
   va_list args;
   va_start(args, format);
-  vfprintf(stderr, format, args);
+  vfprintf(vm.errstream, format, args);
   va_end(args);
-  fputs("\n", stderr);
+  fputs("\n", vm.errstream);
 
   for (int i = vm.frameCount - 1; i >= 0; i--) {
     CallFrame *frame = &vm.frames[i];
     ObjFunction *function = getFrameFunction(frame);
     size_t instruction = frame->ip - function->chunk.code - 1;
-    fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction].line);
+    fprintf(vm.errstream, "[line %d] in ",
+            function->chunk.lines[instruction].line);
     if (function->name == NULL) {
-      fprintf(stderr, "script\n");
+      fprintf(vm.errstream, "script\n");
     } else {
-      fprintf(stderr, "%s()\n", function->name->chars);
+      fprintf(vm.errstream, "%s()\n", function->name->chars);
     }
   }
 
@@ -127,7 +129,7 @@ static void defineNativeClass(const char *name, ObjClass *klass) {
   pop();
 }
 
-void initVM() {
+void initVM(FILE *ostream, FILE *errstream) {
   resetStack();
   vm.stackCapacity = 256;
   vm.stack = GROW_ARRAY(Value, vm.stack, 0, vm.stackCapacity);
@@ -152,6 +154,9 @@ void initVM() {
 
   vm.classes.array = createArrayClass(vm.initString);
   defineNativeClass("Array", vm.classes.array);
+
+  vm.ostream = ostream;
+  vm.errstream = errstream;
 }
 
 void freeVM() {
@@ -402,7 +407,7 @@ static void createArray(int len) {
   push(OBJ_VAL(instance));
 }
 
-static InterpretResult run(FILE *stream) {
+static InterpretResult run() {
   CallFrame *frame = &vm.frames[vm.frameCount - 1];
   register uint8_t *ip = frame->ip;
 
@@ -429,7 +434,7 @@ static InterpretResult run(FILE *stream) {
     for (int i = 0; i < vm.stackCount; i++) {
       Value slot = vm.stack[i];
       printf("[ ");
-      printValue(stream, slot);
+      printValue(vm.ostream, slot);
       printf(" ]");
     }
     printf("\n");
@@ -476,6 +481,16 @@ static InterpretResult run(FILE *stream) {
     case OP_DIVIDE:
       BINARY_OP(NUMBER_VAL, /);
       break;
+    case OP_MODULO:
+      if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) {
+        frame->ip = ip;
+        runtimeError("Operands must be numbers.");
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      double b = AS_NUMBER(pop());
+      double a = AS_NUMBER(pop());
+      push(NUMBER_VAL(fmod(a, b)));
+      break;
     case OP_NOT:
       push(BOOL_VAL(isFalsey(pop())));
       break;
@@ -508,8 +523,8 @@ static InterpretResult run(FILE *stream) {
       BINARY_OP(BOOL_VAL, <);
       break;
     case OP_PRINT: {
-      printValue(stream, pop());
-      fprintf(stream, "\n");
+      printValue(vm.ostream, pop());
+      fprintf(vm.ostream, "\n");
       break;
     }
     case OP_JUMP: {
@@ -675,7 +690,7 @@ static InterpretResult run(FILE *stream) {
         return INTERPRET_RUNTIME_ERROR;
       }
       Value name = pop();
-      ObjInstance *instance = AS_INSTANCE(pop());
+      ObjInstance *instance = AS_INSTANCE(peek(0));
 
       if (!IS_STRING(name)) {
         frame->ip = ip;
@@ -800,8 +815,8 @@ static InterpretResult run(FILE *stream) {
 #undef BINARY_OP
 }
 
-InterpretResult interpret(const char *source, FILE *stream) {
-  ObjFunction *function = compile(source);
+InterpretResult interpret(const char *source) {
+  ObjFunction *function = compile(source, vm.ostream, vm.errstream);
   if (function == NULL) {
     return INTERPRET_COMPILE_ERROR;
   }
@@ -812,5 +827,5 @@ InterpretResult interpret(const char *source, FILE *stream) {
   push(OBJ_VAL(closure));
   callClosure(closure, 0);
 
-  return run(stream);
+  return run();
 }
