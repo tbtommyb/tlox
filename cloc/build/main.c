@@ -1,3 +1,4 @@
+#include "ast.h"
 #include "chunk.h"
 #include "common.h"
 #include "debug.h"
@@ -62,6 +63,7 @@ static void runFile(const char *path) {
 int main(int argc, const char *argv[]) {
   initVM(stdout, stderr);
 
+  testAST();
   if (argc == 1) {
     repl();
   } else if (argc == 2) {

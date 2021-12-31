@@ -185,6 +185,30 @@ cloc/fast:
 	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/build
 .PHONY : cloc/fast
 
+ast.o: ast.c.o
+.PHONY : ast.o
+
+# target to build an object file
+ast.c.o:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/ast.c.o
+.PHONY : ast.c.o
+
+ast.i: ast.c.i
+.PHONY : ast.i
+
+# target to preprocess a source file
+ast.c.i:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/ast.c.i
+.PHONY : ast.c.i
+
+ast.s: ast.c.s
+.PHONY : ast.s
+
+# target to generate assembly for a file
+ast.c.s:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/ast.c.s
+.PHONY : ast.c.s
+
 chunk.o: chunk.c.o
 .PHONY : chunk.o
 
@@ -439,6 +463,9 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... test"
 	@echo "... cloc"
+	@echo "... ast.o"
+	@echo "... ast.i"
+	@echo "... ast.s"
 	@echo "... chunk.o"
 	@echo "... chunk.i"
 	@echo "... chunk.s"

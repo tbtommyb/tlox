@@ -1,4 +1,5 @@
 set(LIB_SOURCES
+  ast.c
   chunk.c
   compiler.c
   debug.c
