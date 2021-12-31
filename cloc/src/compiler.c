@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ast.h"
 #include "chunk.h"
 #include "common.h"
 #include "compiler.h"
@@ -39,7 +40,7 @@ typedef enum {
   PREC_PRIMARY
 } Precedence;
 
-typedef void (*ParseFn)(bool canAssign);
+typedef AstNode *(*ParseFn)(bool canAssign);
 
 typedef struct {
   ParseFn prefix;
@@ -270,9 +271,9 @@ static void endScope() {
   }
 }
 
-static void expression();
-static void statement();
-static void declaration();
+static AstNode *expression();
+static AstNode *statement();
+static AstNode *declaration();
 
 static void printStatement() {
   expression();
@@ -324,7 +325,7 @@ static void synchronize() {
 
 static ParseRule *getRule(TokenType type);
 
-static void parsePrecedence(Precedence precedence);
+static AstNode *parsePrecedence(Precedence precedence);
 
 static int searchConstantsFor(Value value) {
   ValueArray constants = currentChunk()->constants;
@@ -511,53 +512,53 @@ static void and_(bool canAssign) {
   patchJump(endJump);
 }
 
-static void binary(bool canAssign) {
-  // Remember the operator.
-  TokenType operatorType = parser.previous.type;
+/* static AstNode *binary(bool canAssign) { */
+/*   // Remember the operator. */
+/*   TokenType operatorType = parser.previous.type; */
 
-  // Compile the right operand.
-  ParseRule *rule = getRule(operatorType);
-  parsePrecedence((Precedence)(rule->precedence + 1));
+/*   // Compile the right operand. */
+/*   ParseRule *rule = getRule(operatorType); */
+/*   parsePrecedence((Precedence)(rule->precedence + 1)); */
 
-  // Emit the operator instruction.
-  switch (operatorType) {
-  case TOKEN_PLUS:
-    emitByte(OP_ADD);
-    break;
-  case TOKEN_MINUS:
-    emitByte(OP_SUBTRACT);
-    break;
-  case TOKEN_STAR:
-    emitByte(OP_MULTIPLY);
-    break;
-  case TOKEN_SLASH:
-    emitByte(OP_DIVIDE);
-    break;
-  case TOKEN_BANG_EQUAL:
-    emitBytes(OP_EQUAL, OP_NOT);
-    break;
-  case TOKEN_EQUAL_EQUAL:
-    emitByte(OP_EQUAL);
-    break;
-  case TOKEN_GREATER:
-    emitByte(OP_GREATER);
-    break;
-  case TOKEN_GREATER_EQUAL:
-    emitBytes(OP_LESS, OP_NOT);
-    break;
-  case TOKEN_LESS:
-    emitByte(OP_LESS);
-    break;
-  case TOKEN_LESS_EQUAL:
-    emitBytes(OP_GREATER, OP_NOT);
-    break;
-  case TOKEN_PERCENT:
-    emitByte(OP_MODULO);
-    break;
-  default:
-    return; // Unreachable.
-  }
-}
+/*   // Emit the operator instruction. */
+/*   switch (operatorType) { */
+/*   case TOKEN_PLUS: */
+/*     emitByte(OP_ADD); */
+/*     break; */
+/*   case TOKEN_MINUS: */
+/*     emitByte(OP_SUBTRACT); */
+/*     break; */
+/*   case TOKEN_STAR: */
+/*     emitByte(OP_MULTIPLY); */
+/*     break; */
+/*   case TOKEN_SLASH: */
+/*     emitByte(OP_DIVIDE); */
+/*     break; */
+/*   case TOKEN_BANG_EQUAL: */
+/*     emitBytes(OP_EQUAL, OP_NOT); */
+/*     break; */
+/*   case TOKEN_EQUAL_EQUAL: */
+/*     emitByte(OP_EQUAL); */
+/*     break; */
+/*   case TOKEN_GREATER: */
+/*     emitByte(OP_GREATER); */
+/*     break; */
+/*   case TOKEN_GREATER_EQUAL: */
+/*     emitBytes(OP_LESS, OP_NOT); */
+/*     break; */
+/*   case TOKEN_LESS: */
+/*     emitByte(OP_LESS); */
+/*     break; */
+/*   case TOKEN_LESS_EQUAL: */
+/*     emitBytes(OP_GREATER, OP_NOT); */
+/*     break; */
+/*   case TOKEN_PERCENT: */
+/*     emitByte(OP_MODULO); */
+/*     break; */
+/*   default: */
+/*     return; // Unreachable. */
+/*   } */
+/* } */
 
 static void call(bool canAssign) {
   uint8_t argCount = argumentList();
@@ -608,7 +609,7 @@ static void literal(bool canAssign) {
   }
 }
 
-static void expression() { parsePrecedence(PREC_ASSIGNMENT); }
+static AstNode *expression() { return parsePrecedence(PREC_ASSIGNMENT); }
 
 static void block() {
   while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
@@ -684,10 +685,11 @@ static void varDeclaration(bool isConst) {
   defineVariable(global);
 }
 
-static void expressionStatement() {
-  expression();
+static AstNode *expressionStatement() {
+  AstNode *node = expression();
   consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
-  emitByte(OP_POP);
+  /* emitByte(OP_POP); */
+  return node;
 }
 
 static void whileStatement() {
@@ -970,45 +972,47 @@ static void classDeclaration() {
   currentClass = currentClass->enclosing;
 }
 
-static void declaration() {
-  if (match(TOKEN_CLASS)) {
-    classDeclaration();
-  } else if (match(TOKEN_FUN)) {
-    funDeclaration();
-  } else if (match(TOKEN_CONST)) {
-    varDeclaration(true);
-  } else if (match(TOKEN_VAR)) {
-    varDeclaration(false);
-  } else {
-    statement();
-  }
+static AstNode *declaration() {
+  return statement();
+  /* if (match(TOKEN_CLASS)) { */
+  /*   classDeclaration(); */
+  /* } else if (match(TOKEN_FUN)) { */
+  /*   funDeclaration(); */
+  /* } else if (match(TOKEN_CONST)) { */
+  /*   varDeclaration(true); */
+  /* } else if (match(TOKEN_VAR)) { */
+  /*   varDeclaration(false); */
+  /* } else { */
+  /*   statement(); */
+  /* } */
   if (parser.panicMode) {
     synchronize();
   }
 }
 
-static void statement() {
-  if (match(TOKEN_PRINT)) {
-    printStatement();
-  } else if (match(TOKEN_RETURN)) {
-    returnStatement();
-  } else if (match(TOKEN_FOR)) {
-    forStatement();
-  } else if (match(TOKEN_IF)) {
-    ifStatement();
-  } else if (match(TOKEN_WHILE)) {
-    whileStatement();
-  } else if (match(TOKEN_SWITCH)) {
-    switchStatement();
-  } else if (match(TOKEN_LEFT_BRACE)) {
-    beginScope();
-    block();
-    endScope();
-  } else if (match(TOKEN_CONTINUE)) {
-    continueStatement();
-  } else {
-    expressionStatement();
-  }
+static AstNode *statement() {
+  return expressionStatement();
+  /* if (match(TOKEN_PRINT)) { */
+  /*   printStatement(); */
+  /* } else if (match(TOKEN_RETURN)) { */
+  /*   returnStatement(); */
+  /* } else if (match(TOKEN_FOR)) { */
+  /*   forStatement(); */
+  /* } else if (match(TOKEN_IF)) { */
+  /*   ifStatement(); */
+  /* } else if (match(TOKEN_WHILE)) { */
+  /*   whileStatement(); */
+  /* } else if (match(TOKEN_SWITCH)) { */
+  /*   switchStatement(); */
+  /* } else if (match(TOKEN_LEFT_BRACE)) { */
+  /*   beginScope(); */
+  /*   block(); */
+  /*   endScope(); */
+  /* } else if (match(TOKEN_CONTINUE)) { */
+  /*   continueStatement(); */
+  /* } else { */
+  /*   expressionStatement(); */
+  /* } */
 }
 
 static void grouping(bool canAssign) {
@@ -1016,9 +1020,10 @@ static void grouping(bool canAssign) {
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
 }
 
-static void number(bool canAssign) {
+static AstNode *number(bool canAssign) {
   double value = strtod(parser.previous.start, NULL);
-  emitConstant(NUMBER_VAL(value));
+  /* emitConstant(NUMBER_VAL(value)); */
+  return newLiteralExpr(NUMBER_VAL(value));
 }
 
 static void or_(bool canAssign) {
@@ -1062,23 +1067,27 @@ static void ternary(bool canAssign) {
   patchJump(elseJump);
 }
 
-static void unary(bool canAssign) {
+static AstNode *unary(bool canAssign) {
   TokenType operatorType = parser.previous.type;
 
   // Compile the operand.
-  parsePrecedence(PREC_UNARY);
+  AstNode *operand = parsePrecedence(PREC_UNARY);
 
-  // Emit the operator instruction.
-  switch (operatorType) {
-  case TOKEN_BANG:
-    emitByte(OP_NOT);
-    break;
-  case TOKEN_MINUS:
-    emitByte(OP_NEGATE);
-    break;
-  default:
-    return; // Unreachable.
+  if (operatorType == TOKEN_BANG || operatorType == TOKEN_MINUS) {
+    return newUnaryExpr(operand, operatorType);
   }
+  return NULL;
+  /* // Emit the operator instruction. */
+  /* switch (operatorType) { */
+  /* case TOKEN_BANG: */
+  /*   emitByte(OP_NOT); */
+  /*   break; */
+  /* case TOKEN_MINUS: */
+  /*   emitByte(OP_NEGATE); */
+  /*   break; */
+  /* default: */
+  /*   return; // Unreachable. */
+  /* } */
 }
 
 static void postfixModification(bool canAssign, OpCode op) {
@@ -1134,69 +1143,72 @@ static void arrayLiteral(bool canAssign) {
 }
 
 ParseRule rules[] = {
-    [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
-    [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
-    [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
-    [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
-    [TOKEN_LEFT_BRACKET] = {arrayLiteral, leftBracket, PREC_CALL},
-    [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
-    [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
-    [TOKEN_DOT] = {NULL, dot, PREC_CALL},
-    [TOKEN_MINUS] = {unary, binary, PREC_TERM},
-    [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
-    [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
-    [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
-    [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
-    [TOKEN_PERCENT] = {NULL, binary, PREC_FACTOR},
+    /* [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL}, */
+    /* [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE}, */
+    /* [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE}, */
+    /* [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE}, */
+    /* [TOKEN_LEFT_BRACKET] = {arrayLiteral, leftBracket, PREC_CALL}, */
+    /* [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE}, */
+    /* [TOKEN_COMMA] = {NULL, NULL, PREC_NONE}, */
+    /* [TOKEN_DOT] = {NULL, dot, PREC_CALL}, */
+    /* [TOKEN_MINUS] = {unary, binary, PREC_TERM}, */
+    /* [TOKEN_PLUS] = {NULL, binary, PREC_TERM}, */
+    /* [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE}, */
+    /* [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR}, */
+    /* [TOKEN_STAR] = {NULL, binary, PREC_FACTOR}, */
+    /* [TOKEN_PERCENT] = {NULL, binary, PREC_FACTOR}, */
     [TOKEN_BANG] = {unary, NULL, PREC_NONE},
-    [TOKEN_EQUAL] = {NULL, NULL, PREC_NONE},
-    [TOKEN_BANG_EQUAL] = {NULL, binary, PREC_EQUALITY},
-    [TOKEN_EQUAL_EQUAL] = {NULL, binary, PREC_EQUALITY},
-    [TOKEN_GREATER] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_GREATER_EQUAL] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_LESS] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_LESS_EQUAL] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE},
-    [TOKEN_STRING] = {string, NULL, PREC_NONE},
+    /* [TOKEN_EQUAL] = {NULL, NULL, PREC_NONE}, */
+    /* [TOKEN_BANG_EQUAL] = {NULL, binary, PREC_EQUALITY}, */
+    /* [TOKEN_EQUAL_EQUAL] = {NULL, binary, PREC_EQUALITY}, */
+    /* [TOKEN_GREATER] = {NULL, binary, PREC_COMPARISON}, */
+    /* [TOKEN_GREATER_EQUAL] = {NULL, binary, PREC_COMPARISON}, */
+    /* [TOKEN_LESS] = {NULL, binary, PREC_COMPARISON}, */
+    /* [TOKEN_LESS_EQUAL] = {NULL, binary, PREC_COMPARISON}, */
+    /* [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE}, */
+    /* [TOKEN_STRING] = {string, NULL, PREC_NONE}, */
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
-    [TOKEN_AND] = {NULL, and_, PREC_AND},
-    [TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
-    [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
-    [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
-    [TOKEN_FOR] = {NULL, NULL, PREC_NONE},
-    [TOKEN_FUN] = {NULL, NULL, PREC_NONE},
-    [TOKEN_IF] = {NULL, NULL, PREC_NONE},
-    [TOKEN_NIL] = {literal, NULL, PREC_NONE},
-    [TOKEN_OR] = {NULL, or_, PREC_OR},
-    [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
-    [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
-    [TOKEN_SUPER] = {super_, NULL, PREC_NONE},
-    [TOKEN_THIS] = {this_, NULL, PREC_NONE},
-    [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
-    [TOKEN_VAR] = {NULL, NULL, PREC_NONE},
-    [TOKEN_WHILE] = {NULL, NULL, PREC_NONE},
-    [TOKEN_ERROR] = {NULL, NULL, PREC_NONE},
-    [TOKEN_EOF] = {NULL, NULL, PREC_NONE},
-    [TOKEN_QUESTION] = {NULL, ternary, PREC_OR},
-    [TOKEN_PLUS_PLUS] = {NULL, increment, PREC_CALL},
-    [TOKEN_MINUS_MINUS] = {NULL, decrement, PREC_CALL},
+    /* [TOKEN_AND] = {NULL, and_, PREC_AND}, */
+    /* [TOKEN_CLASS] = {NULL, NULL, PREC_NONE}, */
+    /* [TOKEN_ELSE] = {NULL, NULL, PREC_NONE}, */
+    /* [TOKEN_FALSE] = {literal, NULL, PREC_NONE}, */
+    /* [TOKEN_FOR] = {NULL, NULL, PREC_NONE}, */
+    /* [TOKEN_FUN] = {NULL, NULL, PREC_NONE}, */
+    /* [TOKEN_IF] = {NULL, NULL, PREC_NONE}, */
+    /* [TOKEN_NIL] = {literal, NULL, PREC_NONE}, */
+    /* [TOKEN_OR] = {NULL, or_, PREC_OR}, */
+    /* [TOKEN_PRINT] = {NULL, NULL, PREC_NONE}, */
+    /* [TOKEN_RETURN] = {NULL, NULL, PREC_NONE}, */
+    /* [TOKEN_SUPER] = {super_, NULL, PREC_NONE}, */
+    /* [TOKEN_THIS] = {this_, NULL, PREC_NONE}, */
+    /* [TOKEN_TRUE] = {literal, NULL, PREC_NONE}, */
+    /* [TOKEN_VAR] = {NULL, NULL, PREC_NONE}, */
+    /* [TOKEN_WHILE] = {NULL, NULL, PREC_NONE}, */
+    /* [TOKEN_ERROR] = {NULL, NULL, PREC_NONE}, */
+    /* [TOKEN_EOF] = {NULL, NULL, PREC_NONE}, */
+    /* [TOKEN_QUESTION] = {NULL, ternary, PREC_OR}, */
+    /* [TOKEN_PLUS_PLUS] = {NULL, increment, PREC_CALL}, */
+    /* [TOKEN_MINUS_MINUS] = {NULL, decrement, PREC_CALL}, */
 };
 
-static void parsePrecedence(Precedence precedence) {
+static AstNode *parsePrecedence(Precedence precedence) {
   advance();
   ParseFn prefixRule = getRule(parser.previous.type)->prefix;
   if (prefixRule == NULL) {
     error("Expect expression.");
-    return;
+    return NULL;
   }
 
   bool canAssign = precedence <= PREC_ASSIGNMENT;
-  prefixRule(canAssign);
+  AstNode *left = prefixRule(canAssign);
+  if (left != NULL) {
+    return left;
+  }
 
   while (precedence <= getRule(parser.current.type)->precedence) {
     advance();
     ParseFn infixRule = getRule(parser.previous.type)->infix;
-    infixRule(canAssign);
+    return infixRule(canAssign);
   }
 
   if (canAssign && match(TOKEN_EQUAL)) {
@@ -1222,15 +1234,17 @@ ObjFunction *compile(const char *source, FILE *ostream, FILE *errstream) {
 
   advance();
 
-  while (!match(TOKEN_EOF)) {
-    declaration();
-  }
+  /* while (!match(TOKEN_EOF)) { */
+  AstNode *node = declaration();
+  /* } */
 
-  ObjFunction *function = endCompiler();
+  printAST(*node, 0);
+  /* ObjFunction *function = endCompiler(); */
   freeTable(&stringConstants);
   freeTable(&globalConsts);
 
-  return parser.hadError ? NULL : function;
+  return NULL;
+  /* return parser.hadError ? NULL : function; */
 }
 
 // TODO: add constants to this

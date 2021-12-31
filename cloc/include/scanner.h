@@ -2,6 +2,7 @@
 #define clox_scanner_h
 
 typedef enum {
+  TOKEN_UNKNOWN,
   // Single-character tokens.
   TOKEN_LEFT_PAREN,
   TOKEN_RIGHT_PAREN,
