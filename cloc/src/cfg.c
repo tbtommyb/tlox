@@ -34,6 +34,7 @@ static Operation *allocateOperation() {
   op->first = NULL;
   op->second = NULL;
   op->next = NULL;
+  op->prev = NULL;
 
   return op;
 }
@@ -68,22 +69,44 @@ Operand *newLiteralOperand(Value value) {
   return operand;
 }
 
-Operation *newOperation(CfgOp opcode, Operand *first, Operand *second) {
+Operand *newRegisterOperand(Register reg) {
+  Operand *operand = allocateOperand(OPERAND_REG);
+  operand->val.source = reg;
+
+  return operand;
+}
+
+Operation *newOperation(CfgOp opcode, Operand *first, Operand *second,
+                        Operation *prev) {
   Operation *op = allocateOperation();
 
   op->destination = getRegister();
   op->opcode = opcode;
   op->first = first;
   op->second = second;
+  op->prev = prev;
 
   return op;
 }
 
-static Operation *walkAst(AstNode *node) {
+static Operation *walkAst(AstNode *node, Operation *prev) {
+  if (node == NULL) {
+    return NULL;
+  }
   if (node->type == EXPR_LITERAL) {
     Operand *value = newLiteralOperand(node->literal);
-    Operation *op = newOperation(CFG_ASSIGN, value, NULL);
+    Operation *op = newOperation(CFG_ASSIGN, value, NULL, prev);
     return op;
+  }
+  if (node->type == EXPR_BINARY) {
+    Operation *leftOp = walkAst(node->branches.left, prev);
+    Operation *rightOp = walkAst(node->branches.right, leftOp);
+    Operation *core =
+        newOperation(CFG_ADD, newRegisterOperand(leftOp->destination),
+                     newRegisterOperand(rightOp->destination), rightOp);
+    leftOp->next = rightOp;
+    rightOp->next = core;
+    return core;
   }
   return NULL;
 }
@@ -91,7 +114,11 @@ static Operation *walkAst(AstNode *node) {
 BasicBlock *newBasicBlock(AstNode *node) {
   BasicBlock *bb = allocateBasicBlock();
 
-  bb->ops = walkAst(node);
+  Operation *curr = walkAst(node, NULL);
+  while (curr != NULL && curr->prev != NULL) {
+    curr = curr->prev;
+  }
+  bb->ops = curr;
 
   return bb;
 }
@@ -102,6 +129,12 @@ char *operandString(Operand *operand) {
   }
   if (operand->type == OPERAND_LITERAL) {
     return valueToString(operand->val.literal);
+  }
+  if (operand->type == OPERAND_REG) {
+    int length = snprintf(NULL, 0, "t%llu", operand->val.source);
+    char *str = malloc(length + 1); // FIXME: free somewhere
+    snprintf(str, length + 1, "t%llu", operand->val.source);
+    return str;
   }
   return "?";
 }
