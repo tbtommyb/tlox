@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "ast.h"
+#include "cfg.h"
 #include "chunk.h"
 #include "common.h"
 #include "compiler.h"
@@ -1205,6 +1206,9 @@ ObjFunction *compile(const char *source, FILE *ostream, FILE *errstream) {
   /* } */
 
   printAST(*node, 0);
+
+  BasicBlock *bb = newBasicBlock(node);
+  printBasicBlock(bb);
   /* ObjFunction *function = endCompiler(); */
   freeTable(&stringConstants);
   freeTable(&globalConsts);

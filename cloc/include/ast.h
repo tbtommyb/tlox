@@ -8,6 +8,7 @@ typedef enum { EXPR_BINARY, EXPR_LITERAL, EXPR_UNARY } NodeType;
 
 typedef struct AstNode AstNode;
 
+// TODO: add line numbers for errors
 struct AstNode {
   NodeType type;
   Value literal;
@@ -27,6 +28,5 @@ AstNode *newBinaryExpr(AstNode *left, AstNode *right, TokenType operator);
 AstNode *newUnaryExpr(AstNode *right, TokenType operator);
 
 void printAST(AstNode root, int indentation);
-void testAST();
 
 #endif

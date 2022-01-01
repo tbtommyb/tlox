@@ -6,6 +6,11 @@
 },
 {
   "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/cloc -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/cfg.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/cfg.c",
+  "file": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/cfg.c"
+},
+{
+  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src",
   "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/cloc -I/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/chunk.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/cloc/src/chunk.c",
   "file": "/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/chunk.c"
 },

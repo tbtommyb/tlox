@@ -209,6 +209,30 @@ ast.c.s:
 	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/ast.c.s
 .PHONY : ast.c.s
 
+cfg.o: cfg.c.o
+.PHONY : cfg.o
+
+# target to build an object file
+cfg.c.o:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/cfg.c.o
+.PHONY : cfg.c.o
+
+cfg.i: cfg.c.i
+.PHONY : cfg.i
+
+# target to preprocess a source file
+cfg.c.i:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/cfg.c.i
+.PHONY : cfg.c.i
+
+cfg.s: cfg.c.s
+.PHONY : cfg.s
+
+# target to generate assembly for a file
+cfg.c.s:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/cfg.c.s
+.PHONY : cfg.c.s
+
 chunk.o: chunk.c.o
 .PHONY : chunk.o
 
@@ -466,6 +490,9 @@ help:
 	@echo "... ast.o"
 	@echo "... ast.i"
 	@echo "... ast.s"
+	@echo "... cfg.o"
+	@echo "... cfg.i"
+	@echo "... cfg.s"
 	@echo "... chunk.o"
 	@echo "... chunk.i"
 	@echo "... chunk.s"
