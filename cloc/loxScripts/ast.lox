@@ -1,1 +1,22 @@
-!2;
+1 + 3 * 2 - 5;
+
+/*
+
+Expr Bin
+Op: -
+Left:
+  Expr Bin
+  Op: +
+  Left:
+    Lit 1
+  Right:
+    Expr Bin
+    Op: *
+    Left:
+      Lit 3
+    Right:
+      Lit 2
+Right:
+  Lit 5
+
+*/

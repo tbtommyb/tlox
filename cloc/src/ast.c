@@ -36,13 +36,22 @@ AstNode *newUnaryExpr(AstNode *right, TokenType operator) {
 }
 
 const char *tokenTypeStr(TokenType op) {
-  if (op == TOKEN_BANG) {
+  switch (op) {
+  case TOKEN_BANG:
     return "!";
-  }
-  if (op == TOKEN_MINUS) {
+  case TOKEN_PLUS:
+    return "+";
+  case TOKEN_MINUS:
     return "-";
+  case TOKEN_SLASH:
+    return "/";
+  case TOKEN_STAR:
+    return "*";
+  case TOKEN_PERCENT:
+    return "%";
+  default:
+    return "?";
   }
-  return "?";
 }
 
 void printAST(AstNode node, int indentation) {
@@ -58,6 +67,7 @@ void printAST(AstNode node, int indentation) {
     printf("%*sOp: %s\n", indentation, "", tokenTypeStr(node.op));
     printf("%*sRight:\n", indentation, "");
     printAST(*node.branches.right, indentation + 2);
+    break;
   }
   case EXPR_BINARY: {
     printf("%*sExpr Binary\n", indentation, "");
@@ -70,24 +80,3 @@ void printAST(AstNode node, int indentation) {
   }
   }
 }
-
-/* void testAST() { */
-/*   LiteralExpr *one = newLiteralExpr(NUMBER_VAL(1)); */
-/*   LiteralExpr *two = newLiteralExpr(NUMBER_VAL(2)); */
-/*   Token op; */
-/*   op.type = TOKEN_STAR; */
-/*   op.start = "*"; */
-/*   op.length = 1; */
-/*   op.line = 1; */
-/*   BinaryExpr *mult = newBinaryExpr((Expr *)one, (Expr *)two, op); */
-
-/*   LiteralExpr *three = newLiteralExpr(NUMBER_VAL(3)); */
-/*   Token plus; */
-/*   plus.type = TOKEN_PLUS; */
-/*   plus.start = "+"; */
-/*   plus.length = 1; */
-/*   plus.line = 1; */
-/*   BinaryExpr *add = newBinaryExpr((Expr *)three, (Expr *)mult, plus); */
-
-/*   printAST(EXPR_NODE(add), 0); */
-/* } */

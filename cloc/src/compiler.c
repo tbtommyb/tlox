@@ -512,53 +512,25 @@ static void and_(bool canAssign) {
   patchJump(endJump);
 }
 
-/* static AstNode *binary(bool canAssign) { */
-/*   // Remember the operator. */
-/*   TokenType operatorType = parser.previous.type; */
+static AstNode *binary(bool canAssign) {
+  // Remember the operator.
+  TokenType operatorType = parser.previous.type;
 
-/*   // Compile the right operand. */
-/*   ParseRule *rule = getRule(operatorType); */
-/*   parsePrecedence((Precedence)(rule->precedence + 1)); */
+  // Compile the right operand.
+  ParseRule *rule = getRule(operatorType);
+  AstNode *right = parsePrecedence((Precedence)(rule->precedence + 1));
 
-/*   // Emit the operator instruction. */
-/*   switch (operatorType) { */
-/*   case TOKEN_PLUS: */
-/*     emitByte(OP_ADD); */
-/*     break; */
-/*   case TOKEN_MINUS: */
-/*     emitByte(OP_SUBTRACT); */
-/*     break; */
-/*   case TOKEN_STAR: */
-/*     emitByte(OP_MULTIPLY); */
-/*     break; */
-/*   case TOKEN_SLASH: */
-/*     emitByte(OP_DIVIDE); */
-/*     break; */
-/*   case TOKEN_BANG_EQUAL: */
-/*     emitBytes(OP_EQUAL, OP_NOT); */
-/*     break; */
-/*   case TOKEN_EQUAL_EQUAL: */
-/*     emitByte(OP_EQUAL); */
-/*     break; */
-/*   case TOKEN_GREATER: */
-/*     emitByte(OP_GREATER); */
-/*     break; */
-/*   case TOKEN_GREATER_EQUAL: */
-/*     emitBytes(OP_LESS, OP_NOT); */
-/*     break; */
-/*   case TOKEN_LESS: */
-/*     emitByte(OP_LESS); */
-/*     break; */
-/*   case TOKEN_LESS_EQUAL: */
-/*     emitBytes(OP_GREATER, OP_NOT); */
-/*     break; */
-/*   case TOKEN_PERCENT: */
-/*     emitByte(OP_MODULO); */
-/*     break; */
-/*   default: */
-/*     return; // Unreachable. */
-/*   } */
-/* } */
+  // Emit the operator instruction.
+  if (operatorType == TOKEN_PLUS || operatorType == TOKEN_MINUS ||
+      operatorType == TOKEN_STAR || operatorType == TOKEN_SLASH ||
+      operatorType == TOKEN_BANG_EQUAL || operatorType == TOKEN_EQUAL_EQUAL ||
+      operatorType == TOKEN_GREATER || operatorType == TOKEN_GREATER_EQUAL ||
+      operatorType == TOKEN_LESS || operatorType == TOKEN_LESS_EQUAL ||
+      operatorType == TOKEN_PERCENT) {
+    return newBinaryExpr(NULL, right, operatorType);
+  }
+  return NULL;
+}
 
 static void call(bool canAssign) {
   uint8_t argCount = argumentList();
@@ -1077,17 +1049,6 @@ static AstNode *unary(bool canAssign) {
     return newUnaryExpr(operand, operatorType);
   }
   return NULL;
-  /* // Emit the operator instruction. */
-  /* switch (operatorType) { */
-  /* case TOKEN_BANG: */
-  /*   emitByte(OP_NOT); */
-  /*   break; */
-  /* case TOKEN_MINUS: */
-  /*   emitByte(OP_NEGATE); */
-  /*   break; */
-  /* default: */
-  /*   return; // Unreachable. */
-  /* } */
 }
 
 static void postfixModification(bool canAssign, OpCode op) {
@@ -1151,12 +1112,12 @@ ParseRule rules[] = {
     /* [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE}, */
     /* [TOKEN_COMMA] = {NULL, NULL, PREC_NONE}, */
     /* [TOKEN_DOT] = {NULL, dot, PREC_CALL}, */
-    /* [TOKEN_MINUS] = {unary, binary, PREC_TERM}, */
-    /* [TOKEN_PLUS] = {NULL, binary, PREC_TERM}, */
+    [TOKEN_MINUS] = {unary, binary, PREC_TERM},
+    [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
     /* [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE}, */
-    /* [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR}, */
-    /* [TOKEN_STAR] = {NULL, binary, PREC_FACTOR}, */
-    /* [TOKEN_PERCENT] = {NULL, binary, PREC_FACTOR}, */
+    [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
+    [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
+    [TOKEN_PERCENT] = {NULL, binary, PREC_FACTOR},
     [TOKEN_BANG] = {unary, NULL, PREC_NONE},
     /* [TOKEN_EQUAL] = {NULL, NULL, PREC_NONE}, */
     /* [TOKEN_BANG_EQUAL] = {NULL, binary, PREC_EQUALITY}, */
@@ -1201,19 +1162,24 @@ static AstNode *parsePrecedence(Precedence precedence) {
 
   bool canAssign = precedence <= PREC_ASSIGNMENT;
   AstNode *left = prefixRule(canAssign);
-  if (left != NULL) {
-    return left;
-  }
 
   while (precedence <= getRule(parser.current.type)->precedence) {
     advance();
     ParseFn infixRule = getRule(parser.previous.type)->infix;
-    return infixRule(canAssign);
+    AstNode *newNode = infixRule(canAssign);
+    newNode->branches.left = left;
+    left = newNode;
+  }
+
+  if (left != NULL) {
+    return left;
   }
 
   if (canAssign && match(TOKEN_EQUAL)) {
     error("Invalid assignment target.");
   }
+
+  return NULL;
 }
 
 static ParseRule *getRule(TokenType type) { return &rules[type]; }
