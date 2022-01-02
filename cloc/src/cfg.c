@@ -57,6 +57,16 @@ static CfgOp tokenToCfgOp(TokenType token) {
   switch (token) {
   case TOKEN_PLUS:
     return CFG_ADD;
+  case TOKEN_MINUS:
+    return CFG_MINUS;
+  case TOKEN_BANG:
+    return CFG_NEGATE;
+  case TOKEN_SLASH:
+    return CFG_DIVIDE;
+  case TOKEN_STAR:
+    return CFG_MULTIPLY;
+  case TOKEN_PERCENT:
+    return CFG_MODULO;
   default:
     return CFG_UNKNOWN;
   }
@@ -69,6 +79,7 @@ Operand *newLiteralOperand(Value value) {
   return operand;
 }
 
+// TODO: cache operands rather than recreating
 Operand *newRegisterOperand(Register reg) {
   Operand *operand = allocateOperand(OPERAND_REG);
   operand->val.source = reg;
@@ -89,24 +100,51 @@ Operation *newOperation(CfgOp opcode, Operand *first, Operand *second,
   return op;
 }
 
+static Operation *tailOf(Operation *node) {
+  Operation *tail = node;
+  while (tail->next != NULL) {
+    tail = tail->next;
+  }
+  return tail;
+}
+
 static Operation *walkAst(AstNode *node, Operation *prev) {
   if (node == NULL) {
     return NULL;
   }
   if (node->type == EXPR_LITERAL) {
     Operand *value = newLiteralOperand(node->literal);
+
     Operation *op = newOperation(CFG_ASSIGN, value, NULL, prev);
+
     return op;
   }
+  if (node->type == EXPR_UNARY) {
+    Operation *right = walkAst(node->branches.right, prev);
+    Operation *rightTail = tailOf(right);
+
+    Operand *value = newRegisterOperand(rightTail->destination);
+    Operation *op =
+        newOperation(tokenToCfgOp(node->op), value, NULL, rightTail);
+    rightTail->next = op;
+
+    return right;
+  }
   if (node->type == EXPR_BINARY) {
-    Operation *leftOp = walkAst(node->branches.left, prev);
-    Operation *rightOp = walkAst(node->branches.right, leftOp);
-    Operation *core =
-        newOperation(CFG_ADD, newRegisterOperand(leftOp->destination),
-                     newRegisterOperand(rightOp->destination), rightOp);
-    leftOp->next = rightOp;
-    rightOp->next = core;
-    return core;
+    Operation *left = walkAst(node->branches.left, prev);
+    Operation *leftTail = tailOf(left);
+
+    Operation *right = walkAst(node->branches.right, leftTail);
+    Operation *rightTail = tailOf(right);
+
+    Operation *op = newOperation(
+        tokenToCfgOp(node->op), newRegisterOperand(leftTail->destination),
+        newRegisterOperand(rightTail->destination), rightTail);
+
+    leftTail->next = right;
+    rightTail->next = op;
+
+    return left;
   }
   return NULL;
 }
@@ -115,9 +153,6 @@ BasicBlock *newBasicBlock(AstNode *node) {
   BasicBlock *bb = allocateBasicBlock();
 
   Operation *curr = walkAst(node, NULL);
-  while (curr != NULL && curr->prev != NULL) {
-    curr = curr->prev;
-  }
   bb->ops = curr;
 
   return bb;
@@ -141,10 +176,20 @@ char *operandString(Operand *operand) {
 
 char *opcodeString(CfgOp opcode) {
   switch (opcode) {
-  case CFG_ASSIGN:
-    return "<-";
   case CFG_ADD:
     return "+";
+  case CFG_ASSIGN:
+    return "<-";
+  case CFG_DIVIDE:
+    return "/";
+  case CFG_MINUS:
+    return "-";
+  case CFG_MODULO:
+    return "%";
+  case CFG_MULTIPLY:
+    return "*";
+  case CFG_NEGATE:
+    return "-";
   case CFG_UNKNOWN:
   default:
     return "?";

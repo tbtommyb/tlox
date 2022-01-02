@@ -9,7 +9,16 @@
 typedef enum OperandType { OPERAND_LITERAL, OPERAND_REG } OperandType;
 
 // TODO: is this useful?
-typedef enum CfgOp { CFG_UNKNOWN, CFG_ASSIGN, CFG_ADD } CfgOp;
+typedef enum CfgOp {
+  CFG_ADD,
+  CFG_ASSIGN,
+  CFG_DIVIDE,
+  CFG_MINUS,
+  CFG_MODULO,
+  CFG_MULTIPLY,
+  CFG_NEGATE,
+  CFG_UNKNOWN,
+} CfgOp;
 
 typedef uint64_t Register;
 
@@ -37,7 +46,8 @@ typedef struct BasicBlock {
 } BasicBlock;
 
 BasicBlock *newBasicBlock(AstNode *node);
-Operation *newOperation();
+Operation *newOperation(CfgOp opcode, Operand *first, Operand *second,
+                        Operation *prev);
 Operand *newLiteralOperand(Value value);
 Operand *newRegisterOperand(Register reg);
 void printBasicBlock(BasicBlock *bb);
