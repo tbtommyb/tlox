@@ -5,6 +5,7 @@
 #include "ast.h"
 #include "cfg.h"
 #include "chunk.h"
+#include "codegen.h"
 #include "common.h"
 #include "compiler.h"
 #include "memory.h"
@@ -1202,19 +1203,25 @@ ObjFunction *compile(const char *source, FILE *ostream, FILE *errstream) {
   advance();
 
   /* while (!match(TOKEN_EOF)) { */
-  AstNode *node = declaration();
+  AstNode *ast = declaration();
   /* } */
 
-  printAST(*node, 0);
+  printAST(*ast, 0);
+  CFG *cfg = newCFG(ast);
+  printBasicBlock(cfg->start);
 
-  BasicBlock *bb = newBasicBlock(node);
-  printBasicBlock(bb);
+  Chunk *chunk = generateChunk(cfg->start);
+  ObjFunction *function = newFunction();
+  function->chunk = *chunk;
+
+  disassembleChunk(chunk, "testing");
+
   /* ObjFunction *function = endCompiler(); */
   freeTable(&stringConstants);
   freeTable(&globalConsts);
 
-  return NULL;
-  /* return parser.hadError ? NULL : function; */
+  /* return NULL; */
+  return parser.hadError ? NULL : function;
 }
 
 // TODO: add constants to this

@@ -2,6 +2,7 @@ set(LIB_SOURCES
   ast.c
   cfg.c
   chunk.c
+  codegen.c
   compiler.c
   debug.c
   memory.c

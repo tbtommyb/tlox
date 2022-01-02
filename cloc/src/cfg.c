@@ -53,11 +53,18 @@ static Operand *allocateOperand(OperandType type) {
   return operand;
 }
 
+static CFG *allocateCFG() {
+  CFG *cfg = (CFG *)reallocate(NULL, 0, sizeof(CFG));
+  cfg->start = NULL;
+
+  return cfg;
+}
+
 static CfgOp tokenToCfgOp(TokenType token) {
   switch (token) {
   case TOKEN_PLUS:
     return CFG_ADD;
-  case TOKEN_MINUS:
+  case TOKEN_MINUS: // FIXME: this is broken as negation uses same token
     return CFG_MINUS;
   case TOKEN_BANG:
     return CFG_NEGATE;
@@ -200,9 +207,17 @@ void printBasicBlock(BasicBlock *bb) {
   Operation *curr = bb->ops;
 
   while (curr != NULL) {
-    printf("[ t%llu | %s | %s | %s ]\n", curr->destination,
+    printf("[ t%llu | %2s | %2s | %2s ]\n", curr->destination,
            opcodeString(curr->opcode), operandString(curr->first),
            operandString(curr->second));
     curr = curr->next;
   }
+}
+
+CFG *newCFG(AstNode *root) {
+  CFG *cfg = allocateCFG();
+
+  cfg->start = newBasicBlock(root);
+
+  return cfg;
 }

@@ -257,6 +257,30 @@ chunk.c.s:
 	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/chunk.c.s
 .PHONY : chunk.c.s
 
+codegen.o: codegen.c.o
+.PHONY : codegen.o
+
+# target to build an object file
+codegen.c.o:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/codegen.c.o
+.PHONY : codegen.c.o
+
+codegen.i: codegen.c.i
+.PHONY : codegen.i
+
+# target to preprocess a source file
+codegen.c.i:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/codegen.c.i
+.PHONY : codegen.c.i
+
+codegen.s: codegen.c.s
+.PHONY : codegen.s
+
+# target to generate assembly for a file
+codegen.c.s:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/codegen.c.s
+.PHONY : codegen.c.s
+
 compiler.o: compiler.c.o
 .PHONY : compiler.o
 
@@ -496,6 +520,9 @@ help:
 	@echo "... chunk.o"
 	@echo "... chunk.i"
 	@echo "... chunk.s"
+	@echo "... codegen.o"
+	@echo "... codegen.i"
+	@echo "... codegen.s"
 	@echo "... compiler.o"
 	@echo "... compiler.i"
 	@echo "... compiler.s"
