@@ -8,17 +8,17 @@
 
 typedef enum OperandType { OPERAND_LITERAL, OPERAND_REG } OperandType;
 
-// TODO: is this useful?
-typedef enum CfgOp {
+typedef enum IROp {
   CFG_UNKNOWN,
   CFG_ADD,
   CFG_ASSIGN,
   CFG_DIVIDE,
-  CFG_MINUS,
+  CFG_SUBTRACT,
   CFG_MODULO,
   CFG_MULTIPLY,
   CFG_NEGATE,
-} CfgOp;
+  CFG_NOT,
+} IROp;
 
 typedef uint64_t Register;
 
@@ -33,7 +33,7 @@ typedef struct Operand {
 typedef struct Operation Operation;
 
 struct Operation {
-  CfgOp opcode;
+  IROp opcode;
   Register destination;
   Operand *first;
   Operand *second;
@@ -51,7 +51,7 @@ typedef struct CFG {
 
 BasicBlock *newBasicBlock(AstNode *node);
 CFG *newCFG(AstNode *root);
-Operation *newOperation(CfgOp opcode, Operand *first, Operand *second,
+Operation *newOperation(IROp opcode, Operand *first, Operand *second,
                         Operation *prev);
 Operand *newLiteralOperand(Value value);
 Operand *newRegisterOperand(Register reg);

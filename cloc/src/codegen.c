@@ -11,6 +11,11 @@ static void emitBytes(Chunk *chunk, uint8_t byte1, uint8_t byte2) {
   emitByte(chunk, byte2);
 }
 
+static void emitReturn(Chunk *chunk) {
+  emitByte(chunk, OP_NIL);
+  emitByte(chunk, OP_RETURN);
+}
+
 static uint8_t makeConstant(Chunk *chunk, Value value) {
   int constant = addConstant(chunk, value);
   if (constant > UINT8_MAX) {
@@ -42,7 +47,7 @@ void writeOperation(Operation *op, Chunk *chunk) {
   case CFG_DIVIDE:
     emitByte(chunk, OP_DIVIDE);
     break;
-  case CFG_MINUS:
+  case CFG_SUBTRACT:
     emitByte(chunk, OP_SUBTRACT);
     break;
   case CFG_MODULO:
@@ -53,6 +58,9 @@ void writeOperation(Operation *op, Chunk *chunk) {
     break;
   case CFG_NEGATE:
     emitByte(chunk, OP_NEGATE);
+    break;
+  case CFG_NOT:
+    emitByte(chunk, OP_NOT);
     break;
   default:
     printf("Unknown opcode %d\n", op->opcode);
@@ -68,7 +76,6 @@ Chunk *generateChunk(BasicBlock *bb) {
     current = current->next;
   }
   emitByte(chunk, OP_POP);
-  emitByte(chunk, OP_NIL);
-  emitByte(chunk, OP_RETURN);
+  emitReturn(chunk);
   return chunk;
 }

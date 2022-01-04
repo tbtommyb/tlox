@@ -20,18 +20,18 @@ AstNode *newLiteralExpr(Value value) {
   return node;
 }
 
-AstNode *newBinaryExpr(AstNode *left, AstNode *right, TokenType operator) {
+AstNode *newBinaryExpr(AstNode *left, AstNode *right, TokenType op) {
   AstNode *node = allocateAstNode(EXPR_BINARY);
   node->branches.left = left;
   node->branches.right = right;
-  node->op = operator;
+  node->op = op;
   return node;
 }
 
-AstNode *newUnaryExpr(AstNode *right, TokenType operator) {
+AstNode *newUnaryExpr(AstNode *right, TokenType op) {
   AstNode *node = allocateAstNode(EXPR_UNARY);
   node->branches.right = right;
-  node->op = operator;
+  node->op = op;
   return node;
 }
 

@@ -12,7 +12,7 @@ typedef struct AstNode AstNode;
 struct AstNode {
   NodeType type;
   Value literal;
-  TokenType op; // replace me.
+  TokenType op;
   struct {
     AstNode *left;
     AstNode *right;

@@ -60,20 +60,31 @@ static CFG *allocateCFG() {
   return cfg;
 }
 
-static CfgOp tokenToCfgOp(TokenType token) {
+static IROp tokenToOp(TokenType token) {
   switch (token) {
   case TOKEN_PLUS:
     return CFG_ADD;
-  case TOKEN_MINUS: // FIXME: this is broken as negation uses same token
-    return CFG_MINUS;
+  case TOKEN_MINUS:
+    return CFG_SUBTRACT;
   case TOKEN_BANG:
-    return CFG_NEGATE;
+    return CFG_NOT;
   case TOKEN_SLASH:
     return CFG_DIVIDE;
   case TOKEN_STAR:
     return CFG_MULTIPLY;
   case TOKEN_PERCENT:
     return CFG_MODULO;
+  default:
+    return CFG_UNKNOWN;
+  }
+}
+
+static IROp tokenToUnaryOp(TokenType token) {
+  switch (token) {
+  case TOKEN_MINUS:
+    return CFG_NEGATE;
+  case TOKEN_BANG:
+    return CFG_NOT;
   default:
     return CFG_UNKNOWN;
   }
@@ -94,7 +105,7 @@ Operand *newRegisterOperand(Register reg) {
   return operand;
 }
 
-Operation *newOperation(CfgOp opcode, Operand *first, Operand *second,
+Operation *newOperation(IROp opcode, Operand *first, Operand *second,
                         Operation *prev) {
   Operation *op = allocateOperation();
 
@@ -132,7 +143,7 @@ static Operation *walkAst(AstNode *node, Operation *prev) {
 
     Operand *value = newRegisterOperand(rightTail->destination);
     Operation *op =
-        newOperation(tokenToCfgOp(node->op), value, NULL, rightTail);
+        newOperation(tokenToUnaryOp(node->op), value, NULL, rightTail);
     rightTail->next = op;
 
     return right;
@@ -145,7 +156,7 @@ static Operation *walkAst(AstNode *node, Operation *prev) {
     Operation *rightTail = tailOf(right);
 
     Operation *op = newOperation(
-        tokenToCfgOp(node->op), newRegisterOperand(leftTail->destination),
+        tokenToOp(node->op), newRegisterOperand(leftTail->destination),
         newRegisterOperand(rightTail->destination), rightTail);
 
     leftTail->next = right;
@@ -181,7 +192,7 @@ char *operandString(Operand *operand) {
   return "?";
 }
 
-char *opcodeString(CfgOp opcode) {
+char *opcodeString(IROp opcode) {
   switch (opcode) {
   case CFG_ADD:
     return "+";
@@ -189,7 +200,7 @@ char *opcodeString(CfgOp opcode) {
     return "<-";
   case CFG_DIVIDE:
     return "/";
-  case CFG_MINUS:
+  case CFG_SUBTRACT:
     return "-";
   case CFG_MODULO:
     return "%";
@@ -197,6 +208,8 @@ char *opcodeString(CfgOp opcode) {
     return "*";
   case CFG_NEGATE:
     return "-";
+  case CFG_NOT:
+    return "!";
   case CFG_UNKNOWN:
   default:
     return "?";
