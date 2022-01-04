@@ -34,7 +34,6 @@ static Operation *allocateOperation() {
   op->first = NULL;
   op->second = NULL;
   op->next = NULL;
-  op->prev = NULL;
 
   return op;
 }
@@ -105,15 +104,14 @@ Operand *newRegisterOperand(Register reg) {
   return operand;
 }
 
-Operation *newOperation(IROp opcode, Operand *first, Operand *second,
-                        Operation *prev) {
+// Make a separate function for statements that doesn't output to register?
+Operation *newOperation(IROp opcode, Operand *first, Operand *second) {
   Operation *op = allocateOperation();
 
   op->destination = getRegister();
   op->opcode = opcode;
   op->first = first;
   op->second = second;
-  op->prev = prev;
 
   return op;
 }
@@ -126,38 +124,37 @@ static Operation *tailOf(Operation *node) {
   return tail;
 }
 
-static Operation *walkAst(AstNode *node, Operation *prev) {
+static Operation *walkAst(AstNode *node) {
   if (node == NULL) {
     return NULL;
   }
   if (node->type == EXPR_LITERAL) {
     Operand *value = newLiteralOperand(node->literal);
 
-    Operation *op = newOperation(IR_ASSIGN, value, NULL, prev);
+    Operation *op = newOperation(IR_ASSIGN, value, NULL);
 
     return op;
   }
   if (node->type == EXPR_UNARY) {
-    Operation *right = walkAst(node->branches.right, prev);
+    Operation *right = walkAst(node->branches.right);
     Operation *rightTail = tailOf(right);
 
     Operand *value = newRegisterOperand(rightTail->destination);
-    Operation *op =
-        newOperation(tokenToUnaryOp(node->op), value, NULL, rightTail);
+    Operation *op = newOperation(tokenToUnaryOp(node->op), value, NULL);
     rightTail->next = op;
 
     return right;
   }
   if (node->type == EXPR_BINARY) {
-    Operation *left = walkAst(node->branches.left, prev);
+    Operation *left = walkAst(node->branches.left);
     Operation *leftTail = tailOf(left);
 
-    Operation *right = walkAst(node->branches.right, leftTail);
+    Operation *right = walkAst(node->branches.right);
     Operation *rightTail = tailOf(right);
 
-    Operation *op = newOperation(
-        tokenToOp(node->op), newRegisterOperand(leftTail->destination),
-        newRegisterOperand(rightTail->destination), rightTail);
+    Operation *op = newOperation(tokenToOp(node->op),
+                                 newRegisterOperand(leftTail->destination),
+                                 newRegisterOperand(rightTail->destination));
 
     leftTail->next = right;
     rightTail->next = op;
@@ -165,11 +162,11 @@ static Operation *walkAst(AstNode *node, Operation *prev) {
     return left;
   }
   if (node->type == STMT_PRINT) {
-    Operation *left = walkAst(node->branches.left, prev);
+    Operation *left = walkAst(node->branches.left);
     Operation *leftTail = tailOf(left);
 
     Operand *value = newRegisterOperand(leftTail->destination);
-    Operation *op = newOperation(IR_PRINT, value, NULL, leftTail);
+    Operation *op = newOperation(IR_PRINT, value, NULL);
 
     leftTail->next = op;
 
@@ -181,7 +178,7 @@ static Operation *walkAst(AstNode *node, Operation *prev) {
 BasicBlock *newBasicBlock(AstNode *node) {
   BasicBlock *bb = allocateBasicBlock();
 
-  Operation *curr = walkAst(node, NULL);
+  Operation *curr = walkAst(node);
   bb->ops = curr;
 
   return bb;

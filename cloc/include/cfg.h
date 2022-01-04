@@ -39,7 +39,6 @@ struct Operation {
   Operand *first;
   Operand *second;
   Operation *next;
-  Operation *prev;
 };
 
 typedef struct BasicBlock {
@@ -52,8 +51,7 @@ typedef struct CFG {
 
 BasicBlock *newBasicBlock(AstNode *node);
 CFG *newCFG(AstNode *root);
-Operation *newOperation(IROp opcode, Operand *first, Operand *second,
-                        Operation *prev);
+Operation *newOperation(IROp opcode, Operand *first, Operand *second);
 Operand *newLiteralOperand(Value value);
 Operand *newRegisterOperand(Register reg);
 void printBasicBlock(BasicBlock *bb);
