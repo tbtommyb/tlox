@@ -44,6 +44,8 @@ void writeOperation(Operation *op, Chunk *chunk) {
   case IR_ASSIGN:
     emitConstant(chunk, op->first->val.literal); // TODO hardcode literals
     break;
+  case IR_CODE_START:
+    break;
   case IR_DIVIDE:
     emitByte(chunk, OP_DIVIDE);
     break;

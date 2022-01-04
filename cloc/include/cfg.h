@@ -12,6 +12,7 @@ typedef enum IROp {
   IR_UNKNOWN,
   IR_ADD,
   IR_ASSIGN,
+  IR_COND,
   IR_DIVIDE,
   IR_SUBTRACT,
   IR_MODULO,
@@ -19,9 +20,11 @@ typedef enum IROp {
   IR_NEGATE,
   IR_NOT,
   IR_PRINT,
+  IR_CODE_START,
 } IROp;
 
 typedef uint64_t Register;
+typedef uint64_t BasicBlockId;
 
 typedef struct Operand {
   OperandType type;
@@ -42,7 +45,11 @@ struct Operation {
 };
 
 typedef struct BasicBlock {
+  BasicBlockId id;
   Operation *ops;
+  Operation *curr;
+  struct BasicBlock *trueEdge;
+  struct BasicBlock *falseEdge;
 } BasicBlock;
 
 typedef struct CFG {

@@ -4,9 +4,14 @@
 
 #include <stdlib.h>
 
+BasicBlock *newBasicBlock(AstNode *node);
+
+// TODO: make thread safe
 static Register currentRegister = 0;
+static BasicBlockId currentBasicBlockId = 0;
 
 static Register getRegister() { return currentRegister++; }
+static BasicBlockId getBasicBlockId() { return currentBasicBlockId++; }
 
 // TEMP
 char *valueToString(Value value) {
@@ -41,6 +46,10 @@ static Operation *allocateOperation() {
 static BasicBlock *allocateBasicBlock() {
   BasicBlock *bb = (BasicBlock *)reallocate(NULL, 0, sizeof(BasicBlock));
   bb->ops = NULL;
+  bb->curr = NULL;
+  bb->id = getBasicBlockId();
+  bb->trueEdge = NULL;
+  bb->falseEdge = NULL;
 
   return bb;
 }
@@ -112,6 +121,19 @@ Operation *newOperation(IROp opcode, Operand *first, Operand *second) {
   op->opcode = opcode;
   op->first = first;
   op->second = second;
+  op->next = NULL;
+
+  return op;
+}
+
+static Operation *newStartOperation() {
+  Operation *op = allocateOperation();
+
+  op->destination = 0;
+  op->opcode = IR_CODE_START;
+  op->first = NULL;
+  op->second = NULL;
+  op->next = NULL;
 
   return op;
 }
@@ -124,7 +146,7 @@ static Operation *tailOf(Operation *node) {
   return tail;
 }
 
-static Operation *walkAst(AstNode *node) {
+static Operation *walkAst(BasicBlock *bb, AstNode *node) {
   if (node == NULL) {
     return NULL;
   }
@@ -132,54 +154,69 @@ static Operation *walkAst(AstNode *node) {
     Operand *value = newLiteralOperand(node->literal);
 
     Operation *op = newOperation(IR_ASSIGN, value, NULL);
-
+    bb->curr->next = op;
+    bb->curr = op;
     return op;
   }
   if (node->type == EXPR_UNARY) {
-    Operation *right = walkAst(node->branches.right);
-    Operation *rightTail = tailOf(right);
+    Operation *right = walkAst(bb, node->branches.right);
 
-    Operand *value = newRegisterOperand(rightTail->destination);
+    Operand *value = newRegisterOperand(bb->curr->destination);
     Operation *op = newOperation(tokenToUnaryOp(node->op), value, NULL);
-    rightTail->next = op;
 
-    return right;
+    bb->curr->next = op;
+    bb->curr = op;
+    return op;
   }
   if (node->type == EXPR_BINARY) {
-    Operation *left = walkAst(node->branches.left);
+    Operation *left = walkAst(bb, node->branches.left);
     Operation *leftTail = tailOf(left);
 
-    Operation *right = walkAst(node->branches.right);
+    Operation *right = walkAst(bb, node->branches.right);
     Operation *rightTail = tailOf(right);
 
     Operation *op = newOperation(tokenToOp(node->op),
                                  newRegisterOperand(leftTail->destination),
                                  newRegisterOperand(rightTail->destination));
 
-    leftTail->next = right;
-    rightTail->next = op;
-
-    return left;
+    bb->curr->next = op;
+    bb->curr = op;
+    return op;
   }
   if (node->type == STMT_PRINT) {
-    Operation *left = walkAst(node->branches.left);
-    Operation *leftTail = tailOf(left);
+    walkAst(bb, node->expr);
 
-    Operand *value = newRegisterOperand(leftTail->destination);
+    Operand *value = newRegisterOperand(bb->curr->destination);
     Operation *op = newOperation(IR_PRINT, value, NULL);
 
-    leftTail->next = op;
+    bb->curr->next = op;
+    bb->curr = op;
+    return op;
+  }
+  if (node->type == STMT_IF) {
+    Operation *expr = walkAst(bb, node->expr);
 
-    return left;
+    Operation *op =
+        newOperation(IR_COND, newRegisterOperand(bb->curr->destination), NULL);
+
+    bb->curr->next = op;
+    bb->curr = op;
+    bb->trueEdge = newBasicBlock(node->branches.left);
+    bb->falseEdge = newBasicBlock(node->branches.right);
+    return op;
   }
   return NULL;
 }
 
 BasicBlock *newBasicBlock(AstNode *node) {
+  if (node == NULL) {
+    return NULL;
+  }
   BasicBlock *bb = allocateBasicBlock();
+  bb->ops = newStartOperation();
+  bb->curr = bb->ops;
 
-  Operation *curr = walkAst(node);
-  bb->ops = curr;
+  walkAst(bb, node);
 
   return bb;
 }
@@ -206,6 +243,10 @@ char *opcodeString(IROp opcode) {
     return "+";
   case IR_ASSIGN:
     return "<-";
+  case IR_CODE_START:
+    return "<start>";
+  case IR_COND:
+    return "cond";
   case IR_DIVIDE:
     return "/";
   case IR_SUBTRACT:
@@ -229,11 +270,18 @@ char *opcodeString(IROp opcode) {
 void printBasicBlock(BasicBlock *bb) {
   Operation *curr = bb->ops;
 
+  printf("Basic block %llu\n", bb->id);
   while (curr != NULL) {
-    printf("[ t%llu | %6s | %2s | %2s ]\n", curr->destination,
+    printf("[ t%llu | %8s | %2s | %2s ]\n", curr->destination,
            opcodeString(curr->opcode), operandString(curr->first),
            operandString(curr->second));
     curr = curr->next;
+  }
+  if (bb->trueEdge) {
+    printBasicBlock(bb->trueEdge);
+  }
+  if (bb->falseEdge) {
+    printBasicBlock(bb->falseEdge);
   }
 }
 

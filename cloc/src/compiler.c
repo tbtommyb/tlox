@@ -585,12 +585,15 @@ static void literal(bool canAssign) {
 
 static AstNode *expression() { return parsePrecedence(PREC_ASSIGNMENT); }
 
-static void block() {
+static AstNode *block() {
+  // FIXME: handle multiple statements
+  AstNode *node = NULL;
   while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
-    declaration();
+    node = declaration();
   }
 
   consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
+  return node;
 }
 
 static void function(FunctionType type) {
@@ -743,24 +746,26 @@ static void forStatement() {
   endScope();
 }
 
-static void ifStatement() {
+static AstNode *ifStatement() {
   consume(TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
-  expression();
+  AstNode *condition = expression();
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
 
-  int thenJump = emitJump(OP_JUMP_IF_FALSE);
-  emitByte(OP_POP);
-  statement();
+  /* int thenJump = emitJump(OP_JUMP_IF_FALSE); */
+  /* emitByte(OP_POP); */
+  AstNode *thenBranch = statement();
 
-  int elseJump = emitJump(OP_JUMP);
+  /* int elseJump = emitJump(OP_JUMP); */
 
-  patchJump(thenJump);
-  emitByte(OP_POP);
+  /* patchJump(thenJump); */
+  /* emitByte(OP_POP); */
 
+  AstNode *elseBranch = NULL;
   if (match(TOKEN_ELSE)) {
-    statement();
+    elseBranch = statement();
   }
-  patchJump(elseJump);
+  /* patchJump(elseJump); */
+  return newIfStmt(condition, thenBranch, elseBranch);
 }
 
 static void switchStatement() {
@@ -967,6 +972,13 @@ static AstNode *declaration() {
 static AstNode *statement() {
   if (match(TOKEN_PRINT)) {
     return printStatement();
+  } else if (match(TOKEN_IF)) {
+    return ifStatement();
+  } else if (match(TOKEN_LEFT_BRACE)) {
+    beginScope();
+    AstNode *node = block();
+    endScope();
+    return node;
   } else {
     return expressionStatement();
   }
@@ -1139,7 +1151,7 @@ ParseRule rules[] = {
     /* [TOKEN_FALSE] = {literal, NULL, PREC_NONE}, */
     /* [TOKEN_FOR] = {NULL, NULL, PREC_NONE}, */
     /* [TOKEN_FUN] = {NULL, NULL, PREC_NONE}, */
-    /* [TOKEN_IF] = {NULL, NULL, PREC_NONE}, */
+    [TOKEN_IF] = {NULL, NULL, PREC_NONE},
     /* [TOKEN_NIL] = {literal, NULL, PREC_NONE}, */
     /* [TOKEN_OR] = {NULL, or_, PREC_OR}, */
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
