@@ -4,11 +4,12 @@
 #include "scanner.h"
 #include "value.h"
 
-typedef enum { EXPR_BINARY, EXPR_LITERAL, EXPR_UNARY } NodeType;
+typedef enum { EXPR_BINARY, EXPR_LITERAL, EXPR_UNARY, STMT_PRINT } NodeType;
 
 typedef struct AstNode AstNode;
 
 // TODO: add line numbers for errors
+// Separate out Expr and Stmts and sub-types
 struct AstNode {
   NodeType type;
   Value literal;
@@ -26,6 +27,7 @@ static inline bool isNodeType(AstNode node, NodeType type) {
 AstNode *newLiteralExpr(Value value);
 AstNode *newBinaryExpr(AstNode *left, AstNode *right, TokenType operator);
 AstNode *newUnaryExpr(AstNode *right, TokenType operator);
+AstNode *newPrintStmt(AstNode *expr);
 
 void printAST(AstNode root, int indentation);
 

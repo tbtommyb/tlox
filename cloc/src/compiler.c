@@ -277,10 +277,10 @@ static AstNode *expression();
 static AstNode *statement();
 static AstNode *declaration();
 
-static void printStatement() {
-  expression();
+static AstNode *printStatement() {
+  AstNode *expr = expression();
   consume(TOKEN_SEMICOLON, "Expect ';' after value.");
-  emitByte(OP_PRINT);
+  return newPrintStmt(expr);
 }
 
 static void returnStatement() {
@@ -965,9 +965,11 @@ static AstNode *declaration() {
 }
 
 static AstNode *statement() {
-  return expressionStatement();
-  /* if (match(TOKEN_PRINT)) { */
-  /*   printStatement(); */
+  if (match(TOKEN_PRINT)) {
+    return printStatement();
+  } else {
+    return expressionStatement();
+  }
   /* } else if (match(TOKEN_RETURN)) { */
   /*   returnStatement(); */
   /* } else if (match(TOKEN_FOR)) { */
@@ -1116,7 +1118,7 @@ ParseRule rules[] = {
     /* [TOKEN_DOT] = {NULL, dot, PREC_CALL}, */
     [TOKEN_MINUS] = {unary, binary, PREC_TERM},
     [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
-    /* [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE}, */
+    [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
     [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
     [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
     [TOKEN_PERCENT] = {NULL, binary, PREC_FACTOR},
@@ -1140,7 +1142,7 @@ ParseRule rules[] = {
     /* [TOKEN_IF] = {NULL, NULL, PREC_NONE}, */
     /* [TOKEN_NIL] = {literal, NULL, PREC_NONE}, */
     /* [TOKEN_OR] = {NULL, or_, PREC_OR}, */
-    /* [TOKEN_PRINT] = {NULL, NULL, PREC_NONE}, */
+    [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
     /* [TOKEN_RETURN] = {NULL, NULL, PREC_NONE}, */
     /* [TOKEN_SUPER] = {super_, NULL, PREC_NONE}, */
     /* [TOKEN_THIS] = {this_, NULL, PREC_NONE}, */

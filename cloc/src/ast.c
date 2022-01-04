@@ -35,6 +35,12 @@ AstNode *newUnaryExpr(AstNode *right, TokenType op) {
   return node;
 }
 
+AstNode *newPrintStmt(AstNode *expr) {
+  AstNode *node = allocateAstNode(STMT_PRINT);
+  node->branches.left = expr;
+  return node;
+}
+
 const char *tokenTypeStr(TokenType op) {
   switch (op) {
   case TOKEN_BANG:
@@ -77,6 +83,11 @@ void printAST(AstNode node, int indentation) {
     printf("%*sRight:\n", indentation, "");
     printAST(*node.branches.right, indentation + 2);
     break;
+  }
+  case STMT_PRINT: {
+    printf("%*sStmt Print\n", indentation, "");
+    printf("%*sLeft:\n", indentation, "");
+    printAST(*node.branches.left, indentation + 2);
   }
   }
 }

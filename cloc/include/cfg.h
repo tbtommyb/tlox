@@ -9,15 +9,16 @@
 typedef enum OperandType { OPERAND_LITERAL, OPERAND_REG } OperandType;
 
 typedef enum IROp {
-  CFG_UNKNOWN,
-  CFG_ADD,
-  CFG_ASSIGN,
-  CFG_DIVIDE,
-  CFG_SUBTRACT,
-  CFG_MODULO,
-  CFG_MULTIPLY,
-  CFG_NEGATE,
-  CFG_NOT,
+  IR_UNKNOWN,
+  IR_ADD,
+  IR_ASSIGN,
+  IR_DIVIDE,
+  IR_SUBTRACT,
+  IR_MODULO,
+  IR_MULTIPLY,
+  IR_NEGATE,
+  IR_NOT,
+  IR_PRINT,
 } IROp;
 
 typedef uint64_t Register;

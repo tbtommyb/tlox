@@ -38,29 +38,32 @@ Chunk *allocateChunk() {
 
 void writeOperation(Operation *op, Chunk *chunk) {
   switch (op->opcode) {
-  case CFG_ADD:
+  case IR_ADD:
     emitByte(chunk, OP_ADD);
     break;
-  case CFG_ASSIGN:
+  case IR_ASSIGN:
     emitConstant(chunk, op->first->val.literal); // TODO hardcode literals
     break;
-  case CFG_DIVIDE:
+  case IR_DIVIDE:
     emitByte(chunk, OP_DIVIDE);
     break;
-  case CFG_SUBTRACT:
+  case IR_SUBTRACT:
     emitByte(chunk, OP_SUBTRACT);
     break;
-  case CFG_MODULO:
+  case IR_MODULO:
     emitByte(chunk, OP_MODULO);
     break;
-  case CFG_MULTIPLY:
+  case IR_MULTIPLY:
     emitByte(chunk, OP_MULTIPLY);
     break;
-  case CFG_NEGATE:
+  case IR_NEGATE:
     emitByte(chunk, OP_NEGATE);
     break;
-  case CFG_NOT:
+  case IR_NOT:
     emitByte(chunk, OP_NOT);
+    break;
+  case IR_PRINT:
+    emitByte(chunk, OP_PRINT);
     break;
   default:
     printf("Unknown opcode %d\n", op->opcode);
@@ -75,7 +78,6 @@ Chunk *generateChunk(BasicBlock *bb) {
     writeOperation(current, chunk);
     current = current->next;
   }
-  emitByte(chunk, OP_POP);
   emitReturn(chunk);
   return chunk;
 }

@@ -63,30 +63,30 @@ static CFG *allocateCFG() {
 static IROp tokenToOp(TokenType token) {
   switch (token) {
   case TOKEN_PLUS:
-    return CFG_ADD;
+    return IR_ADD;
   case TOKEN_MINUS:
-    return CFG_SUBTRACT;
+    return IR_SUBTRACT;
   case TOKEN_BANG:
-    return CFG_NOT;
+    return IR_NOT;
   case TOKEN_SLASH:
-    return CFG_DIVIDE;
+    return IR_DIVIDE;
   case TOKEN_STAR:
-    return CFG_MULTIPLY;
+    return IR_MULTIPLY;
   case TOKEN_PERCENT:
-    return CFG_MODULO;
+    return IR_MODULO;
   default:
-    return CFG_UNKNOWN;
+    return IR_UNKNOWN;
   }
 }
 
 static IROp tokenToUnaryOp(TokenType token) {
   switch (token) {
   case TOKEN_MINUS:
-    return CFG_NEGATE;
+    return IR_NEGATE;
   case TOKEN_BANG:
-    return CFG_NOT;
+    return IR_NOT;
   default:
-    return CFG_UNKNOWN;
+    return IR_UNKNOWN;
   }
 }
 
@@ -133,7 +133,7 @@ static Operation *walkAst(AstNode *node, Operation *prev) {
   if (node->type == EXPR_LITERAL) {
     Operand *value = newLiteralOperand(node->literal);
 
-    Operation *op = newOperation(CFG_ASSIGN, value, NULL, prev);
+    Operation *op = newOperation(IR_ASSIGN, value, NULL, prev);
 
     return op;
   }
@@ -161,6 +161,17 @@ static Operation *walkAst(AstNode *node, Operation *prev) {
 
     leftTail->next = right;
     rightTail->next = op;
+
+    return left;
+  }
+  if (node->type == STMT_PRINT) {
+    Operation *left = walkAst(node->branches.left, prev);
+    Operation *leftTail = tailOf(left);
+
+    Operand *value = newRegisterOperand(leftTail->destination);
+    Operation *op = newOperation(IR_PRINT, value, NULL, leftTail);
+
+    leftTail->next = op;
 
     return left;
   }
@@ -194,23 +205,25 @@ char *operandString(Operand *operand) {
 
 char *opcodeString(IROp opcode) {
   switch (opcode) {
-  case CFG_ADD:
+  case IR_ADD:
     return "+";
-  case CFG_ASSIGN:
+  case IR_ASSIGN:
     return "<-";
-  case CFG_DIVIDE:
+  case IR_DIVIDE:
     return "/";
-  case CFG_SUBTRACT:
+  case IR_SUBTRACT:
     return "-";
-  case CFG_MODULO:
+  case IR_MODULO:
     return "%";
-  case CFG_MULTIPLY:
+  case IR_MULTIPLY:
     return "*";
-  case CFG_NEGATE:
+  case IR_NEGATE:
     return "-";
-  case CFG_NOT:
+  case IR_NOT:
     return "!";
-  case CFG_UNKNOWN:
+  case IR_PRINT:
+    return "print";
+  case IR_UNKNOWN:
   default:
     return "?";
   }
@@ -220,7 +233,7 @@ void printBasicBlock(BasicBlock *bb) {
   Operation *curr = bb->ops;
 
   while (curr != NULL) {
-    printf("[ t%llu | %2s | %2s | %2s ]\n", curr->destination,
+    printf("[ t%llu | %6s | %2s | %2s ]\n", curr->destination,
            opcodeString(curr->opcode), operandString(curr->first),
            operandString(curr->second));
     curr = curr->next;
