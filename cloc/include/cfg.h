@@ -46,6 +46,7 @@ struct Operation {
 
 typedef struct BasicBlock {
   BasicBlockId id;
+  int opsCount;
   Operation *ops;
   Operation *curr;
   struct BasicBlock *trueEdge;

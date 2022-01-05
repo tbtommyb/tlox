@@ -45,6 +45,7 @@ static Operation *allocateOperation() {
 
 static BasicBlock *allocateBasicBlock() {
   BasicBlock *bb = (BasicBlock *)reallocate(NULL, 0, sizeof(BasicBlock));
+  bb->opsCount = 0;
   bb->ops = NULL;
   bb->curr = NULL;
   bb->id = getBasicBlockId();
@@ -150,62 +151,52 @@ static Operation *walkAst(BasicBlock *bb, AstNode *node) {
   if (node == NULL) {
     return NULL;
   }
-  if (node->type == EXPR_LITERAL) {
+
+  bb->opsCount++;
+  Operation *op = NULL;
+
+  switch (node->type) {
+  case EXPR_LITERAL: {
     Operand *value = newLiteralOperand(node->literal);
-
-    Operation *op = newOperation(IR_ASSIGN, value, NULL);
-    bb->curr->next = op;
-    bb->curr = op;
-    return op;
+    op = newOperation(IR_ASSIGN, value, NULL);
+    break;
   }
-  if (node->type == EXPR_UNARY) {
+  case EXPR_UNARY: {
     Operation *right = walkAst(bb, node->branches.right);
-
     Operand *value = newRegisterOperand(bb->curr->destination);
-    Operation *op = newOperation(tokenToUnaryOp(node->op), value, NULL);
-
-    bb->curr->next = op;
-    bb->curr = op;
-    return op;
+    op = newOperation(tokenToUnaryOp(node->op), value, NULL);
+    break;
   }
-  if (node->type == EXPR_BINARY) {
+  case EXPR_BINARY: {
     Operation *left = walkAst(bb, node->branches.left);
     Operation *leftTail = tailOf(left);
 
     Operation *right = walkAst(bb, node->branches.right);
     Operation *rightTail = tailOf(right);
 
-    Operation *op = newOperation(tokenToOp(node->op),
-                                 newRegisterOperand(leftTail->destination),
-                                 newRegisterOperand(rightTail->destination));
+    op = newOperation(tokenToOp(node->op),
+                      newRegisterOperand(leftTail->destination),
+                      newRegisterOperand(rightTail->destination));
 
-    bb->curr->next = op;
-    bb->curr = op;
-    return op;
+    break;
   }
-  if (node->type == STMT_PRINT) {
+  case STMT_PRINT: {
     walkAst(bb, node->expr);
-
     Operand *value = newRegisterOperand(bb->curr->destination);
-    Operation *op = newOperation(IR_PRINT, value, NULL);
-
-    bb->curr->next = op;
-    bb->curr = op;
-    return op;
+    op = newOperation(IR_PRINT, value, NULL);
+    break;
   }
-  if (node->type == STMT_IF) {
+  case STMT_IF: {
     Operation *expr = walkAst(bb, node->expr);
-
-    Operation *op =
-        newOperation(IR_COND, newRegisterOperand(bb->curr->destination), NULL);
-
-    bb->curr->next = op;
-    bb->curr = op;
+    op = newOperation(IR_COND, newRegisterOperand(bb->curr->destination), NULL);
     bb->trueEdge = newBasicBlock(node->branches.left);
     bb->falseEdge = newBasicBlock(node->branches.right);
-    return op;
+    break;
   }
-  return NULL;
+  }
+  bb->curr->next = op;
+  bb->curr = op;
+  return op;
 }
 
 BasicBlock *newBasicBlock(AstNode *node) {
@@ -270,17 +261,25 @@ char *opcodeString(IROp opcode) {
 void printBasicBlock(BasicBlock *bb) {
   Operation *curr = bb->ops;
 
-  printf("Basic block %llu\n", bb->id);
+  printf("Basic block %llu", bb->id);
+  if (bb->trueEdge) {
+    printf(" | Edges: %llu", bb->trueEdge->id);
+  }
+  if (bb->falseEdge) {
+    printf(", %llu", bb->falseEdge->id);
+  }
+  printf("\n");
+  printf("Op count: %d\n", bb->opsCount);
   while (curr != NULL) {
     printf("[ t%llu | %8s | %2s | %2s ]\n", curr->destination,
            opcodeString(curr->opcode), operandString(curr->first),
            operandString(curr->second));
     curr = curr->next;
   }
-  if (bb->trueEdge) {
+  if (bb->trueEdge != NULL) {
     printBasicBlock(bb->trueEdge);
   }
-  if (bb->falseEdge) {
+  if (bb->falseEdge != NULL) {
     printBasicBlock(bb->falseEdge);
   }
 }

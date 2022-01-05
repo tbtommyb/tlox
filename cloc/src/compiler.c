@@ -751,20 +751,12 @@ static AstNode *ifStatement() {
   AstNode *condition = expression();
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
 
-  /* int thenJump = emitJump(OP_JUMP_IF_FALSE); */
-  /* emitByte(OP_POP); */
   AstNode *thenBranch = statement();
-
-  /* int elseJump = emitJump(OP_JUMP); */
-
-  /* patchJump(thenJump); */
-  /* emitByte(OP_POP); */
-
   AstNode *elseBranch = NULL;
   if (match(TOKEN_ELSE)) {
     elseBranch = statement();
   }
-  /* patchJump(elseJump); */
+
   return newIfStmt(condition, thenBranch, elseBranch);
 }
 

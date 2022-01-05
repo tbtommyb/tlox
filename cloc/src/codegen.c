@@ -36,7 +36,9 @@ Chunk *allocateChunk() {
   return chunk;
 }
 
-void writeOperation(Operation *op, Chunk *chunk) {
+void iterateBB(Chunk *chunk, BasicBlock *bb);
+
+static void writeOperation(BasicBlock *bb, Operation *op, Chunk *chunk) {
   switch (op->opcode) {
   case IR_ADD:
     emitByte(chunk, OP_ADD);
@@ -46,6 +48,26 @@ void writeOperation(Operation *op, Chunk *chunk) {
     break;
   case IR_CODE_START:
     break;
+  case IR_COND: {
+    int elseBranchOffset = bb->falseEdge != NULL ? 3 : 0;
+    emitByte(chunk, OP_JUMP_IF_FALSE);
+    emitByte(chunk,
+             ((bb->trueEdge->opsCount + 2 + elseBranchOffset) >> 8) &
+                 0xff); // make func for this
+    emitByte(chunk, (bb->trueEdge->opsCount + 2 + elseBranchOffset) & 0xff);
+    emitByte(chunk, OP_POP);
+    iterateBB(chunk, bb->trueEdge);
+    if (bb->falseEdge != NULL) {
+      emitByte(chunk, OP_JUMP);
+      emitByte(chunk,
+               ((bb->falseEdge->opsCount + 1) >> 8) &
+                   0xff); // make func for this
+      emitByte(chunk, (bb->falseEdge->opsCount + 1) & 0xff);
+      iterateBB(chunk, bb->falseEdge);
+    }
+
+    break;
+  }
   case IR_DIVIDE:
     emitByte(chunk, OP_DIVIDE);
     break;
@@ -72,14 +94,19 @@ void writeOperation(Operation *op, Chunk *chunk) {
   }
 }
 
+void iterateBB(Chunk *chunk, BasicBlock *bb) {
+  Operation *current = bb->ops;
+  while (current != NULL) {
+    writeOperation(bb, current, chunk);
+    current = current->next;
+  }
+}
+
 Chunk *generateChunk(BasicBlock *bb) {
   Chunk *chunk = allocateChunk();
 
-  Operation *current = bb->ops;
-  while (current != NULL) {
-    writeOperation(current, chunk);
-    current = current->next;
-  }
+  iterateBB(chunk, bb);
+  // should be pop after expression statements
   emitReturn(chunk);
   return chunk;
 }
