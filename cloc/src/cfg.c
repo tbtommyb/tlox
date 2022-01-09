@@ -271,7 +271,7 @@ void printBasicBlock(BasicBlock *bb) {
   printf("\n");
   printf("Op count: %d\n", bb->opsCount);
   while (curr != NULL) {
-    printf("[ t%llu | %8s | %2s | %2s ]\n", curr->destination,
+    printf("[ t%llu | %8s | %6s | %6s ]\n", curr->destination,
            opcodeString(curr->opcode), operandString(curr->first),
            operandString(curr->second));
     curr = curr->next;

@@ -567,19 +567,16 @@ static void leftBracket(bool canAssign) {
   }
 }
 
-static void literal(bool canAssign) {
+static AstNode *literal(bool canAssign) {
   switch (parser.previous.type) {
   case TOKEN_FALSE:
-    emitByte(OP_FALSE);
-    break;
+    return newLiteralExpr(FALSE_VAL);
   case TOKEN_NIL:
-    emitByte(OP_NIL);
-    break;
+    return newLiteralExpr(NIL_VAL);
   case TOKEN_TRUE:
-    emitByte(OP_TRUE);
-    break;
+    return newLiteralExpr(TRUE_VAL);
   default:
-    return; // Unreachable.
+    return NULL; // Unreachable.
   }
 }
 
@@ -1140,7 +1137,7 @@ ParseRule rules[] = {
     /* [TOKEN_AND] = {NULL, and_, PREC_AND}, */
     /* [TOKEN_CLASS] = {NULL, NULL, PREC_NONE}, */
     /* [TOKEN_ELSE] = {NULL, NULL, PREC_NONE}, */
-    /* [TOKEN_FALSE] = {literal, NULL, PREC_NONE}, */
+    [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
     /* [TOKEN_FOR] = {NULL, NULL, PREC_NONE}, */
     /* [TOKEN_FUN] = {NULL, NULL, PREC_NONE}, */
     [TOKEN_IF] = {NULL, NULL, PREC_NONE},
@@ -1150,7 +1147,7 @@ ParseRule rules[] = {
     /* [TOKEN_RETURN] = {NULL, NULL, PREC_NONE}, */
     /* [TOKEN_SUPER] = {super_, NULL, PREC_NONE}, */
     /* [TOKEN_THIS] = {this_, NULL, PREC_NONE}, */
-    /* [TOKEN_TRUE] = {literal, NULL, PREC_NONE}, */
+    [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
     /* [TOKEN_VAR] = {NULL, NULL, PREC_NONE}, */
     /* [TOKEN_WHILE] = {NULL, NULL, PREC_NONE}, */
     /* [TOKEN_ERROR] = {NULL, NULL, PREC_NONE}, */

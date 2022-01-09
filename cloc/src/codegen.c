@@ -60,9 +60,10 @@ static void writeOperation(BasicBlock *bb, Operation *op, Chunk *chunk) {
     if (bb->falseEdge != NULL) {
       emitByte(chunk, OP_JUMP);
       emitByte(chunk,
-               ((bb->falseEdge->opsCount + 1) >> 8) &
+               ((bb->falseEdge->opsCount + 2) >> 8) &
                    0xff); // make func for this
-      emitByte(chunk, (bb->falseEdge->opsCount + 1) & 0xff);
+      emitByte(chunk, (bb->falseEdge->opsCount + 2) & 0xff);
+      emitByte(chunk, OP_POP);
       iterateBB(chunk, bb->falseEdge);
     }
 

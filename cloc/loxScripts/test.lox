@@ -1,4 +1,4 @@
-if (2 + 2) {
+if (false) {
   print 7;
 } else {
   print 9;
