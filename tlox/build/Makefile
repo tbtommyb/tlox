@@ -57,10 +57,10 @@ RM = /usr/local/Cellar/cmake/3.21.4/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /Users/thomasbarrett/coding/crafting-interpreters/cloc
+CMAKE_SOURCE_DIR = /Users/thomasbarrett/coding/crafting-interpreters/tlox
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /Users/thomasbarrett/coding/crafting-interpreters/cloc
+CMAKE_BINARY_DIR = /Users/thomasbarrett/coding/crafting-interpreters/tlox
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -142,14 +142,14 @@ test/fast: test
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/thomasbarrett/coding/crafting-interpreters/cloc/CMakeFiles /Users/thomasbarrett/coding/crafting-interpreters/cloc//CMakeFiles/progress.marks
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/thomasbarrett/coding/crafting-interpreters/cloc/CMakeFiles 0
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(CMAKE_COMMAND) -E cmake_progress_start /Users/thomasbarrett/coding/crafting-interpreters/tlox/CMakeFiles /Users/thomasbarrett/coding/crafting-interpreters/tlox/build//CMakeFiles/progress.marks
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 build/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/thomasbarrett/coding/crafting-interpreters/tlox/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
 clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 clean
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 build/clean
 .PHONY : clean
 
 # The main clean target
@@ -158,57 +158,56 @@ clean/fast: clean
 
 # Prepare targets for installation.
 preinstall: all
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 preinstall
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 build/preinstall
 .PHONY : preinstall
 
 # Prepare targets for installation.
 preinstall/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 preinstall
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 build/preinstall
 .PHONY : preinstall/fast
 
 # clear depends
 depend:
-	$(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
 
-#=============================================================================
-# Target rules for targets named cloc
+# Convenience name for target.
+build/CMakeFiles/cloc-bin.dir/rule:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 build/CMakeFiles/cloc-bin.dir/rule
+.PHONY : build/CMakeFiles/cloc-bin.dir/rule
 
-# Build rule for target.
-cloc: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 cloc
-.PHONY : cloc
-
-# fast build rule for target.
-cloc/fast:
-	$(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/build
-.PHONY : cloc/fast
-
-#=============================================================================
-# Target rules for targets named check_cloc
-
-# Build rule for target.
-check_cloc: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 check_cloc
-.PHONY : check_cloc
-
-# fast build rule for target.
-check_cloc/fast:
-	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/check_cloc.dir/build.make tests/CMakeFiles/check_cloc.dir/build
-.PHONY : check_cloc/fast
-
-#=============================================================================
-# Target rules for targets named cloc-bin
-
-# Build rule for target.
-cloc-bin: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 cloc-bin
+# Convenience name for target.
+cloc-bin: build/CMakeFiles/cloc-bin.dir/rule
 .PHONY : cloc-bin
 
 # fast build rule for target.
 cloc-bin/fast:
-	$(MAKE) $(MAKESILENT) -f build/CMakeFiles/cloc-bin.dir/build.make build/CMakeFiles/cloc-bin.dir/build
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f build/CMakeFiles/cloc-bin.dir/build.make build/CMakeFiles/cloc-bin.dir/build
 .PHONY : cloc-bin/fast
+
+main.o: main.c.o
+.PHONY : main.o
+
+# target to build an object file
+main.c.o:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f build/CMakeFiles/cloc-bin.dir/build.make build/CMakeFiles/cloc-bin.dir/main.c.o
+.PHONY : main.c.o
+
+main.i: main.c.i
+.PHONY : main.i
+
+# target to preprocess a source file
+main.c.i:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f build/CMakeFiles/cloc-bin.dir/build.make build/CMakeFiles/cloc-bin.dir/main.c.i
+.PHONY : main.c.i
+
+main.s: main.c.s
+.PHONY : main.s
+
+# target to generate assembly for a file
+main.c.s:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f build/CMakeFiles/cloc-bin.dir/build.make build/CMakeFiles/cloc-bin.dir/main.c.s
+.PHONY : main.c.s
 
 # Help Target
 help:
@@ -223,9 +222,10 @@ help:
 	@echo "... list_install_components"
 	@echo "... rebuild_cache"
 	@echo "... test"
-	@echo "... check_cloc"
-	@echo "... cloc"
 	@echo "... cloc-bin"
+	@echo "... main.o"
+	@echo "... main.i"
+	@echo "... main.s"
 .PHONY : help
 
 
@@ -237,6 +237,6 @@ help:
 # No rule that depends on this can have commands that come from listfiles
 # because they might be regenerated.
 cmake_check_build_system:
-	$(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
 .PHONY : cmake_check_build_system
 

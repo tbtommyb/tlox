@@ -1,4 +1,4 @@
-# Install script for directory: /Users/thomasbarrett/coding/crafting-interpreters/cloc
+# Install script for directory: /Users/thomasbarrett/coding/crafting-interpreters/tlox
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -39,9 +39,9 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("/Users/thomasbarrett/coding/crafting-interpreters/cloc/src/cmake_install.cmake")
-  include("/Users/thomasbarrett/coding/crafting-interpreters/cloc/tests/cmake_install.cmake")
-  include("/Users/thomasbarrett/coding/crafting-interpreters/cloc/build/cmake_install.cmake")
+  include("/Users/thomasbarrett/coding/crafting-interpreters/tlox/src/cmake_install.cmake")
+  include("/Users/thomasbarrett/coding/crafting-interpreters/tlox/tests/cmake_install.cmake")
+  include("/Users/thomasbarrett/coding/crafting-interpreters/tlox/build/cmake_install.cmake")
 
 endif()
 
@@ -53,5 +53,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/Users/thomasbarrett/coding/crafting-interpreters/cloc/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/Users/thomasbarrett/coding/crafting-interpreters/tlox/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

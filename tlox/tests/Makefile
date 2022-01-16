@@ -57,10 +57,10 @@ RM = /usr/local/Cellar/cmake/3.21.4/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /Users/thomasbarrett/coding/crafting-interpreters/cloc
+CMAKE_SOURCE_DIR = /Users/thomasbarrett/coding/crafting-interpreters/tlox
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /Users/thomasbarrett/coding/crafting-interpreters/cloc
+CMAKE_BINARY_DIR = /Users/thomasbarrett/coding/crafting-interpreters/tlox
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -142,14 +142,14 @@ test/fast: test
 
 # The main all target
 all: cmake_check_build_system
-	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(CMAKE_COMMAND) -E cmake_progress_start /Users/thomasbarrett/coding/crafting-interpreters/cloc/CMakeFiles /Users/thomasbarrett/coding/crafting-interpreters/cloc/tests//CMakeFiles/progress.marks
-	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/thomasbarrett/coding/crafting-interpreters/cloc/CMakeFiles 0
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(CMAKE_COMMAND) -E cmake_progress_start /Users/thomasbarrett/coding/crafting-interpreters/tlox/CMakeFiles /Users/thomasbarrett/coding/crafting-interpreters/tlox/tests//CMakeFiles/progress.marks
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/thomasbarrett/coding/crafting-interpreters/tlox/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
 clean:
-	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/clean
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/clean
 .PHONY : clean
 
 # The main clean target
@@ -158,22 +158,22 @@ clean/fast: clean
 
 # Prepare targets for installation.
 preinstall: all
-	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/preinstall
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/preinstall
 .PHONY : preinstall
 
 # Prepare targets for installation.
 preinstall/fast:
-	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/preinstall
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/preinstall
 .PHONY : preinstall/fast
 
 # clear depends
 depend:
-	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
 
 # Convenience name for target.
 tests/CMakeFiles/check_cloc.dir/rule:
-	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/check_cloc.dir/rule
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/check_cloc.dir/rule
 .PHONY : tests/CMakeFiles/check_cloc.dir/rule
 
 # Convenience name for target.
@@ -182,7 +182,7 @@ check_cloc: tests/CMakeFiles/check_cloc.dir/rule
 
 # fast build rule for target.
 check_cloc/fast:
-	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/check_cloc.dir/build.make tests/CMakeFiles/check_cloc.dir/build
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/check_cloc.dir/build.make tests/CMakeFiles/check_cloc.dir/build
 .PHONY : check_cloc/fast
 
 check_cloc.o: check_cloc.c.o
@@ -190,7 +190,7 @@ check_cloc.o: check_cloc.c.o
 
 # target to build an object file
 check_cloc.c.o:
-	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/check_cloc.dir/build.make tests/CMakeFiles/check_cloc.dir/check_cloc.c.o
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/check_cloc.dir/build.make tests/CMakeFiles/check_cloc.dir/check_cloc.c.o
 .PHONY : check_cloc.c.o
 
 check_cloc.i: check_cloc.c.i
@@ -198,7 +198,7 @@ check_cloc.i: check_cloc.c.i
 
 # target to preprocess a source file
 check_cloc.c.i:
-	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/check_cloc.dir/build.make tests/CMakeFiles/check_cloc.dir/check_cloc.c.i
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/check_cloc.dir/build.make tests/CMakeFiles/check_cloc.dir/check_cloc.c.i
 .PHONY : check_cloc.c.i
 
 check_cloc.s: check_cloc.c.s
@@ -206,7 +206,7 @@ check_cloc.s: check_cloc.c.s
 
 # target to generate assembly for a file
 check_cloc.c.s:
-	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/check_cloc.dir/build.make tests/CMakeFiles/check_cloc.dir/check_cloc.c.s
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/check_cloc.dir/build.make tests/CMakeFiles/check_cloc.dir/check_cloc.c.s
 .PHONY : check_cloc.c.s
 
 # Help Target
@@ -237,6 +237,6 @@ help:
 # No rule that depends on this can have commands that come from listfiles
 # because they might be regenerated.
 cmake_check_build_system:
-	cd /Users/thomasbarrett/coding/crafting-interpreters/cloc && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
 .PHONY : cmake_check_build_system
 

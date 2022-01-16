@@ -3,3 +3,4 @@ if (false) {
 } else {
   print 9;
 }
+print 10;

@@ -1,4 +1,4 @@
-# Install script for directory: /Users/thomasbarrett/coding/crafting-interpreters/cloc/build
+# Install script for directory: /Users/thomasbarrett/coding/crafting-interpreters/tlox/tests
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
