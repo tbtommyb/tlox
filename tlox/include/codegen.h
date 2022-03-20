@@ -3,8 +3,9 @@
 
 #include "cfg.h"
 #include "chunk.h"
+#include "table.h"
 
 Chunk *allocateChunk();
-Chunk *generateChunk(BasicBlock *bb);
+Chunk *generateChunk(BasicBlock *bb, Table *labels);
 
 #endif

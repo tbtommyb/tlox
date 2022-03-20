@@ -1,8 +1,10 @@
 #include "ast.h"
+#include "linked_list.h"
 #include "memory.h"
 #include "scanner.h"
 #include "value.h"
 
+// TODO: integrate with garbage collector
 static AstNode *allocateAstNode(NodeType type) {
   AstNode *node = (AstNode *)reallocate(NULL, 0, sizeof(AstNode));
   node->type = type;
@@ -11,6 +13,7 @@ static AstNode *allocateAstNode(NodeType type) {
   node->expr = NULL;
   node->branches.left = NULL;
   node->branches.right = NULL;
+  node->stmts = NULL;
 
   return node;
 }
@@ -51,6 +54,12 @@ AstNode *newIfStmt(AstNode *condition, AstNode *thenBranch,
   return node;
 }
 
+AstNode *newModuleStmt() {
+  AstNode *node = allocateAstNode(STMT_MODULE);
+  node->stmts = linkedList_allocate();
+  return node;
+}
+
 const char *tokenTypeStr(TokenType op) {
   switch (op) {
   case TOKEN_BANG:
@@ -70,6 +79,7 @@ const char *tokenTypeStr(TokenType op) {
   }
 }
 
+// change to take pointer?
 void printAST(AstNode node, int indentation) {
   switch (node.type) {
   case EXPR_LITERAL: {
@@ -80,37 +90,45 @@ void printAST(AstNode node, int indentation) {
   }
   case EXPR_UNARY: {
     printf("%*sExpr Unary\n", indentation, "");
-    printf("%*sOp: %s\n", indentation, "", tokenTypeStr(node.op));
-    printf("%*sRight:\n", indentation, "");
-    printAST(*node.branches.right, indentation + 2);
+    printf("%*sOp: %s\n", indentation + 2, "", tokenTypeStr(node.op));
+    printf("%*sRight:\n", indentation + 2, "");
+    printAST(*node.branches.right, indentation + 4);
     break;
   }
   case EXPR_BINARY: {
     printf("%*sExpr Binary\n", indentation, "");
-    printf("%*sOp: %s\n", indentation, "", tokenTypeStr(node.op));
-    printf("%*sLeft:\n", indentation, "");
-    printAST(*node.branches.left, indentation + 2);
-    printf("%*sRight:\n", indentation, "");
-    printAST(*node.branches.right, indentation + 2);
+    printf("%*sOp: %s\n", indentation + 2, "", tokenTypeStr(node.op));
+    printf("%*sLeft:\n", indentation + 2, "");
+    printAST(*node.branches.left, indentation + 4);
+    printf("%*sRight:\n", indentation + 2, "");
+    printAST(*node.branches.right, indentation + 4);
     break;
   }
   case STMT_IF: {
     printf("%*sStmt If\n", indentation, "");
-    printf("%*sCondition:\n", indentation, "");
-    printAST(*node.expr, indentation + 2);
-    printf("%*sThen:\n", indentation, "");
-    printAST(*node.branches.left, indentation + 2);
+    printf("%*sCondition:\n", indentation + 2, "");
+    printAST(*node.expr, indentation + 4);
+    printf("%*sThen:\n", indentation + 2, "");
+    printAST(*node.branches.left, indentation + 4);
     if (node.branches.right) {
-      printf("%*sElse:\n", indentation, "");
-      printAST(*node.branches.right, indentation + 2);
+      printf("%*sElse:\n", indentation + 2, "");
+      printAST(*node.branches.right, indentation + 4);
     }
     break;
   }
   case STMT_PRINT: {
     printf("%*sStmt Print\n", indentation, "");
-    printf("%*sExpr:\n", indentation, "");
-    printAST(*node.expr, indentation + 2);
+    printf("%*sExpr:\n", indentation + 2, "");
+    printAST(*node.expr, indentation + 4);
     break;
+  }
+  case STMT_MODULE: {
+    printf("%*sStmt Module\n", indentation, "");
+    Node *stmtNode = (Node *)node.stmts->head;
+    while (stmtNode != NULL) {
+      printAST(*(AstNode *)stmtNode->data, indentation + 2);
+      stmtNode = stmtNode->next;
+    }
   }
   }
 }

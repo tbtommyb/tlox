@@ -6,6 +6,7 @@ set(LIB_SOURCES
   compiler.c
   debug.c
   memory.c
+  linked_list.c
   lox_array.c
   object.c
   scanner.c

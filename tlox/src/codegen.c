@@ -3,7 +3,7 @@
 #import "memory.h"
 
 static void emitByte(Chunk *chunk, uint8_t byte) {
-  writeChunk(chunk, byte, 123);
+  writeChunk(chunk, byte, 123); // FIXME
 }
 
 static void emitBytes(Chunk *chunk, uint8_t byte1, uint8_t byte2) {
@@ -36,9 +36,10 @@ Chunk *allocateChunk() {
   return chunk;
 }
 
-void iterateBB(Chunk *chunk, BasicBlock *bb);
+void iterateBB(Chunk *chunk, BasicBlock *bb, Table *labels);
 
-static void writeOperation(BasicBlock *bb, Operation *op, Chunk *chunk) {
+static void writeOperation(BasicBlock *bb, Operation *op, Chunk *chunk,
+                           Table *labels) {
   switch (op->opcode) {
   case IR_ADD:
     emitByte(chunk, OP_ADD);
@@ -49,24 +50,24 @@ static void writeOperation(BasicBlock *bb, Operation *op, Chunk *chunk) {
   case IR_CODE_START:
     break;
   case IR_COND: {
-    int elseBranchOffset = bb->falseEdge != NULL ? 3 : 0;
+    // Write label ID into instruction stream and later rewrite symbolic
+    // addresses
     emitByte(chunk, OP_JUMP_IF_FALSE);
-    emitByte(chunk,
-             ((bb->trueEdge->opsCount + 2 + elseBranchOffset) >> 8) &
-                 0xff); // make func for this
-    emitByte(chunk, (bb->trueEdge->opsCount + 2 + elseBranchOffset) & 0xff);
+    emitByte(chunk, (op->second->val.label >> 8) & 0xff);
+    emitByte(chunk, op->second->val.label & 0xff);
     emitByte(chunk, OP_POP);
-    iterateBB(chunk, bb->trueEdge);
-    if (bb->falseEdge != NULL) {
-      emitByte(chunk, OP_JUMP);
-      emitByte(chunk,
-               ((bb->falseEdge->opsCount + 2) >> 8) &
-                   0xff); // make func for this
-      emitByte(chunk, (bb->falseEdge->opsCount + 2) & 0xff);
-      emitByte(chunk, OP_POP);
-      iterateBB(chunk, bb->falseEdge);
-    }
-
+    break;
+  }
+  case IR_GOTO: {
+    emitByte(chunk, OP_JUMP);
+    emitByte(chunk, (op->first->val.label >> 8) & 0xff);
+    emitByte(chunk, op->first->val.label & 0xff);
+    emitByte(chunk, OP_POP);
+    break;
+  }
+  case IR_LABEL: {
+    tableSet(labels, NUMBER_VAL(op->first->val.label),
+             NUMBER_VAL(chunk->count - 1));
     break;
   }
   case IR_DIVIDE:
@@ -95,18 +96,38 @@ static void writeOperation(BasicBlock *bb, Operation *op, Chunk *chunk) {
   }
 }
 
-void iterateBB(Chunk *chunk, BasicBlock *bb) {
+void iterateBB(Chunk *chunk, BasicBlock *bb, Table *labels) {
   Operation *current = bb->ops;
   while (current != NULL) {
-    writeOperation(bb, current, chunk);
+    writeOperation(bb, current, chunk, labels);
     current = current->next;
+  }
+  // Iterate through and rewrite all JUMP addresses using stored addresses
+  int index = 0;
+  while (index < chunk->count) {
+    if (chunk->code[index] == OP_JUMP ||
+        chunk->code[index] == OP_JUMP_IF_FALSE) {
+      uint8_t hi = chunk->code[index + 1];
+      uint8_t lo = chunk->code[index + 2];
+      LabelId labelId = (hi << 8) | lo;
+      Value location;
+      if (!tableGet(labels, NUMBER_VAL(labelId), &location)) {
+        // error
+        printf("No position found for label %llu\n", labelId);
+      }
+      int offset = (int)AS_NUMBER(location) - index - 2;
+      chunk->code[index + 1] = (offset >> 8) & 0xff;
+      chunk->code[index + 2] = offset & 0xff;
+      index++;
+    }
+    index++;
   }
 }
 
-Chunk *generateChunk(BasicBlock *bb) {
+Chunk *generateChunk(BasicBlock *bb, Table *labels) {
   Chunk *chunk = allocateChunk();
 
-  iterateBB(chunk, bb);
+  iterateBB(chunk, bb, labels);
   // should be pop after expression statements
   emitReturn(chunk);
   return chunk;

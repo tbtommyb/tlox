@@ -7,11 +7,15 @@
 BasicBlock *newBasicBlock(AstNode *node);
 
 // TODO: make thread safe
-static Register currentRegister = 0;
+static Register currentRegister = 1;
 static BasicBlockId currentBasicBlockId = 0;
+static OperationId currentOperationId = 1;
+static LabelId currentLabelId = 0;
 
 static Register getRegister() { return currentRegister++; }
 static BasicBlockId getBasicBlockId() { return currentBasicBlockId++; }
+static OperationId getOperationId() { return currentOperationId++; }
+static LabelId getLabelId() { return currentLabelId++; }
 
 // TEMP
 char *valueToString(Value value) {
@@ -114,15 +118,22 @@ Operand *newRegisterOperand(Register reg) {
   return operand;
 }
 
+Operand *newLabelOperand(LabelId id) {
+  Operand *operand = allocateOperand(OPERAND_LABEL);
+  operand->val.label = id;
+
+  return operand;
+}
+
 // Make a separate function for statements that doesn't output to register?
 Operation *newOperation(IROp opcode, Operand *first, Operand *second) {
   Operation *op = allocateOperation();
 
   op->destination = getRegister();
+  op->id = getOperationId();
   op->opcode = opcode;
   op->first = first;
   op->second = second;
-  op->next = NULL;
 
   return op;
 }
@@ -132,9 +143,26 @@ static Operation *newStartOperation() {
 
   op->destination = 0;
   op->opcode = IR_CODE_START;
-  op->first = NULL;
-  op->second = NULL;
-  op->next = NULL;
+
+  return op;
+}
+
+static Operation *newGotoOperation(LabelId labelId) {
+  Operation *op = allocateOperation();
+
+  op->id = getOperationId();
+  op->opcode = IR_GOTO;
+  op->first = newLabelOperand(labelId);
+
+  return op;
+}
+
+static Operation *newLabelOperation(LabelId labelId) {
+  Operation *op = allocateOperation();
+
+  op->id = getOperationId();
+  op->opcode = IR_LABEL;
+  op->first = newLabelOperand(labelId);
 
   return op;
 }
@@ -159,12 +187,16 @@ static Operation *walkAst(BasicBlock *bb, AstNode *node) {
   case EXPR_LITERAL: {
     Operand *value = newLiteralOperand(node->literal);
     op = newOperation(IR_ASSIGN, value, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
     break;
   }
   case EXPR_UNARY: {
     Operation *right = walkAst(bb, node->branches.right);
     Operand *value = newRegisterOperand(bb->curr->destination);
     op = newOperation(tokenToUnaryOp(node->op), value, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
     break;
   }
   case EXPR_BINARY: {
@@ -178,24 +210,48 @@ static Operation *walkAst(BasicBlock *bb, AstNode *node) {
                       newRegisterOperand(leftTail->destination),
                       newRegisterOperand(rightTail->destination));
 
+    bb->curr->next = op;
+    bb->curr = op;
     break;
   }
   case STMT_PRINT: {
     walkAst(bb, node->expr);
     Operand *value = newRegisterOperand(bb->curr->destination);
     op = newOperation(IR_PRINT, value, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
     break;
   }
   case STMT_IF: {
     Operation *expr = walkAst(bb, node->expr);
-    op = newOperation(IR_COND, newRegisterOperand(bb->curr->destination), NULL);
-    bb->trueEdge = newBasicBlock(node->branches.left);
-    bb->falseEdge = newBasicBlock(node->branches.right);
+    LabelId elseLabelId = getLabelId();
+    LabelId afterLabelId = getLabelId();
+    op = newOperation(IR_COND, newRegisterOperand(bb->curr->destination),
+                      newLabelOperand(elseLabelId));
+    bb->curr->next = op;
+    bb->curr = op;
+    walkAst(bb, node->branches.left);
+    Operation *afterOp = newGotoOperation(afterLabelId);
+    bb->curr->next = afterOp;
+    bb->curr = afterOp;
+    Operation *elseLabel = newLabelOperation(elseLabelId);
+    bb->curr->next = elseLabel;
+    bb->curr = elseLabel;
+    walkAst(bb, node->branches.right);
+    Operation *afterLabel = newLabelOperation(afterLabelId);
+    bb->curr->next = afterLabel;
+    bb->curr = afterLabel;
     break;
   }
+  case STMT_MODULE: {
+    Node *stmtNode = (Node *)node->stmts->head;
+    while (stmtNode != NULL) {
+      // FIXME: create new BB per statement
+      walkAst(bb, stmtNode->data);
+      stmtNode = stmtNode->next;
+    }
   }
-  bb->curr->next = op;
-  bb->curr = op;
+  }
   return op;
 }
 
@@ -225,6 +281,12 @@ char *operandString(Operand *operand) {
     snprintf(str, length + 1, "t%llu", operand->val.source);
     return str;
   }
+  if (operand->type == OPERAND_LABEL) {
+    int length = snprintf(NULL, 0, "L%llu", operand->val.label);
+    char *str = malloc(length + 1); // FIXME: free somewhere
+    snprintf(str, length + 1, "L%llu", operand->val.label);
+    return str;
+  }
   return "?";
 }
 
@@ -252,6 +314,10 @@ char *opcodeString(IROp opcode) {
     return "!";
   case IR_PRINT:
     return "print";
+  case IR_GOTO:
+    return "goto";
+  case IR_LABEL:
+    return "label";
   case IR_UNKNOWN:
   default:
     return "?";
@@ -271,9 +337,17 @@ void printBasicBlock(BasicBlock *bb) {
   printf("\n");
   printf("Op count: %d\n", bb->opsCount);
   while (curr != NULL) {
-    printf("[ t%llu | %8s | %6s | %6s ]\n", curr->destination,
-           opcodeString(curr->opcode), operandString(curr->first),
-           operandString(curr->second));
+    if (curr->opcode == IR_LABEL) {
+      printf("L%llu:\n", curr->first->val.label);
+    } else if (curr->destination == 0) {
+      printf("%4llu: [       | %8s | %6s | %6s ]\n", curr->id,
+             opcodeString(curr->opcode), operandString(curr->first),
+             operandString(curr->second));
+    } else {
+      printf("%4llu: [ t%-4llu | %8s | %6s | %6s ]\n", curr->id,
+             curr->destination, opcodeString(curr->opcode),
+             operandString(curr->first), operandString(curr->second));
+    }
     curr = curr->next;
   }
   if (bb->trueEdge != NULL) {
@@ -284,6 +358,7 @@ void printBasicBlock(BasicBlock *bb) {
   }
 }
 
+// Change to handle iterating through multiple statements
 CFG *newCFG(AstNode *root) {
   CFG *cfg = allocateCFG();
 

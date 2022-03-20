@@ -8,6 +8,7 @@
 #include "codegen.h"
 #include "common.h"
 #include "compiler.h"
+#include "linked_list.h"
 #include "memory.h"
 #include "scanner.h"
 #include "table.h"
@@ -93,6 +94,7 @@ Compiler *current = NULL;
 ClassCompiler *currentClass = NULL;
 Table stringConstants;
 Table globalConsts;
+Table labels;
 
 static Chunk *currentChunk() { return &current->function->chunk; }
 
@@ -1202,18 +1204,20 @@ ObjFunction *compile(const char *source, FILE *ostream, FILE *errstream) {
 
   initTable(&stringConstants);
   initTable(&globalConsts);
+  initTable(&labels);
 
   advance();
 
-  /* while (!match(TOKEN_EOF)) { */
-  AstNode *ast = declaration();
-  /* } */
+  AstNode *ast = newModuleStmt();
+  while (!match(TOKEN_EOF)) {
+    linkedList_append(ast->stmts, declaration());
+  }
 
   printAST(*ast, 0);
   CFG *cfg = newCFG(ast);
   printBasicBlock(cfg->start);
 
-  Chunk *chunk = generateChunk(cfg->start);
+  Chunk *chunk = generateChunk(cfg->start, &labels);
   ObjFunction *function = newFunction();
   function->chunk = *chunk;
 
@@ -1222,6 +1226,7 @@ ObjFunction *compile(const char *source, FILE *ostream, FILE *errstream) {
   /* ObjFunction *function = endCompiler(); */
   freeTable(&stringConstants);
   freeTable(&globalConsts);
+  freeTable(&labels);
 
   /* return NULL; */
   return parser.hadError ? NULL : function;

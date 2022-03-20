@@ -1,6 +1,7 @@
 #ifndef clox_ast_h
 #define clox_ast_h
 
+#include "linked_list.h"
 #include "scanner.h"
 #include "value.h"
 
@@ -9,6 +10,7 @@ typedef enum {
   EXPR_LITERAL,
   EXPR_UNARY,
   STMT_IF,
+  STMT_MODULE,
   STMT_PRINT
 } NodeType;
 
@@ -25,6 +27,7 @@ struct AstNode {
     AstNode *left;
     AstNode *right;
   } branches;
+  LinkedList *stmts;
 };
 
 static inline bool isNodeType(AstNode node, NodeType type) {
@@ -37,6 +40,7 @@ AstNode *newUnaryExpr(AstNode *right, TokenType operator);
 AstNode *newPrintStmt(AstNode *expr);
 AstNode *newIfStmt(AstNode *condition, AstNode *thenBranch,
                    AstNode *elseBranch);
+AstNode *newModuleStmt();
 
 void printAST(AstNode root, int indentation);
 

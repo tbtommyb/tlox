@@ -6,7 +6,11 @@
 #include "value.h"
 #include <stdint.h>
 
-typedef enum OperandType { OPERAND_LITERAL, OPERAND_REG } OperandType;
+typedef enum OperandType {
+  OPERAND_LITERAL,
+  OPERAND_REG,
+  OPERAND_LABEL
+} OperandType;
 
 typedef enum IROp {
   IR_UNKNOWN,
@@ -21,22 +25,29 @@ typedef enum IROp {
   IR_NOT,
   IR_PRINT,
   IR_CODE_START,
+  IR_GOTO,
+  IR_LABEL
 } IROp;
 
 typedef uint64_t Register;
 typedef uint64_t BasicBlockId;
+typedef uint64_t OperationId;
+typedef uint64_t LabelId; // TODO: make 16_t
 
 typedef struct Operand {
   OperandType type;
   union {
     Value literal;
     Register source;
+    LabelId label;
   } val;
 } Operand;
 
 typedef struct Operation Operation;
 
+// TODO: create different Operation types
 struct Operation {
+  OperationId id;
   IROp opcode;
   Register destination;
   Operand *first;
