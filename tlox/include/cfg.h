@@ -32,7 +32,7 @@ typedef enum IROp {
 typedef uint64_t Register;
 typedef uint64_t BasicBlockId;
 typedef uint64_t OperationId;
-typedef uint64_t LabelId; // TODO: make 16_t
+typedef int64_t LabelId; // TODO: make 16_t
 
 typedef struct Operand {
   OperandType type;
@@ -57,9 +57,10 @@ struct Operation {
 
 typedef struct BasicBlock {
   BasicBlockId id;
-  int opsCount;
+  LabelId labelId;
+  int opsCount; // Keep this?
   Operation *ops;
-  Operation *curr;
+  Operation *curr; // Keep this?
   struct BasicBlock *trueEdge;
   struct BasicBlock *falseEdge;
 } BasicBlock;

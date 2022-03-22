@@ -98,6 +98,7 @@ static void writeOperation(BasicBlock *bb, Operation *op, Chunk *chunk,
 
 void iterateBB(Chunk *chunk, BasicBlock *bb, Table *labels) {
   Operation *current = bb->ops;
+  // TODO: do this via CFG edges?
   while (current != NULL) {
     writeOperation(bb, current, chunk, labels);
     current = current->next;

@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 
+Table labelBasicBlockMapping;
 BasicBlock *newBasicBlock(AstNode *node);
 
 // TODO: make thread safe
@@ -55,6 +56,7 @@ static BasicBlock *allocateBasicBlock() {
   bb->id = getBasicBlockId();
   bb->trueEdge = NULL;
   bb->falseEdge = NULL;
+  bb->labelId = -1;
 
   return bb;
 }
@@ -223,13 +225,19 @@ static Operation *walkAst(BasicBlock *bb, AstNode *node) {
     break;
   }
   case STMT_IF: {
+    // TODO: tidy up implementation here
     Operation *expr = walkAst(bb, node->expr);
+    LabelId ifLabelId = getLabelId();
     LabelId elseLabelId = getLabelId();
     LabelId afterLabelId = getLabelId();
     op = newOperation(IR_COND, newRegisterOperand(bb->curr->destination),
                       newLabelOperand(elseLabelId));
     bb->curr->next = op;
     bb->curr = op;
+
+    Operation *ifLabel = newLabelOperation(ifLabelId);
+    bb->curr->next = ifLabel;
+    bb->curr = ifLabel;
     walkAst(bb, node->branches.left);
     Operation *afterOp = newGotoOperation(afterLabelId);
     bb->curr->next = afterOp;
@@ -245,6 +253,7 @@ static Operation *walkAst(BasicBlock *bb, AstNode *node) {
   }
   case STMT_MODULE: {
     Node *stmtNode = (Node *)node->stmts->head;
+
     while (stmtNode != NULL) {
       // FIXME: create new BB per statement
       walkAst(bb, stmtNode->data);
@@ -255,6 +264,9 @@ static Operation *walkAst(BasicBlock *bb, AstNode *node) {
   return op;
 }
 
+// TODO: Create IRList or similar (linked list of 3AC IR)
+// so that BasicBlock is only created when actually making blocks
+// Rename too
 BasicBlock *newBasicBlock(AstNode *node) {
   if (node == NULL) {
     return NULL;
@@ -266,6 +278,99 @@ BasicBlock *newBasicBlock(AstNode *node) {
   walkAst(bb, node);
 
   return bb;
+}
+
+// TODO: make beautiful
+CFG *constructCFG(BasicBlock *irList) {
+  CFG *cfg = allocateCFG();
+  cfg->start = allocateBasicBlock();
+
+  initTable(&labelBasicBlockMapping);
+
+  BasicBlock *currentBB = cfg->start;
+  currentBB->ops = irList->ops;
+  Operation *currentOp = irList->ops;
+
+  while (currentOp != NULL) {
+    currentBB->opsCount++;
+
+    if (currentOp->opcode == IR_COND) {
+      Value ifBranchPtr;
+      // TODO: macro to avoid this access
+      LabelId ifBranchHead = currentOp->next->first->val.label;
+      BasicBlock *ifBranchBB = NULL;
+      if (tableGet(&labelBasicBlockMapping, NUMBER_VAL(ifBranchHead),
+                   &ifBranchPtr)) {
+        ifBranchBB = AS_POINTER(ifBranchPtr);
+      } else {
+        ifBranchBB = allocateBasicBlock();
+        tableSet(&labelBasicBlockMapping, NUMBER_VAL(ifBranchHead),
+                 POINTER_VAL(ifBranchBB));
+      }
+
+      Value elseBranchPtr;
+      LabelId elseBranchHead = currentOp->second->val.label;
+      BasicBlock *elseBranchBB = NULL;
+      if (tableGet(&labelBasicBlockMapping, NUMBER_VAL(elseBranchHead),
+                   &elseBranchPtr)) {
+        elseBranchBB = AS_POINTER(elseBranchPtr);
+      } else {
+        elseBranchBB = allocateBasicBlock();
+        tableSet(&labelBasicBlockMapping, NUMBER_VAL(elseBranchHead),
+                 POINTER_VAL(elseBranchBB));
+      }
+
+      currentBB->trueEdge = ifBranchBB;
+      currentBB->falseEdge = elseBranchBB;
+    } else if (currentOp->opcode == IR_LABEL) {
+      currentBB->opsCount--; // FIXME: hack
+      Value labelBBPtr;
+      BasicBlock *labelBB = NULL;
+      LabelId labelId = currentOp->first->val.label;
+      if (tableGet(&labelBasicBlockMapping, NUMBER_VAL(labelId), &labelBBPtr)) {
+        labelBB = AS_POINTER(labelBBPtr);
+        labelBB->labelId = labelId;
+      } else {
+        labelBB = allocateBasicBlock();
+        labelBB->labelId = labelId;
+        tableSet(&labelBasicBlockMapping, NUMBER_VAL(labelId),
+                 POINTER_VAL(labelBB));
+      }
+      currentBB = labelBB;
+      currentBB->ops = currentOp->next;
+    } else if (currentOp->opcode == IR_GOTO) {
+      Value elseBranchPtr;
+      LabelId elseBranchHead = currentOp->first->val.label;
+      BasicBlock *elseBranchBB = NULL;
+      if (tableGet(&labelBasicBlockMapping, NUMBER_VAL(elseBranchHead),
+                   &elseBranchPtr)) {
+        elseBranchBB = AS_POINTER(elseBranchPtr);
+      } else {
+        elseBranchBB = allocateBasicBlock();
+        tableSet(&labelBasicBlockMapping, NUMBER_VAL(elseBranchHead),
+                 POINTER_VAL(elseBranchBB));
+      }
+
+      currentBB->trueEdge = elseBranchBB;
+    } else if (currentOp->next != NULL && currentOp->next->opcode == IR_LABEL) {
+      Value labelBBPtr;
+      BasicBlock *labelBB = NULL;
+      LabelId labelId = currentOp->next->first->val.label;
+      if (tableGet(&labelBasicBlockMapping, NUMBER_VAL(labelId), &labelBBPtr)) {
+        labelBB = AS_POINTER(labelBBPtr);
+      } else {
+        labelBB = allocateBasicBlock();
+        tableSet(&labelBasicBlockMapping, NUMBER_VAL(labelId),
+                 POINTER_VAL(labelBB));
+      }
+      currentBB->trueEdge = labelBB;
+    }
+    currentOp = currentOp->next;
+  }
+
+  freeTable(&labelBasicBlockMapping);
+
+  return cfg;
 }
 
 char *operandString(Operand *operand) {
@@ -324,10 +429,15 @@ char *opcodeString(IROp opcode) {
   }
 }
 
+// TODO: track visited BBs to avoid duplication
 void printBasicBlock(BasicBlock *bb) {
   Operation *curr = bb->ops;
 
-  printf("Basic block %llu", bb->id);
+  if (bb->labelId == -1) {
+    printf("Basic block %llu (main)", bb->id);
+  } else {
+    printf("Basic block %llu (L%lld)", bb->id, bb->labelId);
+  }
   if (bb->trueEdge) {
     printf(" | Edges: %llu", bb->trueEdge->id);
   }
@@ -336,7 +446,8 @@ void printBasicBlock(BasicBlock *bb) {
   }
   printf("\n");
   printf("Op count: %d\n", bb->opsCount);
-  while (curr != NULL) {
+  int i = 0;
+  while (curr != NULL && i < bb->opsCount) {
     if (curr->opcode == IR_LABEL) {
       printf("L%llu:\n", curr->first->val.label);
     } else if (curr->destination == 0) {
@@ -349,6 +460,7 @@ void printBasicBlock(BasicBlock *bb) {
              operandString(curr->first), operandString(curr->second));
     }
     curr = curr->next;
+    i++;
   }
   if (bb->trueEdge != NULL) {
     printBasicBlock(bb->trueEdge);
@@ -358,11 +470,13 @@ void printBasicBlock(BasicBlock *bb) {
   }
 }
 
-// Change to handle iterating through multiple statements
 CFG *newCFG(AstNode *root) {
-  CFG *cfg = allocateCFG();
+  BasicBlock *irList = newBasicBlock(root);
 
-  cfg->start = newBasicBlock(root);
+  /* CFG *cfg = allocateCFG(); */
+  /* cfg->start = irList; */
+
+  CFG *cfg = constructCFG(irList);
 
   return cfg;
 }
