@@ -136,7 +136,7 @@ static void rewriteLabels(Chunk *chunk, Table *labels) {
 Chunk *generateChunk(CFG *cfg, Table *labels) {
   Chunk *chunk = allocateChunk();
 
-  LinkedList *postOrdered = postOrderTraverse(cfg->start);
+  LinkedList *postOrdered = postOrderTraverse(cfg);
   Node *tail = postOrdered->tail;
   while (tail != NULL) {
     generateBasicBlockCode(chunk, tail->data, labels);

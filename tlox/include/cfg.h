@@ -77,7 +77,7 @@ CFG *newCFG(AstNode *root);
 Operation *newOperation(IROp opcode, Operand *first, Operand *second);
 Operand *newLiteralOperand(Value value);
 Operand *newRegisterOperand(Register reg);
-LinkedList *postOrderTraverse(BasicBlock *bb);
+LinkedList *postOrderTraverse(CFG *cfg);
 void printCFG(CFG *cfg);
 
 #endif

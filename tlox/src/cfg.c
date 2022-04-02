@@ -444,13 +444,13 @@ void dfsWalk(BasicBlock *bb, Table *visitedSet, LinkedList *ordered) {
   linkedList_append(ordered, bb);
 }
 
-LinkedList *postOrderTraverse(BasicBlock *bb) {
+LinkedList *postOrderTraverse(CFG *cfg) {
   Table visitedSet;
   initTable(&visitedSet);
 
   LinkedList *ordered = linkedList_allocate();
 
-  dfsWalk(bb, &visitedSet, ordered);
+  dfsWalk(cfg->start, &visitedSet, ordered);
 
   freeTable(&visitedSet);
 
@@ -493,7 +493,7 @@ void printBasicBlock(BasicBlock *bb) {
 }
 
 void printCFG(CFG *cfg) {
-  LinkedList *ordered = postOrderTraverse(cfg->start);
+  LinkedList *ordered = postOrderTraverse(cfg);
   Node *tail = ordered->tail;
   while (tail != NULL) {
     printBasicBlock(tail->data);
