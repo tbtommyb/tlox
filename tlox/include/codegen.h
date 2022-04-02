@@ -6,6 +6,6 @@
 #include "table.h"
 
 Chunk *allocateChunk();
-Chunk *generateChunk(BasicBlock *bb, Table *labels);
+Chunk *generateChunk(CFG *cfg, Table *labels);
 
 #endif

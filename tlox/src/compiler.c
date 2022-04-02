@@ -1212,13 +1212,13 @@ ObjFunction *compile(const char *source, FILE *ostream, FILE *errstream) {
   while (!match(TOKEN_EOF)) {
     linkedList_append(ast->stmts, declaration());
   }
-
   printAST(*ast, 0);
+
   CFG *cfg = newCFG(ast);
-  /* printBasicBlock(cfg->start); */
   printCFG(cfg);
 
-  Chunk *chunk = generateChunk(cfg->start, &labels);
+  /* Chunk *chunk = generateChunk(cfg->start, &labels); */
+  Chunk *chunk = generateChunk(cfg, &labels);
   ObjFunction *function = newFunction();
   function->chunk = *chunk;
 

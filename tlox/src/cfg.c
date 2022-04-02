@@ -4,8 +4,6 @@
 
 #include <stdlib.h>
 
-typedef void (*bbHandler)(BasicBlock *bb);
-
 Table labelBasicBlockMapping;
 BasicBlock *newBasicBlock(AstNode *node);
 
@@ -325,7 +323,6 @@ CFG *constructCFG(BasicBlock *irList) {
       currentBB->trueEdge = ifBranchBB;
       currentBB->falseEdge = elseBranchBB;
     } else if (currentOp->opcode == IR_LABEL) {
-      currentBB->opsCount--; // FIXME: hack
       Value labelBBPtr;
       BasicBlock *labelBB = NULL;
       LabelId labelId = currentOp->first->val.label;
@@ -434,20 +431,20 @@ char *opcodeString(IROp opcode) {
 void dfsWalk(BasicBlock *bb, Table *visitedSet, LinkedList *ordered) {
   tableSet(visitedSet, NUMBER_VAL(bb->id), TRUE_VAL);
   Value unused;
-  if (bb->trueEdge != NULL) {
-    if (!tableGet(visitedSet, NUMBER_VAL(bb->trueEdge->id), &unused)) {
-      dfsWalk(bb->trueEdge, visitedSet, ordered);
-    }
-  }
   if (bb->falseEdge != NULL) {
     if (!tableGet(visitedSet, NUMBER_VAL(bb->falseEdge->id), &unused)) {
       dfsWalk(bb->falseEdge, visitedSet, ordered);
     }
   }
+  if (bb->trueEdge != NULL) {
+    if (!tableGet(visitedSet, NUMBER_VAL(bb->trueEdge->id), &unused)) {
+      dfsWalk(bb->trueEdge, visitedSet, ordered);
+    }
+  }
   linkedList_append(ordered, bb);
 }
 
-void reversePostOrderTraverse(BasicBlock *bb, bbHandler handler) {
+LinkedList *postOrderTraverse(BasicBlock *bb) {
   Table visitedSet;
   initTable(&visitedSet);
 
@@ -457,11 +454,7 @@ void reversePostOrderTraverse(BasicBlock *bb, bbHandler handler) {
 
   freeTable(&visitedSet);
 
-  Node *tail = ordered->tail;
-  while (tail != NULL) {
-    handler(tail->data);
-    tail = tail->prev;
-  }
+  return ordered;
 }
 
 void printBasicBlock(BasicBlock *bb) {
@@ -479,11 +472,12 @@ void printBasicBlock(BasicBlock *bb) {
     printf(", %llu", bb->falseEdge->id);
   }
   printf("\n");
+  // Slightly incorrect due to labels
   printf("Op count: %d\n", bb->opsCount);
   int i = 0;
   while (curr != NULL && i < bb->opsCount) {
     if (curr->opcode == IR_LABEL) {
-      printf("L%llu:\n", curr->first->val.label);
+      // Don't bother printing labels
     } else if (curr->destination == 0) {
       printf("%4llu: [       | %8s | %6s | %6s ]\n", curr->id,
              opcodeString(curr->opcode), operandString(curr->first),
@@ -499,14 +493,16 @@ void printBasicBlock(BasicBlock *bb) {
 }
 
 void printCFG(CFG *cfg) {
-  reversePostOrderTraverse(cfg->start, printBasicBlock);
+  LinkedList *ordered = postOrderTraverse(cfg->start);
+  Node *tail = ordered->tail;
+  while (tail != NULL) {
+    printBasicBlock(tail->data);
+    tail = tail->prev;
+  }
 }
 
 CFG *newCFG(AstNode *root) {
   BasicBlock *irList = newBasicBlock(root);
-
-  /* CFG *cfg = allocateCFG(); */
-  /* cfg->start = irList; */
 
   CFG *cfg = constructCFG(irList);
 

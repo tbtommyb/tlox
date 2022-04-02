@@ -69,11 +69,14 @@ typedef struct CFG {
   BasicBlock *start;
 } CFG;
 
+typedef void (*bbHandler)(BasicBlock *bb);
+
 BasicBlock *newBasicBlock(AstNode *node);
 CFG *newCFG(AstNode *root);
 Operation *newOperation(IROp opcode, Operand *first, Operand *second);
 Operand *newLiteralOperand(Value value);
 Operand *newRegisterOperand(Register reg);
+LinkedList *postOrderTraverse(BasicBlock *bb);
 void printCFG(CFG *cfg);
 
 #endif

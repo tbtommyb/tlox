@@ -36,10 +36,7 @@ Chunk *allocateChunk() {
   return chunk;
 }
 
-void iterateBB(Chunk *chunk, BasicBlock *bb, Table *labels);
-
-static void writeOperation(BasicBlock *bb, Operation *op, Chunk *chunk,
-                           Table *labels) {
+static void writeOperation(Operation *op, Chunk *chunk, Table *labels) {
   switch (op->opcode) {
   case IR_ADD:
     emitByte(chunk, OP_ADD);
@@ -96,13 +93,19 @@ static void writeOperation(BasicBlock *bb, Operation *op, Chunk *chunk,
   }
 }
 
-void iterateBB(Chunk *chunk, BasicBlock *bb, Table *labels) {
-  Operation *current = bb->ops;
-  // TODO: do this via CFG edges?
-  while (current != NULL) {
-    writeOperation(bb, current, chunk, labels);
-    current = current->next;
+static void generateBasicBlockCode(Chunk *chunk, BasicBlock *bb,
+                                   Table *labels) {
+  Operation *curr = bb->ops;
+  int i = 0;
+
+  while (curr != NULL && i < bb->opsCount) {
+    writeOperation(curr, chunk, labels);
+    curr = curr->next;
+    i++;
   }
+}
+
+static void rewriteLabels(Chunk *chunk, Table *labels) {
   // Iterate through and rewrite all JUMP addresses using stored addresses
   int index = 0;
   while (index < chunk->count) {
@@ -125,11 +128,19 @@ void iterateBB(Chunk *chunk, BasicBlock *bb, Table *labels) {
   }
 }
 
-Chunk *generateChunk(BasicBlock *bb, Table *labels) {
+Chunk *generateChunk(CFG *cfg, Table *labels) {
   Chunk *chunk = allocateChunk();
 
-  iterateBB(chunk, bb, labels);
-  // should be pop after expression statements
+  LinkedList *postOrdered = postOrderTraverse(cfg->start);
+  Node *tail = postOrdered->tail;
+  while (tail != NULL) {
+    generateBasicBlockCode(chunk, tail->data, labels);
+    tail = tail->prev;
+  }
+
+  rewriteLabels(chunk, labels);
+
+  // TODO: should be pop after expression statements
   emitReturn(chunk);
   return chunk;
 }
