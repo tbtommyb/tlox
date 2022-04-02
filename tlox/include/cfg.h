@@ -74,6 +74,6 @@ CFG *newCFG(AstNode *root);
 Operation *newOperation(IROp opcode, Operand *first, Operand *second);
 Operand *newLiteralOperand(Value value);
 Operand *newRegisterOperand(Register reg);
-void printBasicBlock(BasicBlock *bb);
+void printCFG(CFG *cfg);
 
 #endif

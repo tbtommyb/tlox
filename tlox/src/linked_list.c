@@ -17,8 +17,10 @@ Node *linkedList_append(LinkedList *list, void *data) {
 
   if (list->tail == NULL) {
     list->head = list->tail = node;
+    list->head->prev = NULL;
     list->length = 1;
   } else {
+    node->prev = list->tail;
     list->tail->next = node;
     list->tail = node;
     list->length++;

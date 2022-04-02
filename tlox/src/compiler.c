@@ -1215,7 +1215,8 @@ ObjFunction *compile(const char *source, FILE *ostream, FILE *errstream) {
 
   printAST(*ast, 0);
   CFG *cfg = newCFG(ast);
-  printBasicBlock(cfg->start);
+  /* printBasicBlock(cfg->start); */
+  printCFG(cfg);
 
   Chunk *chunk = generateChunk(cfg->start, &labels);
   ObjFunction *function = newFunction();

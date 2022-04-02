@@ -4,6 +4,8 @@
 
 #include <stdlib.h>
 
+typedef void (*bbHandler)(BasicBlock *bb);
+
 Table labelBasicBlockMapping;
 BasicBlock *newBasicBlock(AstNode *node);
 
@@ -429,7 +431,39 @@ char *opcodeString(IROp opcode) {
   }
 }
 
-// TODO: track visited BBs to avoid duplication
+void dfsWalk(BasicBlock *bb, Table *visitedSet, LinkedList *ordered) {
+  tableSet(visitedSet, NUMBER_VAL(bb->id), TRUE_VAL);
+  Value unused;
+  if (bb->trueEdge != NULL) {
+    if (!tableGet(visitedSet, NUMBER_VAL(bb->trueEdge->id), &unused)) {
+      dfsWalk(bb->trueEdge, visitedSet, ordered);
+    }
+  }
+  if (bb->falseEdge != NULL) {
+    if (!tableGet(visitedSet, NUMBER_VAL(bb->falseEdge->id), &unused)) {
+      dfsWalk(bb->falseEdge, visitedSet, ordered);
+    }
+  }
+  linkedList_append(ordered, bb);
+}
+
+void reversePostOrderTraverse(BasicBlock *bb, bbHandler handler) {
+  Table visitedSet;
+  initTable(&visitedSet);
+
+  LinkedList *ordered = linkedList_allocate();
+
+  dfsWalk(bb, &visitedSet, ordered);
+
+  freeTable(&visitedSet);
+
+  Node *tail = ordered->tail;
+  while (tail != NULL) {
+    handler(tail->data);
+    tail = tail->prev;
+  }
+}
+
 void printBasicBlock(BasicBlock *bb) {
   Operation *curr = bb->ops;
 
@@ -462,12 +496,10 @@ void printBasicBlock(BasicBlock *bb) {
     curr = curr->next;
     i++;
   }
-  if (bb->trueEdge != NULL) {
-    printBasicBlock(bb->trueEdge);
-  }
-  if (bb->falseEdge != NULL) {
-    printBasicBlock(bb->falseEdge);
-  }
+}
+
+void printCFG(CFG *cfg) {
+  reversePostOrderTraverse(cfg->start, printBasicBlock);
 }
 
 CFG *newCFG(AstNode *root) {
