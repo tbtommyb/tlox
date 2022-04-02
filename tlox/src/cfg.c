@@ -159,11 +159,11 @@ static Operation *newGotoOperation(LabelId labelId) {
   return op;
 }
 
-static Operation *newLabelOperation(LabelId labelId) {
+static Operation *newLabelOperation(LabelId labelId, IROp opcode) {
   Operation *op = allocateOperation();
 
   op->id = getOperationId();
-  op->opcode = IR_LABEL;
+  op->opcode = opcode;
   op->first = newLabelOperand(labelId);
 
   return op;
@@ -235,18 +235,18 @@ static Operation *walkAst(BasicBlock *bb, AstNode *node) {
     bb->curr->next = op;
     bb->curr = op;
 
-    Operation *ifLabel = newLabelOperation(ifLabelId);
+    Operation *ifLabel = newLabelOperation(ifLabelId, IR_LABEL);
     bb->curr->next = ifLabel;
     bb->curr = ifLabel;
     walkAst(bb, node->branches.left);
     Operation *afterOp = newGotoOperation(afterLabelId);
     bb->curr->next = afterOp;
     bb->curr = afterOp;
-    Operation *elseLabel = newLabelOperation(elseLabelId);
+    Operation *elseLabel = newLabelOperation(elseLabelId, IR_ELSE_LABEL);
     bb->curr->next = elseLabel;
     bb->curr = elseLabel;
     walkAst(bb, node->branches.right);
-    Operation *afterLabel = newLabelOperation(afterLabelId);
+    Operation *afterLabel = newLabelOperation(afterLabelId, IR_LABEL);
     bb->curr->next = afterLabel;
     bb->curr = afterLabel;
     break;
@@ -296,7 +296,6 @@ CFG *constructCFG(BasicBlock *irList) {
 
     if (currentOp->opcode == IR_COND) {
       Value ifBranchPtr;
-      // TODO: macro to avoid this access
       LabelId ifBranchHead = currentOp->next->first->val.label;
       BasicBlock *ifBranchBB = NULL;
       if (tableGet(&labelBasicBlockMapping, NUMBER_VAL(ifBranchHead),
@@ -322,7 +321,8 @@ CFG *constructCFG(BasicBlock *irList) {
 
       currentBB->trueEdge = ifBranchBB;
       currentBB->falseEdge = elseBranchBB;
-    } else if (currentOp->opcode == IR_LABEL) {
+    } else if (currentOp->opcode == IR_LABEL ||
+               currentOp->opcode == IR_ELSE_LABEL) {
       Value labelBBPtr;
       BasicBlock *labelBB = NULL;
       LabelId labelId = currentOp->first->val.label;
@@ -476,7 +476,7 @@ void printBasicBlock(BasicBlock *bb) {
   printf("Op count: %d\n", bb->opsCount);
   int i = 0;
   while (curr != NULL && i < bb->opsCount) {
-    if (curr->opcode == IR_LABEL) {
+    if (curr->opcode == IR_LABEL || curr->opcode == IR_ELSE_LABEL) {
       // Don't bother printing labels
     } else if (curr->destination == 0) {
       printf("%4llu: [       | %8s | %6s | %6s ]\n", curr->id,

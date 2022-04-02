@@ -26,7 +26,8 @@ typedef enum IROp {
   IR_PRINT,
   IR_CODE_START,
   IR_GOTO,
-  IR_LABEL
+  IR_LABEL,
+  IR_ELSE_LABEL
 } IROp;
 
 typedef uint64_t Register;
@@ -58,8 +59,8 @@ struct Operation {
 typedef struct BasicBlock {
   BasicBlockId id;
   LabelId labelId;
-  int opsCount; // Keep this?
-  Operation *ops;
+  int opsCount;    // Keep this?
+  Operation *ops;  // Redo as LinkedList
   Operation *curr; // Keep this?
   struct BasicBlock *trueEdge;
   struct BasicBlock *falseEdge;

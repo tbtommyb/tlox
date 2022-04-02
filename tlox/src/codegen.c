@@ -59,12 +59,17 @@ static void writeOperation(Operation *op, Chunk *chunk, Table *labels) {
     emitByte(chunk, OP_JUMP);
     emitByte(chunk, (op->first->val.label >> 8) & 0xff);
     emitByte(chunk, op->first->val.label & 0xff);
-    emitByte(chunk, OP_POP);
     break;
   }
   case IR_LABEL: {
     tableSet(labels, NUMBER_VAL(op->first->val.label),
              NUMBER_VAL(chunk->count - 1));
+    break;
+  }
+  case IR_ELSE_LABEL: {
+    tableSet(labels, NUMBER_VAL(op->first->val.label),
+             NUMBER_VAL(chunk->count - 1));
+    emitByte(chunk, OP_POP);
     break;
   }
   case IR_DIVIDE:
