@@ -53,6 +53,13 @@ AstNode *newDefineStmt(Token token, AstNode *expr) {
   return node;
 }
 
+AstNode *newAssignStmt(Token token, AstNode *expr) {
+  AstNode *node = allocateAstNode(STMT_ASSIGN);
+  node->token = token;
+  node->expr = expr;
+  return node;
+}
+
 AstNode *newPrintStmt(AstNode *expr) {
   AstNode *node = allocateAstNode(STMT_PRINT);
   node->expr = expr;
@@ -119,19 +126,26 @@ void printAST(AstNode node, int indentation) {
     break;
   }
   case EXPR_VARIABLE: {
-    ObjString *tokenName = makeString(node.token.start, node.token.length);
-    printf("%*sExpr Variable\n", indentation, "");
-    printf("%*sName: %s\n", indentation + 2, "", tokenName->chars);
+    ObjString *tokenName = copyString(node.token.start, node.token.length);
+    printf("%*sVariable %s\n", indentation, "", tokenName->chars);
     break;
   }
   case STMT_DEFINE: {
-    ObjString *tokenName = makeString(node.token.start, node.token.length);
+    ObjString *tokenName = copyString(node.token.start, node.token.length);
     printf("%*sStmt Define\n", indentation, "");
     printf("%*sName: %s\n", indentation + 2, "", tokenName->chars);
     if (node.expr != NULL) {
       printf("%*sValue:\n", indentation + 2, "");
       printAST(*node.expr, indentation + 4);
     }
+    break;
+  }
+  case STMT_ASSIGN: {
+    ObjString *tokenName = copyString(node.token.start, node.token.length);
+    printf("%*sStmt Assign\n", indentation, "");
+    printf("%*sName: %s\n", indentation + 2, "", tokenName->chars);
+    printf("%*sValue:\n", indentation + 2, "");
+    printAST(*node.expr, indentation + 4);
     break;
   }
   case STMT_IF: {

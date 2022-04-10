@@ -124,6 +124,14 @@ static void writeOperation(Operation *op, Chunk *chunk, Table *labels) {
     Value name = op->first->val.literal;
     int arg = identifierConstant(chunk, name);
     emitBytes(chunk, OP_GET_GLOBAL, (uint8_t)arg);
+    break;
+  }
+  case IR_VARIABLE_ASSIGN: {
+    Value name = op->first->val.literal;
+    int arg = identifierConstant(chunk, name);
+    emitBytes(chunk, OP_SET_GLOBAL, (uint8_t)arg);
+    emitByte(chunk, OP_POP);
+    break;
   }
   default:
     printf("Unknown opcode %d\n", op->opcode);

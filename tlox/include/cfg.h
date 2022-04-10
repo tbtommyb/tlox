@@ -29,7 +29,8 @@ typedef enum IROp {
   IR_LABEL,
   IR_ELSE_LABEL,
   IR_DEFINE,
-  IR_VARIABLE
+  IR_VARIABLE,
+  IR_VARIABLE_ASSIGN
 } IROp;
 
 typedef uint64_t Register;

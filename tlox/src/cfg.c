@@ -276,9 +276,22 @@ static Operation *walkAst(BasicBlock *bb, AstNode *node) {
       bb->curr->next = op;
       bb->curr = op;
     } else {
-      walkAst(bb, node->expr);
+      op = walkAst(bb, node->expr);
     }
-    op = newOperation(IR_DEFINE, name, NULL);
+    op = newOperation(IR_DEFINE, name, newRegisterOperand(op->destination));
+
+    bb->curr->next = op;
+    bb->curr = op;
+    break;
+  }
+  case STMT_ASSIGN: {
+    // TODO: semantic checks here
+    Operand *name = newLiteralOperand(
+        OBJ_VAL(copyString(node->token.start, node->token.length)));
+    op = walkAst(bb, node->expr);
+
+    op = newOperation(IR_VARIABLE_ASSIGN, name,
+                      newRegisterOperand(op->destination));
 
     bb->curr->next = op;
     bb->curr = op;
@@ -458,6 +471,8 @@ char *opcodeString(IROp opcode) {
     return "define";
   case IR_VARIABLE:
     return "var";
+  case IR_VARIABLE_ASSIGN:
+    return "assign";
   case IR_UNKNOWN:
   default:
     return "?";

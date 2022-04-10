@@ -2,6 +2,6 @@ var a = 3 * 3;
 var b = false;
 var c;
 
-print a;
-print b;
+c = a;
+
 print c;

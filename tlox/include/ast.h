@@ -10,7 +10,7 @@ typedef enum {
   EXPR_LITERAL,
   EXPR_UNARY,
   EXPR_VARIABLE,
-  STMT_ASSIGN, // TDOO
+  STMT_ASSIGN,
   STMT_DEFINE,
   STMT_IF,
   STMT_MODULE,
@@ -43,6 +43,7 @@ AstNode *newBinaryExpr(AstNode *left, AstNode *right, TokenType operator);
 AstNode *newUnaryExpr(AstNode *right, TokenType operator);
 AstNode *newVariableExpr(Token token);
 AstNode *newDefineStmt(Token token, AstNode *expr);
+AstNode *newAssignStmt(Token, AstNode *expr);
 AstNode *newPrintStmt(AstNode *expr);
 AstNode *newIfStmt(AstNode *condition, AstNode *thenBranch,
                    AstNode *elseBranch);

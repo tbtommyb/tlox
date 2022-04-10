@@ -900,8 +900,11 @@ static AstNode *namedVariable(Token name, bool canAssign) {
 }
 
 static AstNode *variable(bool canAssign) {
-  // Create AstAssign here too?
-  return newVariableExpr(parser.previous);
+  Token token = parser.previous;
+  if (canAssign && match(TOKEN_EQUAL)) {
+    return newAssignStmt(token, expression());
+  }
+  return newVariableExpr(token);
   /* namedVariable(parser.previous, canAssign); */
 }
 
