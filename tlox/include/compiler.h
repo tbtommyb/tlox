@@ -6,4 +6,11 @@
 
 ObjFunction *compile(const char *source, FILE *ostream, FILE *errstream);
 void markCompilerRoots();
+
+typedef struct {
+  Table *globalConsts;
+  Table *stringConstants;
+  Table *labels;
+} CompilerState;
+
 #endif

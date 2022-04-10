@@ -183,7 +183,7 @@ static Operation *tailOf(Operation *node) {
   return tail;
 }
 
-static Operation *walkAst(BasicBlock *bb, AstNode *node) {
+static Operation *walkAst(CompilerState state, BasicBlock *bb, AstNode *node) {
   if (node == NULL) {
     return NULL;
   }
@@ -200,7 +200,7 @@ static Operation *walkAst(BasicBlock *bb, AstNode *node) {
     break;
   }
   case EXPR_UNARY: {
-    Operation *right = walkAst(bb, node->branches.right);
+    Operation *right = walkAst(state, bb, node->branches.right);
     Operand *value = newRegisterOperand(bb->curr->destination);
     op = newOperation(tokenToUnaryOp(node->op), value, NULL);
     bb->curr->next = op;
@@ -208,10 +208,10 @@ static Operation *walkAst(BasicBlock *bb, AstNode *node) {
     break;
   }
   case EXPR_BINARY: {
-    Operation *left = walkAst(bb, node->branches.left);
+    Operation *left = walkAst(state, bb, node->branches.left);
     Operation *leftTail = tailOf(left);
 
-    Operation *right = walkAst(bb, node->branches.right);
+    Operation *right = walkAst(state, bb, node->branches.right);
     Operation *rightTail = tailOf(right);
 
     op = newOperation(tokenToOp(node->op),
@@ -223,15 +223,14 @@ static Operation *walkAst(BasicBlock *bb, AstNode *node) {
     break;
   }
   case EXPR_VARIABLE: {
-    Operand *name = newLiteralOperand(
-        OBJ_VAL(copyString(node->token.start, node->token.length)));
+    Operand *name = newLiteralOperand(OBJ_VAL(node->token));
     op = newOperation(IR_VARIABLE, name, NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
   }
   case STMT_PRINT: {
-    walkAst(bb, node->expr);
+    walkAst(state, bb, node->expr);
     Operand *value = newRegisterOperand(bb->curr->destination);
     op = newOperation(IR_PRINT, value, NULL);
     bb->curr->next = op;
@@ -240,7 +239,7 @@ static Operation *walkAst(BasicBlock *bb, AstNode *node) {
   }
   case STMT_IF: {
     // TODO: tidy up implementation here
-    Operation *expr = walkAst(bb, node->expr);
+    Operation *expr = walkAst(state, bb, node->expr);
     LabelId ifLabelId = getLabelId();
     LabelId elseLabelId = getLabelId();
     LabelId afterLabelId = getLabelId();
@@ -252,23 +251,30 @@ static Operation *walkAst(BasicBlock *bb, AstNode *node) {
     Operation *ifLabel = newLabelOperation(ifLabelId, IR_LABEL);
     bb->curr->next = ifLabel;
     bb->curr = ifLabel;
-    walkAst(bb, node->branches.left);
+    walkAst(state, bb, node->branches.left);
     Operation *afterOp = newGotoOperation(afterLabelId);
     bb->curr->next = afterOp;
     bb->curr = afterOp;
     Operation *elseLabel = newLabelOperation(elseLabelId, IR_ELSE_LABEL);
     bb->curr->next = elseLabel;
     bb->curr = elseLabel;
-    walkAst(bb, node->branches.right);
+    walkAst(state, bb, node->branches.right);
     Operation *afterLabel = newLabelOperation(afterLabelId, IR_LABEL);
     bb->curr->next = afterLabel;
     bb->curr = afterLabel;
     break;
   }
   case STMT_DEFINE: {
-    // TODO: semantic checks here
-    Operand *name = newLiteralOperand(
-        OBJ_VAL(copyString(node->token.start, node->token.length)));
+    // Semantic checks. Maybe move to their own module with error handling
+    if (tableFindString(state.globalConsts, node->token->chars,
+                        node->token->length)) {
+      // FIXME
+      printf("ERR: Cannot redeclare a const variable\n");
+      break;
+    }
+
+    // CFG
+    Operand *name = newLiteralOperand(OBJ_VAL(node->token));
 
     if (node->expr == NULL) {
       Operand *value = newLiteralOperand(NIL_VAL);
@@ -276,7 +282,7 @@ static Operation *walkAst(BasicBlock *bb, AstNode *node) {
       bb->curr->next = op;
       bb->curr = op;
     } else {
-      op = walkAst(bb, node->expr);
+      op = walkAst(state, bb, node->expr);
     }
     op = newOperation(IR_DEFINE, name, newRegisterOperand(op->destination));
 
@@ -284,11 +290,42 @@ static Operation *walkAst(BasicBlock *bb, AstNode *node) {
     bb->curr = op;
     break;
   }
+  case STMT_DEFINE_CONST: {
+    // Semantic checks. Maybe move to their own module with error handling
+    // FIXME use HashSet
+    tableSet(state.globalConsts, OBJ_VAL(node->token), TRUE_VAL);
+
+    // CFG
+    Operand *name = newLiteralOperand(OBJ_VAL(node->token));
+
+    if (node->expr == NULL) {
+      Operand *value = newLiteralOperand(NIL_VAL);
+      op = newOperation(IR_ASSIGN, value, NULL);
+      bb->curr->next = op;
+      bb->curr = op;
+    } else {
+      op = walkAst(state, bb, node->expr);
+    }
+    op = newOperation(IR_DEFINE_CONST, name,
+                      newRegisterOperand(op->destination));
+
+    bb->curr->next = op;
+    bb->curr = op;
+    break;
+  }
   case STMT_ASSIGN: {
-    // TODO: semantic checks here
-    Operand *name = newLiteralOperand(
-        OBJ_VAL(copyString(node->token.start, node->token.length)));
-    op = walkAst(bb, node->expr);
+    // Semantic checks. Maybe move to their own module with error handling
+    bool isGlobalConstant =
+        tableFindString(state.globalConsts, node->token->chars,
+                        node->token->length) != NULL;
+    if (isGlobalConstant) {
+      printf("ERR: cannot reassign constant variable\n");
+      break;
+    }
+
+    // CFG
+    Operand *name = newLiteralOperand(OBJ_VAL(node->token));
+    op = walkAst(state, bb, node->expr);
 
     op = newOperation(IR_VARIABLE_ASSIGN, name,
                       newRegisterOperand(op->destination));
@@ -301,7 +338,7 @@ static Operation *walkAst(BasicBlock *bb, AstNode *node) {
     Node *stmtNode = (Node *)node->stmts->head;
 
     while (stmtNode != NULL) {
-      walkAst(bb, stmtNode->data);
+      walkAst(state, bb, stmtNode->data);
       stmtNode = stmtNode->next;
     }
   }
@@ -319,8 +356,6 @@ BasicBlock *newBasicBlock(AstNode *node) {
   BasicBlock *bb = allocateBasicBlock();
   bb->ops = newStartOperation();
   bb->curr = bb->ops;
-
-  walkAst(bb, node);
 
   return bb;
 }
@@ -469,6 +504,8 @@ char *opcodeString(IROp opcode) {
     return "label";
   case IR_DEFINE:
     return "define";
+  case IR_DEFINE_CONST:
+    return "define const";
   case IR_VARIABLE:
     return "var";
   case IR_VARIABLE_ASSIGN:
@@ -530,11 +567,11 @@ void printBasicBlock(BasicBlock *bb) {
     if (curr->opcode == IR_LABEL || curr->opcode == IR_ELSE_LABEL) {
       // Don't bother printing labels
     } else if (curr->destination == 0) {
-      printf("%4llu: [       | %8s | %6s | %6s ]\n", curr->id,
+      printf("%4llu: [       | %14s | %6s | %6s ]\n", curr->id,
              opcodeString(curr->opcode), operandString(curr->first),
              operandString(curr->second));
     } else {
-      printf("%4llu: [ t%-4llu | %8s | %6s | %6s ]\n", curr->id,
+      printf("%4llu: [ t%-4llu | %14s | %6s | %6s ]\n", curr->id,
              curr->destination, opcodeString(curr->opcode),
              operandString(curr->first), operandString(curr->second));
     }
@@ -552,8 +589,10 @@ void printCFG(CFG *cfg) {
   }
 }
 
-CFG *newCFG(AstNode *root) {
+CFG *newCFG(CompilerState state, AstNode *root) {
   BasicBlock *irList = newBasicBlock(root);
+
+  walkAst(state, irList, root);
 
   CFG *cfg = constructCFG(irList);
 

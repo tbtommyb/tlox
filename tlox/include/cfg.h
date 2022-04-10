@@ -2,6 +2,7 @@
 #define clox_cfg_h
 
 #include "ast.h"
+#include "compiler.h"
 #include "scanner.h"
 #include "value.h"
 #include <stdint.h>
@@ -29,6 +30,7 @@ typedef enum IROp {
   IR_LABEL,
   IR_ELSE_LABEL,
   IR_DEFINE,
+  IR_DEFINE_CONST,
   IR_VARIABLE,
   IR_VARIABLE_ASSIGN
 } IROp;
@@ -74,7 +76,7 @@ typedef struct CFG {
 } CFG;
 
 BasicBlock *newBasicBlock(AstNode *node);
-CFG *newCFG(AstNode *root);
+CFG *newCFG(CompilerState state, AstNode *root);
 Operation *newOperation(IROp opcode, Operand *first, Operand *second);
 Operand *newLiteralOperand(Value value);
 Operand *newRegisterOperand(Register reg);

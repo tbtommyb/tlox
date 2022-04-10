@@ -12,6 +12,7 @@ typedef enum {
   EXPR_VARIABLE,
   STMT_ASSIGN,
   STMT_DEFINE,
+  STMT_DEFINE_CONST,
   STMT_IF,
   STMT_MODULE,
   STMT_PRINT
@@ -31,7 +32,7 @@ struct AstNode {
     AstNode *right;
   } branches;
   LinkedList *stmts;
-  Token token;
+  ObjString *token;
 };
 
 static inline bool isNodeType(AstNode node, NodeType type) {
@@ -41,9 +42,10 @@ static inline bool isNodeType(AstNode node, NodeType type) {
 AstNode *newLiteralExpr(Value value);
 AstNode *newBinaryExpr(AstNode *left, AstNode *right, TokenType operator);
 AstNode *newUnaryExpr(AstNode *right, TokenType operator);
-AstNode *newVariableExpr(Token token);
-AstNode *newDefineStmt(Token token, AstNode *expr);
-AstNode *newAssignStmt(Token, AstNode *expr);
+AstNode *newVariableExpr(ObjString *token);
+AstNode *newDefineStmt(ObjString *token, AstNode *expr);
+AstNode *newConstDefineStmt(ObjString *token, AstNode *expr);
+AstNode *newAssignStmt(ObjString *token, AstNode *expr);
 AstNode *newPrintStmt(AstNode *expr);
 AstNode *newIfStmt(AstNode *condition, AstNode *thenBranch,
                    AstNode *elseBranch);

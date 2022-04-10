@@ -448,34 +448,13 @@ static void declareVariable(bool isConst) {
   addLocal(*name, isConst);
 }
 
-static Token parseVariable(bool isConst, const char *errorMessage) {
+static ObjString *parseVariable(const char *errorMessage) {
   consume(TOKEN_IDENTIFIER, errorMessage);
 
   Token prev = parser.previous;
-  if (tableFindString(&globalConsts, prev.start, prev.length)) {
-    error("Cannot redeclare a const variable");
-    /* return false; */
-  }
 
-  return prev;
+  return copyString(prev.start, prev.length);
   /* declareVariable(isConst); */
-
-  /* if (current->scopeDepth > 0) { */
-  /*   return 0; */
-  /* } */
-  /* // we are in global scope. Check for a global variable with the same name
-   */
-  /* if (searchConstantsFor(OBJ_VAL(copyString(token.start, token.length))) !=
-   */
-  /*     -1) { */
-  /*   error("Already a variable with this name in this scope"); */
-  /*   return 0; */
-  /* } */
-
-  /* if (isConst) { */
-  /*   ObjString *varName = makeString(token.start, token.length); */
-  /*   tableSet(&globalConsts, OBJ_VAL(varName), TRUE_VAL); */
-  /* } */
 
   /* return identifierConstant(&token); */
 }
@@ -683,9 +662,15 @@ static void funDeclaration() {
 }
 
 static AstNode *varDeclaration(bool isConst) {
-  Token name = parseVariable(isConst, "Expect variable name.");
+  ObjString *name = parseVariable("Expect variable name.");
 
-  AstNode *node = newDefineStmt(name, NULL);
+  AstNode *node = NULL;
+  if (isConst) {
+    // TODO maybe combine into one when creating subtypes for AST nodes
+    node = newConstDefineStmt(name, NULL);
+  } else {
+    node = newDefineStmt(name, NULL);
+  }
   if (match(TOKEN_EQUAL)) {
     node->expr = expression();
   }
@@ -900,7 +885,7 @@ static AstNode *namedVariable(Token name, bool canAssign) {
 }
 
 static AstNode *variable(bool canAssign) {
-  Token token = parser.previous;
+  ObjString *token = copyString(parser.previous.start, parser.previous.length);
   if (canAssign && match(TOKEN_EQUAL)) {
     return newAssignStmt(token, expression());
   }
@@ -1045,7 +1030,6 @@ static void grouping(bool canAssign) {
 
 static AstNode *number(bool canAssign) {
   double value = strtod(parser.previous.start, NULL);
-  /* emitConstant(NUMBER_VAL(value)); */
   return newLiteralExpr(NUMBER_VAL(value));
 }
 
@@ -1253,6 +1237,9 @@ ObjFunction *compile(const char *source, FILE *ostream, FILE *errstream) {
   initTable(&globalConsts);
   initTable(&labels);
 
+  CompilerState state = {.stringConstants = &stringConstants,
+                         .globalConsts = &globalConsts,
+                         .labels = &labels};
   advance();
 
   AstNode *ast = newModuleStmt();
@@ -1261,7 +1248,7 @@ ObjFunction *compile(const char *source, FILE *ostream, FILE *errstream) {
   }
   printAST(*ast, 0);
 
-  CFG *cfg = newCFG(ast);
+  CFG *cfg = newCFG(state, ast);
   printCFG(cfg);
 
   Chunk *chunk = generateChunk(cfg, &labels);

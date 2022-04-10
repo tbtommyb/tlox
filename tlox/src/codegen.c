@@ -120,6 +120,17 @@ static void writeOperation(Operation *op, Chunk *chunk, Table *labels) {
     emitBytes(chunk, OP_DEFINE_GLOBAL, (uint8_t)arg);
     break;
   }
+  case IR_DEFINE_CONST: {
+    Value name = op->first->val.literal;
+    if (searchConstantsFor(chunk, name) != -1) {
+      // FIXME
+      printf("ERR: Already a variable with this name in this scope\n");
+      break;
+    }
+    int arg = identifierConstant(chunk, name);
+    emitBytes(chunk, OP_DEFINE_GLOBAL, (uint8_t)arg);
+    break;
+  }
   case IR_VARIABLE: {
     Value name = op->first->val.literal;
     int arg = identifierConstant(chunk, name);
