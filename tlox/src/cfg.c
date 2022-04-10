@@ -34,6 +34,12 @@ char *valueToString(Value value) {
   case VAL_EMPTY:
     snprintf(output, 128, "<empty>");
     break;
+  case VAL_OBJ: {
+    if (IS_STRING(value)) {
+      snprintf(output, 128, "%s", AS_STRING(value)->chars);
+    }
+    break;
+  }
   }
   return output;
 }
@@ -216,6 +222,14 @@ static Operation *walkAst(BasicBlock *bb, AstNode *node) {
     bb->curr = op;
     break;
   }
+  case EXPR_VARIABLE: {
+    Operand *name = newLiteralOperand(
+        OBJ_VAL(copyString(node->token.start, node->token.length)));
+    op = newOperation(IR_VARIABLE, name, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+    break;
+  }
   case STMT_PRINT: {
     walkAst(bb, node->expr);
     Operand *value = newRegisterOperand(bb->curr->destination);
@@ -251,11 +265,29 @@ static Operation *walkAst(BasicBlock *bb, AstNode *node) {
     bb->curr = afterLabel;
     break;
   }
+  case STMT_DEFINE: {
+    // TODO: semantic checks here
+    Operand *name = newLiteralOperand(
+        OBJ_VAL(copyString(node->token.start, node->token.length)));
+
+    if (node->expr == NULL) {
+      Operand *value = newLiteralOperand(NIL_VAL);
+      op = newOperation(IR_ASSIGN, value, NULL);
+      bb->curr->next = op;
+      bb->curr = op;
+    } else {
+      walkAst(bb, node->expr);
+    }
+    op = newOperation(IR_DEFINE, name, NULL);
+
+    bb->curr->next = op;
+    bb->curr = op;
+    break;
+  }
   case STMT_MODULE: {
     Node *stmtNode = (Node *)node->stmts->head;
 
     while (stmtNode != NULL) {
-      // FIXME: create new BB per statement
       walkAst(bb, stmtNode->data);
       stmtNode = stmtNode->next;
     }
@@ -422,6 +454,10 @@ char *opcodeString(IROp opcode) {
     return "goto";
   case IR_LABEL:
     return "label";
+  case IR_DEFINE:
+    return "define";
+  case IR_VARIABLE:
+    return "var";
   case IR_UNKNOWN:
   default:
     return "?";

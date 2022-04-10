@@ -1,0 +1,7 @@
+var a = 3 * 3;
+var b = false;
+var c;
+
+print a;
+print b;
+print c;

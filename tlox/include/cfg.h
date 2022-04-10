@@ -27,7 +27,9 @@ typedef enum IROp {
   IR_CODE_START,
   IR_GOTO,
   IR_LABEL,
-  IR_ELSE_LABEL
+  IR_ELSE_LABEL,
+  IR_DEFINE,
+  IR_VARIABLE
 } IROp;
 
 typedef uint64_t Register;
@@ -70,13 +72,12 @@ typedef struct CFG {
   BasicBlock *start;
 } CFG;
 
-typedef void (*bbHandler)(BasicBlock *bb);
-
 BasicBlock *newBasicBlock(AstNode *node);
 CFG *newCFG(AstNode *root);
 Operation *newOperation(IROp opcode, Operand *first, Operand *second);
 Operand *newLiteralOperand(Value value);
 Operand *newRegisterOperand(Register reg);
+
 LinkedList *postOrderTraverse(CFG *cfg);
 void printCFG(CFG *cfg);
 

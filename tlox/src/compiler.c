@@ -426,6 +426,7 @@ static void addLocal(Token name, bool isConst) {
   local->isConst = isConst;
 }
 
+// only does locals
 static void declareVariable(bool isConst) {
   Token *name = &parser.previous;
 
@@ -447,34 +448,67 @@ static void declareVariable(bool isConst) {
   addLocal(*name, isConst);
 }
 
-static uint8_t parseVariable(bool isConst, const char *errorMessage) {
+static Token parseVariable(bool isConst, const char *errorMessage) {
   consume(TOKEN_IDENTIFIER, errorMessage);
 
-  Token token = parser.previous;
-  if (tableFindString(&globalConsts, token.start, token.length)) {
+  Token prev = parser.previous;
+  if (tableFindString(&globalConsts, prev.start, prev.length)) {
     error("Cannot redeclare a const variable");
-    return 0;
+    /* return false; */
   }
 
-  declareVariable(isConst);
+  return prev;
+  /* declareVariable(isConst); */
 
-  if (current->scopeDepth > 0) {
-    return 0;
-  }
-  // we are in global scope. Check for a global variable with the same name
-  if (searchConstantsFor(OBJ_VAL(copyString(token.start, token.length))) !=
-      -1) {
-    error("Already a variable with this name in this scope");
-    return 0;
-  }
+  /* if (current->scopeDepth > 0) { */
+  /*   return 0; */
+  /* } */
+  /* // we are in global scope. Check for a global variable with the same name
+   */
+  /* if (searchConstantsFor(OBJ_VAL(copyString(token.start, token.length))) !=
+   */
+  /*     -1) { */
+  /*   error("Already a variable with this name in this scope"); */
+  /*   return 0; */
+  /* } */
 
-  if (isConst) {
-    ObjString *varName = makeString(token.start, token.length);
-    tableSet(&globalConsts, OBJ_VAL(varName), TRUE_VAL);
-  }
+  /* if (isConst) { */
+  /*   ObjString *varName = makeString(token.start, token.length); */
+  /*   tableSet(&globalConsts, OBJ_VAL(varName), TRUE_VAL); */
+  /* } */
 
-  return identifierConstant(&token);
+  /* return identifierConstant(&token); */
 }
+/* static uint8_t parseVariable(bool isConst, const char *errorMessage) { */
+/*   consume(TOKEN_IDENTIFIER, errorMessage); */
+
+/*   Token token = parser.previous; */
+/*   if (tableFindString(&globalConsts, token.start, token.length)) { */
+/*     error("Cannot redeclare a const variable"); */
+/*     return 0; */
+/*   } */
+
+/*   declareVariable(isConst); */
+
+/*   if (current->scopeDepth > 0) { */
+/*     return 0; */
+/*   } */
+/*   // we are in global scope. Check for a global variable with the same name
+ */
+/*   if (searchConstantsFor(OBJ_VAL(copyString(token.start, token.length))) !=
+ */
+/*       -1) { */
+/*     error("Already a variable with this name in this scope"); */
+/*     return 0; */
+/*   } */
+
+/*   if (isConst) { */
+/*     ObjString *varName = makeString(token.start, token.length); */
+/*     tableSet(&globalConsts, OBJ_VAL(varName), TRUE_VAL); */
+/*   } */
+
+/*   return identifierConstant(&token); */
+/* } */
 
 static void markInitialized() {
   if (current->scopeDepth == 0) {
@@ -607,8 +641,8 @@ static void function(FunctionType type) {
       if (current->function->arity > 255) {
         errorAtCurrent("Can't have more than 255 parameters.");
       }
-      uint8_t constant = parseVariable(false, "Expect parameter name.");
-      defineVariable(constant);
+      /* uint8_t constant = parseVariable(false, "Expect parameter name."); */
+      /* defineVariable(constant); */
     } while (match(TOKEN_COMMA));
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
@@ -642,23 +676,24 @@ static void method() {
 }
 
 static void funDeclaration() {
-  uint8_t global = parseVariable(true, "Expect function name.");
-  markInitialized();
-  function(TYPE_FUNCTION);
-  defineVariable(global);
+  /* uint8_t global = parseVariable(true, "Expect function name."); */
+  /* markInitialized(); */
+  /* function(TYPE_FUNCTION); */
+  /* defineVariable(global); */
 }
 
-static void varDeclaration(bool isConst) {
-  uint8_t global = parseVariable(isConst, "Expect variable name.");
+static AstNode *varDeclaration(bool isConst) {
+  Token name = parseVariable(isConst, "Expect variable name.");
 
+  AstNode *node = newDefineStmt(name, NULL);
   if (match(TOKEN_EQUAL)) {
-    expression();
-  } else {
-    emitByte(OP_NIL);
+    node->expr = expression();
   }
   consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 
-  defineVariable(global);
+  /* defineVariable(global); */
+
+  return node;
 }
 
 static AstNode *expressionStatement() {
@@ -830,7 +865,9 @@ static void continueStatement() {
   emitLoop(current->loopOffset);
 }
 
-static void namedVariable(Token name, bool canAssign) {
+// TODO: how to represent variable ref in AST?
+// This is all codegen?
+static AstNode *namedVariable(Token name, bool canAssign) {
   uint8_t getOp, setOp;
   Local *local = NULL;
   int arg = resolveLocal(current, &name, &local);
@@ -853,7 +890,7 @@ static void namedVariable(Token name, bool canAssign) {
   if (canAssign && match(TOKEN_EQUAL)) {
     if ((local != NULL && local->isConst) || isGlobalConstant) {
       error("Cannot reassign constant variable.");
-      return;
+      return NULL;
     }
     expression();
     emitBytes(setOp, (uint8_t)arg);
@@ -862,8 +899,10 @@ static void namedVariable(Token name, bool canAssign) {
   }
 }
 
-static void variable(bool canAssign) {
-  namedVariable(parser.previous, canAssign);
+static AstNode *variable(bool canAssign) {
+  // Create AstAssign here too?
+  return newVariableExpr(parser.previous);
+  /* namedVariable(parser.previous, canAssign); */
 }
 
 static Token syntheticToken(const char *text) {
@@ -943,15 +982,17 @@ static void classDeclaration() {
 }
 
 static AstNode *declaration() {
-  return statement();
+  if (match(TOKEN_CONST)) {
+    return varDeclaration(true);
+  } else if (match(TOKEN_VAR)) {
+    return varDeclaration(false);
+  } else {
+    return statement();
+  }
   /* if (match(TOKEN_CLASS)) { */
   /*   classDeclaration(); */
   /* } else if (match(TOKEN_FUN)) { */
   /*   funDeclaration(); */
-  /* } else if (match(TOKEN_CONST)) { */
-  /*   varDeclaration(true); */
-  /* } else if (match(TOKEN_VAR)) { */
-  /*   varDeclaration(false); */
   /* } else { */
   /*   statement(); */
   /* } */
@@ -1126,14 +1167,14 @@ ParseRule rules[] = {
     [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
     [TOKEN_PERCENT] = {NULL, binary, PREC_FACTOR},
     [TOKEN_BANG] = {unary, NULL, PREC_NONE},
-    /* [TOKEN_EQUAL] = {NULL, NULL, PREC_NONE}, */
+    [TOKEN_EQUAL] = {NULL, NULL, PREC_NONE},
     /* [TOKEN_BANG_EQUAL] = {NULL, binary, PREC_EQUALITY}, */
     /* [TOKEN_EQUAL_EQUAL] = {NULL, binary, PREC_EQUALITY}, */
     /* [TOKEN_GREATER] = {NULL, binary, PREC_COMPARISON}, */
     /* [TOKEN_GREATER_EQUAL] = {NULL, binary, PREC_COMPARISON}, */
     /* [TOKEN_LESS] = {NULL, binary, PREC_COMPARISON}, */
     /* [TOKEN_LESS_EQUAL] = {NULL, binary, PREC_COMPARISON}, */
-    /* [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE}, */
+    [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE},
     /* [TOKEN_STRING] = {string, NULL, PREC_NONE}, */
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
     /* [TOKEN_AND] = {NULL, and_, PREC_AND}, */
@@ -1150,10 +1191,10 @@ ParseRule rules[] = {
     /* [TOKEN_SUPER] = {super_, NULL, PREC_NONE}, */
     /* [TOKEN_THIS] = {this_, NULL, PREC_NONE}, */
     [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
-    /* [TOKEN_VAR] = {NULL, NULL, PREC_NONE}, */
+    [TOKEN_VAR] = {NULL, NULL, PREC_NONE},
     /* [TOKEN_WHILE] = {NULL, NULL, PREC_NONE}, */
     /* [TOKEN_ERROR] = {NULL, NULL, PREC_NONE}, */
-    /* [TOKEN_EOF] = {NULL, NULL, PREC_NONE}, */
+    [TOKEN_EOF] = {NULL, NULL, PREC_NONE},
     /* [TOKEN_QUESTION] = {NULL, ternary, PREC_OR}, */
     /* [TOKEN_PLUS_PLUS] = {NULL, increment, PREC_CALL}, */
     /* [TOKEN_MINUS_MINUS] = {NULL, decrement, PREC_CALL}, */
@@ -1173,6 +1214,9 @@ static AstNode *parsePrecedence(Precedence precedence) {
   while (precedence <= getRule(parser.current.type)->precedence) {
     advance();
     ParseFn infixRule = getRule(parser.previous.type)->infix;
+    if (infixRule == NULL) {
+      return NULL;
+    }
     AstNode *newNode = infixRule(canAssign);
     newNode->branches.left = left;
     left = newNode;
@@ -1217,12 +1261,11 @@ ObjFunction *compile(const char *source, FILE *ostream, FILE *errstream) {
   CFG *cfg = newCFG(ast);
   printCFG(cfg);
 
-  /* Chunk *chunk = generateChunk(cfg->start, &labels); */
   Chunk *chunk = generateChunk(cfg, &labels);
   ObjFunction *function = newFunction();
   function->chunk = *chunk;
 
-  disassembleChunk(chunk, "testing");
+  disassembleChunk(chunk, "main");
 
   /* ObjFunction *function = endCompiler(); */
   freeTable(&stringConstants);

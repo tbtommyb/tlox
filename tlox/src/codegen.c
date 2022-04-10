@@ -36,6 +36,27 @@ Chunk *allocateChunk() {
   return chunk;
 }
 
+// Variables stuff
+static int searchConstantsFor(Chunk *chunk, Value value) {
+  ValueArray constants = chunk->constants;
+  for (int i = 0; i < constants.count; i++) {
+    Value constant = constants.values[i];
+    if (valuesEqual(constant, value)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+static uint8_t identifierConstant(Chunk *chunk, Value name) {
+  int constantIndex = searchConstantsFor(chunk, name);
+  if (constantIndex != -1) {
+    return constantIndex;
+  }
+  return makeConstant(chunk, name);
+}
+// End variables stuff
+
 static void writeOperation(Operation *op, Chunk *chunk, Table *labels) {
   switch (op->opcode) {
   case IR_ADD:
@@ -93,6 +114,17 @@ static void writeOperation(Operation *op, Chunk *chunk, Table *labels) {
   case IR_PRINT:
     emitByte(chunk, OP_PRINT);
     break;
+  case IR_DEFINE: {
+    Value name = op->first->val.literal;
+    int arg = identifierConstant(chunk, name);
+    emitBytes(chunk, OP_DEFINE_GLOBAL, (uint8_t)arg);
+    break;
+  }
+  case IR_VARIABLE: {
+    Value name = op->first->val.literal;
+    int arg = identifierConstant(chunk, name);
+    emitBytes(chunk, OP_GET_GLOBAL, (uint8_t)arg);
+  }
   default:
     printf("Unknown opcode %d\n", op->opcode);
   }
