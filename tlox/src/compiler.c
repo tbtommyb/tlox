@@ -70,6 +70,9 @@ typedef enum {
   TYPE_INITIALIZER,
 } FunctionType;
 
+// TODO: separate out parser
+// have error handling logic in Compiler available to all subcomponents
+// create Scope/SymbolTable to hold locals and upvalues and track constants
 typedef struct Compiler {
   struct Compiler *enclosing;
   ObjFunction *function;
@@ -448,12 +451,14 @@ static void declareVariable(bool isConst) {
   addLocal(*name, isConst);
 }
 
-static ObjString *parseVariable(const char *errorMessage) {
+// FIXME: do need Token, not ObjString, after all so that we can show
+// error locations.
+static Token parseVariable(const char *errorMessage) {
   consume(TOKEN_IDENTIFIER, errorMessage);
 
   Token prev = parser.previous;
 
-  return copyString(prev.start, prev.length);
+  return prev;
   /* declareVariable(isConst); */
 
   /* return identifierConstant(&token); */
@@ -662,7 +667,7 @@ static void funDeclaration() {
 }
 
 static AstNode *varDeclaration(bool isConst) {
-  ObjString *name = parseVariable("Expect variable name.");
+  Token name = parseVariable("Expect variable name.");
 
   AstNode *node = NULL;
   if (isConst) {
@@ -885,7 +890,9 @@ static AstNode *namedVariable(Token name, bool canAssign) {
 }
 
 static AstNode *variable(bool canAssign) {
-  ObjString *token = copyString(parser.previous.start, parser.previous.length);
+  /* ObjString *token = copyString(parser.previous.start,
+   * parser.previous.length); */
+  Token token = parser.previous;
   if (canAssign && match(TOKEN_EQUAL)) {
     return newAssignStmt(token, expression());
   }
@@ -1247,6 +1254,8 @@ ObjFunction *compile(const char *source, FILE *ostream, FILE *errstream) {
     linkedList_append(ast->stmts, declaration());
   }
   printAST(*ast, 0);
+
+  // TODO: create semantic check section
 
   CFG *cfg = newCFG(state, ast);
   printCFG(cfg);

@@ -223,7 +223,8 @@ static Operation *walkAst(CompilerState state, BasicBlock *bb, AstNode *node) {
     break;
   }
   case EXPR_VARIABLE: {
-    Operand *name = newLiteralOperand(OBJ_VAL(node->token));
+    Operand *name = newLiteralOperand(
+        OBJ_VAL(copyString(node->token.start, node->token.length)));
     op = newOperation(IR_VARIABLE, name, NULL);
     bb->curr->next = op;
     bb->curr = op;
@@ -265,16 +266,18 @@ static Operation *walkAst(CompilerState state, BasicBlock *bb, AstNode *node) {
     break;
   }
   case STMT_DEFINE: {
+    ObjString *nameString = copyString(node->token.start, node->token.length);
     // Semantic checks. Maybe move to their own module with error handling
-    if (tableFindString(state.globalConsts, node->token->chars,
-                        node->token->length)) {
+    if (tableFindString(state.globalConsts, nameString->chars,
+                        nameString->length)) {
       // FIXME
       printf("ERR: Cannot redeclare a const variable\n");
       break;
     }
 
     // CFG
-    Operand *name = newLiteralOperand(OBJ_VAL(node->token));
+    Operand *name = newLiteralOperand(
+        OBJ_VAL(copyString(node->token.start, node->token.length)));
 
     if (node->expr == NULL) {
       Operand *value = newLiteralOperand(NIL_VAL);
@@ -291,12 +294,20 @@ static Operation *walkAst(CompilerState state, BasicBlock *bb, AstNode *node) {
     break;
   }
   case STMT_DEFINE_CONST: {
+    ObjString *nameString = copyString(node->token.start, node->token.length);
     // Semantic checks. Maybe move to their own module with error handling
+    bool isGlobalConstant =
+        tableFindString(state.globalConsts, nameString->chars,
+                        nameString->length) != NULL;
+    if (isGlobalConstant) {
+      printf("ERR: cannot redefine constant variable\n");
+      break;
+    }
     // FIXME use HashSet
-    tableSet(state.globalConsts, OBJ_VAL(node->token), TRUE_VAL);
+    tableSet(state.globalConsts, OBJ_VAL(nameString), TRUE_VAL);
 
     // CFG
-    Operand *name = newLiteralOperand(OBJ_VAL(node->token));
+    Operand *name = newLiteralOperand(OBJ_VAL(nameString));
 
     if (node->expr == NULL) {
       Operand *value = newLiteralOperand(NIL_VAL);
@@ -314,17 +325,19 @@ static Operation *walkAst(CompilerState state, BasicBlock *bb, AstNode *node) {
     break;
   }
   case STMT_ASSIGN: {
+    ObjString *nameString = copyString(node->token.start, node->token.length);
     // Semantic checks. Maybe move to their own module with error handling
     bool isGlobalConstant =
-        tableFindString(state.globalConsts, node->token->chars,
-                        node->token->length) != NULL;
+        tableFindString(state.globalConsts, nameString->chars,
+                        nameString->length) != NULL;
     if (isGlobalConstant) {
       printf("ERR: cannot reassign constant variable\n");
       break;
     }
 
     // CFG
-    Operand *name = newLiteralOperand(OBJ_VAL(node->token));
+    Operand *name = newLiteralOperand(
+        OBJ_VAL(copyString(node->token.start, node->token.length)));
     op = walkAst(state, bb, node->expr);
 
     op = newOperation(IR_VARIABLE_ASSIGN, name,

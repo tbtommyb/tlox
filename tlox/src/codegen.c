@@ -38,6 +38,7 @@ Chunk *allocateChunk() {
 
 // Variables stuff
 static int searchConstantsFor(Chunk *chunk, Value value) {
+  // FIXME look in symbol table instead of runtime
   ValueArray constants = chunk->constants;
   for (int i = 0; i < constants.count; i++) {
     Value constant = constants.values[i];
@@ -122,11 +123,13 @@ static void writeOperation(Operation *op, Chunk *chunk, Table *labels) {
   }
   case IR_DEFINE_CONST: {
     Value name = op->first->val.literal;
-    if (searchConstantsFor(chunk, name) != -1) {
-      // FIXME
-      printf("ERR: Already a variable with this name in this scope\n");
-      break;
-    }
+    // Probably handles local consts too, but redefinitions should be caught
+    // earlier in semantic analysis using symbol table
+    /* if (searchConstantsFor(chunk, name) != -1) { */
+    /*   // FIXME */
+    /*   printf("ERR: Already a variable with this name in this scope\n"); */
+    /*   break; */
+    /* } */
     int arg = identifierConstant(chunk, name);
     emitBytes(chunk, OP_DEFINE_GLOBAL, (uint8_t)arg);
     break;
