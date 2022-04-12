@@ -51,8 +51,18 @@
 },
 {
   "directory": "/Users/thomasbarrett/coding/crafting-interpreters/tlox/src",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/tlox -I/Users/thomasbarrett/coding/crafting-interpreters/tlox/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/parser.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/tlox/src/parser.c",
+  "file": "/Users/thomasbarrett/coding/crafting-interpreters/tlox/src/parser.c"
+},
+{
+  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/tlox/src",
   "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/tlox -I/Users/thomasbarrett/coding/crafting-interpreters/tlox/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/scanner.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/tlox/src/scanner.c",
   "file": "/Users/thomasbarrett/coding/crafting-interpreters/tlox/src/scanner.c"
+},
+{
+  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/tlox/src",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/tlox -I/Users/thomasbarrett/coding/crafting-interpreters/tlox/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/semantic.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/tlox/src/semantic.c",
+  "file": "/Users/thomasbarrett/coding/crafting-interpreters/tlox/src/semantic.c"
 },
 {
   "directory": "/Users/thomasbarrett/coding/crafting-interpreters/tlox/src",

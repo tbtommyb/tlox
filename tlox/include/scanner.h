@@ -1,6 +1,8 @@
 #ifndef clox_scanner_h
 #define clox_scanner_h
 
+#include <stdbool.h>
+
 typedef enum {
   TOKEN_UNKNOWN,
   // Single-character tokens.
@@ -72,6 +74,7 @@ typedef struct {
   int line;
 } Token;
 
+bool identifiersEqual(Token *a, Token *b);
 void initScanner(const char *source);
 Token scanToken();
 

@@ -266,16 +266,6 @@ static Operation *walkAst(CompilerState state, BasicBlock *bb, AstNode *node) {
     break;
   }
   case STMT_DEFINE: {
-    ObjString *nameString = copyString(node->token.start, node->token.length);
-    // Semantic checks. Maybe move to their own module with error handling
-    if (tableFindString(state.globalConsts, nameString->chars,
-                        nameString->length)) {
-      // FIXME
-      printf("ERR: Cannot redeclare a const variable\n");
-      break;
-    }
-
-    // CFG
     Operand *name = newLiteralOperand(
         OBJ_VAL(copyString(node->token.start, node->token.length)));
 
@@ -295,18 +285,6 @@ static Operation *walkAst(CompilerState state, BasicBlock *bb, AstNode *node) {
   }
   case STMT_DEFINE_CONST: {
     ObjString *nameString = copyString(node->token.start, node->token.length);
-    // Semantic checks. Maybe move to their own module with error handling
-    bool isGlobalConstant =
-        tableFindString(state.globalConsts, nameString->chars,
-                        nameString->length) != NULL;
-    if (isGlobalConstant) {
-      printf("ERR: cannot redefine constant variable\n");
-      break;
-    }
-    // FIXME use HashSet
-    tableSet(state.globalConsts, OBJ_VAL(nameString), TRUE_VAL);
-
-    // CFG
     Operand *name = newLiteralOperand(OBJ_VAL(nameString));
 
     if (node->expr == NULL) {

@@ -15,4 +15,7 @@
 #define NAN_BOXING
 #undef NAN_BOXING
 
+typedef struct Parser Parser;
+typedef struct Compiler Compiler;
+
 #endif

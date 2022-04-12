@@ -9,7 +9,9 @@ set(LIB_SOURCES
   linked_list.c
   lox_array.c
   object.c
+  parser.c
   scanner.c
+  semantic.c
   table.c
   value.c
   vm.c

@@ -12,6 +12,7 @@
 #include "lox_array.h"
 #include "memory.h"
 #include "object.h"
+#include "parser.h"
 #include "table.h"
 #include "value.h"
 #include "vm.h"
@@ -816,7 +817,8 @@ static InterpretResult run() {
 }
 
 InterpretResult interpret(const char *source) {
-  ObjFunction *function = compile(source, vm.ostream, vm.errstream);
+  Compiler compiler = initCompiler(TYPE_SCRIPT, vm.ostream, vm.errstream);
+  ObjFunction *function = compile(&compiler, source);
   if (function == NULL) {
     return INTERPRET_COMPILE_ERROR;
   }

@@ -425,6 +425,30 @@ object.c.s:
 	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/object.c.s
 .PHONY : object.c.s
 
+parser.o: parser.c.o
+.PHONY : parser.o
+
+# target to build an object file
+parser.c.o:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/parser.c.o
+.PHONY : parser.c.o
+
+parser.i: parser.c.i
+.PHONY : parser.i
+
+# target to preprocess a source file
+parser.c.i:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/parser.c.i
+.PHONY : parser.c.i
+
+parser.s: parser.c.s
+.PHONY : parser.s
+
+# target to generate assembly for a file
+parser.c.s:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/parser.c.s
+.PHONY : parser.c.s
+
 scanner.o: scanner.c.o
 .PHONY : scanner.o
 
@@ -448,6 +472,30 @@ scanner.s: scanner.c.s
 scanner.c.s:
 	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/scanner.c.s
 .PHONY : scanner.c.s
+
+semantic.o: semantic.c.o
+.PHONY : semantic.o
+
+# target to build an object file
+semantic.c.o:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/semantic.c.o
+.PHONY : semantic.c.o
+
+semantic.i: semantic.c.i
+.PHONY : semantic.i
+
+# target to preprocess a source file
+semantic.c.i:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/semantic.c.i
+.PHONY : semantic.c.i
+
+semantic.s: semantic.c.s
+.PHONY : semantic.s
+
+# target to generate assembly for a file
+semantic.c.s:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/semantic.c.s
+.PHONY : semantic.c.s
 
 table.o: table.c.o
 .PHONY : table.o
@@ -565,9 +613,15 @@ help:
 	@echo "... object.o"
 	@echo "... object.i"
 	@echo "... object.s"
+	@echo "... parser.o"
+	@echo "... parser.i"
+	@echo "... parser.s"
 	@echo "... scanner.o"
 	@echo "... scanner.i"
 	@echo "... scanner.s"
+	@echo "... semantic.o"
+	@echo "... semantic.i"
+	@echo "... semantic.s"
 	@echo "... table.o"
 	@echo "... table.i"
 	@echo "... table.s"

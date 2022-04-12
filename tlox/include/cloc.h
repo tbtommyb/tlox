@@ -6,6 +6,7 @@
 #include "memory.h"
 #include "object.h"
 #include "scanner.h"
+#include "semantic.h"
 #include "table.h"
 #include "value.h"
 #include "vm.h"

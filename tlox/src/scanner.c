@@ -294,3 +294,10 @@ Token scanToken() {
   }
   return errorToken("Unexpected character.");
 }
+
+bool identifiersEqual(Token *a, Token *b) {
+  if (a->length != b->length) {
+    return false;
+  }
+  return memcmp(a->start, b->start, a->length) == 0;
+}
