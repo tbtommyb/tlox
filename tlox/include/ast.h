@@ -11,6 +11,7 @@ typedef enum {
   EXPR_UNARY,
   EXPR_VARIABLE,
   STMT_ASSIGN,
+  STMT_BLOCK,
   STMT_DEFINE,
   STMT_DEFINE_CONST,
   STMT_IF,
@@ -50,6 +51,7 @@ AstNode *newPrintStmt(AstNode *expr);
 AstNode *newIfStmt(AstNode *condition, AstNode *thenBranch,
                    AstNode *elseBranch);
 AstNode *newModuleStmt();
+AstNode *newBlockStmt();
 
 void printAST(AstNode root, int indentation);
 

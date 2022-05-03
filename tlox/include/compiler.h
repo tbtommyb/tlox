@@ -20,12 +20,37 @@ typedef struct CompilerState {
   Table *labels;
 } CompilerState;
 
+typedef struct {
+  Token name;
+  int depth;
+  bool isConst;
+  bool isCaptured;
+} Local;
+
+typedef struct {
+  uint8_t index;
+  bool isLocal;
+} Upvalue;
+
+typedef struct Scope {
+  struct Scope *enclosing;
+
+  Upvalue upvalues[UINT8_COUNT];
+  Local locals[UINT8_COUNT];
+  int localCount;
+  int scopeDepth;
+
+  int loopOffset;
+  int currentStackDepth;
+} Scope;
+
 typedef struct Compiler {
   bool hadError;
   bool panicMode;
   FILE *ostream;
   FILE *errstream;
   Parser *parser;
+  Scope *currentScope;
   FunctionType type;
 } Compiler;
 

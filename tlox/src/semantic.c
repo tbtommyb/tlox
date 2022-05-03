@@ -6,6 +6,17 @@ void analyse(AstNode *node, Compiler *compiler, CompilerState *state) {
     return;
   }
   switch (node->type) {
+  case STMT_ASSIGN: {
+    ObjString *nameString = copyString(node->token.start, node->token.length);
+    bool isGlobalConstant =
+        tableFindString(state->globalConsts, nameString->chars,
+                        nameString->length) != NULL;
+    if (isGlobalConstant) {
+      errorAt(compiler, &node->token, "Cannot reassign a const variable.");
+      return;
+    }
+    break;
+  }
   case STMT_DEFINE: {
     ObjString *nameString = copyString(node->token.start, node->token.length);
     if (tableFindString(state->globalConsts, nameString->chars,

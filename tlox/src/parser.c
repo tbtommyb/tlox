@@ -155,10 +155,9 @@ static AstNode *expression(Parser *parser) {
 }
 
 static AstNode *block(Parser *parser) {
-  // FIXME: handle multiple statements
-  AstNode *node = NULL;
+  AstNode *node = newBlockStmt();
   while (!check(parser, TOKEN_RIGHT_BRACE) && !check(parser, TOKEN_EOF)) {
-    node = declaration(parser);
+    linkedList_append(node->stmts, declaration(parser));
   }
 
   consume(parser, TOKEN_RIGHT_BRACE, "Expect '}' after block.");
@@ -257,10 +256,6 @@ static AstNode *statement(Parser *parser) {
   /*   whileStatement(); */
   /* } else if (match(TOKEN_SWITCH)) { */
   /*   switchStatement(); */
-  /* } else if (match(TOKEN_LEFT_BRACE)) { */
-  /*   beginScope(); */
-  /*   block(); */
-  /*   endScope(); */
   /* } else if (match(TOKEN_CONTINUE)) { */
   /*   continueStatement(); */
   /* } else { */
@@ -288,8 +283,8 @@ static AstNode *number(Parser *parser, bool canAssign) {
 ParseRule rules[] = {
     /* [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL}, */
     /* [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE}, */
-    /* [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE}, */
-    /* [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE}, */
+    [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
+    [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
     /* [TOKEN_LEFT_BRACKET] = {arrayLiteral, leftBracket, PREC_CALL}, */
     /* [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE}, */
     /* [TOKEN_COMMA] = {NULL, NULL, PREC_NONE}, */
@@ -372,7 +367,7 @@ static ParseRule *getRule(TokenType type) { return &rules[type]; }
 AstNode *parse(Parser *parser) {
   advance(parser);
 
-  AstNode *ast = newModuleStmt(parser);
+  AstNode *ast = newModuleStmt();
   while (!match(parser, TOKEN_EOF)) {
     linkedList_append(ast->stmts, declaration(parser));
   }

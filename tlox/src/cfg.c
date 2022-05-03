@@ -303,17 +303,6 @@ static Operation *walkAst(CompilerState state, BasicBlock *bb, AstNode *node) {
     break;
   }
   case STMT_ASSIGN: {
-    ObjString *nameString = copyString(node->token.start, node->token.length);
-    // Semantic checks. Maybe move to their own module with error handling
-    bool isGlobalConstant =
-        tableFindString(state.globalConsts, nameString->chars,
-                        nameString->length) != NULL;
-    if (isGlobalConstant) {
-      printf("ERR: cannot reassign constant variable\n");
-      break;
-    }
-
-    // CFG
     Operand *name = newLiteralOperand(
         OBJ_VAL(copyString(node->token.start, node->token.length)));
     op = walkAst(state, bb, node->expr);
@@ -332,6 +321,16 @@ static Operation *walkAst(CompilerState state, BasicBlock *bb, AstNode *node) {
       walkAst(state, bb, stmtNode->data);
       stmtNode = stmtNode->next;
     }
+    break;
+  }
+  case STMT_BLOCK: {
+    Node *blockNode = (Node *)node->stmts->head;
+
+    while (blockNode != NULL) {
+      walkAst(state, bb, blockNode->data);
+      blockNode = blockNode->next;
+    }
+    break;
   }
   }
   return op;

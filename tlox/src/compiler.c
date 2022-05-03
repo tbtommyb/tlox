@@ -18,46 +18,15 @@
 #include "debug.h"
 #endif
 
-typedef struct {
-  Token name;
-  int depth;
-  bool isConst;
-  bool isCaptured;
-} Local;
-
-typedef struct {
-  uint8_t index;
-  bool isLocal;
-} Upvalue;
-
-// TODO: separate out parser
-// have error handling logic in Compiler available to all subcomponents
-// create Scope/SymbolTable to hold locals and upvalues and track constants
-typedef struct OldCompiler {
-  struct OldCompiler *enclosing;
-  ObjFunction *function;
-
-  Upvalue upvalues[UINT8_COUNT];
-  Local locals[UINT8_COUNT];
-  int localCount;
-  int scopeDepth;
-
-  int loopOffset;
-  int currentStackDepth;
-} OldCompiler;
-
-typedef struct ClassCompiler {
-  struct ClassCompiler *enclosing;
-  bool hasSuperclass;
-} ClassCompiler;
-
-OldCompiler *current = NULL;
-ClassCompiler *currentClass = NULL;
 Table stringConstants;
 Table globalConsts;
 Table labels;
+/* typedef struct ClassCompiler { */
+/*   struct ClassCompiler *enclosing; */
+/*   bool hasSuperclass; */
+/* } ClassCompiler; */
 
-static Chunk *currentChunk() { return &current->function->chunk; }
+/* ClassCompiler *currentClass = NULL; */
 
 /* static void emitLoop(int loopStart) { */
 /*   emitByte(OP_LOOP); */
@@ -139,23 +108,16 @@ void errorAtCurrent(Compiler *compiler, const char *message) {
   errorAt(compiler, &compiler->parser->current, message);
 }
 
-static void initOldCompiler(OldCompiler *compiler, Parser *parser,
-                            FunctionType type) {
-  compiler->enclosing = current;
-  compiler->function = NULL;
+static void initScope(Scope *scope, Compiler *compiler, FunctionType type) {
+  scope->enclosing = compiler->currentScope;
 
-  compiler->localCount = 0;
-  compiler->scopeDepth = 0;
-  compiler->function = newFunction();
-  compiler->loopOffset = -1;
-  current = compiler;
+  scope->localCount = 0;
+  scope->scopeDepth = 0;
+  scope->loopOffset = -1;
 
-  if (type != TYPE_SCRIPT) {
-    current->function->name =
-        copyString(parser->previous.start, parser->previous.length);
-  }
+  compiler->currentScope = scope;
 
-  Local *local = &current->locals[current->localCount++];
+  Local *local = &scope->locals[scope->localCount++];
   local->depth = 0;
   local->isCaptured = false;
 
@@ -307,12 +269,12 @@ static void initOldCompiler(OldCompiler *compiler, Parser *parser,
 /*   return identifierConstant(&token); */
 /* } */
 
-static void markInitialized() {
-  if (current->scopeDepth == 0) {
-    return;
-  }
-  current->locals[current->localCount - 1].depth = current->scopeDepth;
-}
+/* static void markInitialized() { */
+/*   if (current->scopeDepth == 0) { */
+/*     return; */
+/*   } */
+/*   current->locals[current->localCount - 1].depth = current->scopeDepth; */
+/* } */
 
 /* static void defineVariable(uint8_t global) { */
 /*   if (current->scopeDepth > 0) { */
@@ -796,16 +758,22 @@ ObjFunction *compile(Compiler *compiler, const char *source) {
   // FIXME: move to Compiler
   initScanner(source);
 
-  OldCompiler oldCompiler;
-  initOldCompiler(&oldCompiler, compiler->parser, TYPE_SCRIPT);
-
   initTable(&stringConstants);
   initTable(&globalConsts);
   initTable(&labels);
 
+  Scope scope;
+  initScope(&scope, compiler, TYPE_SCRIPT);
+
   CompilerState state = {.stringConstants = &stringConstants,
                          .globalConsts = &globalConsts,
                          .labels = &labels};
+
+  ObjString *functionName = NULL;
+  if (compiler->type != TYPE_SCRIPT) {
+    functionName = copyString(compiler->parser->previous.start,
+                              compiler->parser->previous.length);
+  }
 
   AstNode *ast = parse(compiler->parser);
 #ifdef DEBUG_PRINT_CODE
@@ -829,9 +797,11 @@ ObjFunction *compile(Compiler *compiler, const char *source) {
   Chunk *chunk = generateChunk(cfg, &labels);
   ObjFunction *function = newFunction();
   function->chunk = *chunk;
+  function->name = functionName;
 
 #ifdef DEBUG_PRINT_CODE
-  disassembleChunk(chunk, "main");
+  disassembleChunk(chunk,
+                   functionName != NULL ? functionName->chars : "<script>");
 #endif
 
   /* ObjFunction *function = endCompiler(); */
@@ -839,17 +809,7 @@ ObjFunction *compile(Compiler *compiler, const char *source) {
   freeTable(&globalConsts);
   freeTable(&labels);
 
-  /* return NULL; */
   return compiler->hadError ? NULL : function;
-}
-
-// TODO: add constants to this
-void markCompilerRoots() {
-  OldCompiler *compiler = current;
-  while (compiler != NULL) {
-    markObject((Obj *)compiler->function);
-    compiler = compiler->enclosing;
-  }
 }
 
 Compiler initCompiler(FunctionType type, FILE *ostream, FILE *errstream) {
@@ -859,6 +819,7 @@ Compiler initCompiler(FunctionType type, FILE *ostream, FILE *errstream) {
                        .ostream = ostream,
                        .errstream = errstream,
                        .parser = &parser,
+                       .currentScope = NULL,
                        .type = type};
   parser.compiler = &compiler; // FIXME: is this stack reference bad?
   return compiler;

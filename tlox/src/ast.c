@@ -87,6 +87,12 @@ AstNode *newModuleStmt() {
   return node;
 }
 
+AstNode *newBlockStmt() {
+  AstNode *node = allocateAstNode(STMT_BLOCK);
+  node->stmts = linkedList_allocate();
+  return node;
+}
+
 const char *tokenTypeStr(TokenType op) {
   switch (op) {
   case TOKEN_BANG:
@@ -189,6 +195,16 @@ void printAST(AstNode node, int indentation) {
       printAST(*(AstNode *)stmtNode->data, indentation + 2);
       stmtNode = stmtNode->next;
     }
+    break;
+  }
+  case STMT_BLOCK: {
+    printf("%*sStmt Block\n", indentation, "");
+    Node *stmtNode = (Node *)node.stmts->head;
+    while (stmtNode != NULL) {
+      printAST(*(AstNode *)stmtNode->data, indentation + 2);
+      stmtNode = stmtNode->next;
+    }
+    break;
   }
   }
 }
