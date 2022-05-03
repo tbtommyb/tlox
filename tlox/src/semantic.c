@@ -31,7 +31,7 @@ void analyse(AstNode *node, Compiler *compiler, CompilerState *state) {
   case STMT_MODULE: {
     Node *stmtNode = (Node *)node->stmts->head;
 
-    while (stmtNode != NULL && !compiler->hadError) {
+    while (stmtNode != NULL) {
       analyse(stmtNode->data, compiler, state);
       stmtNode = stmtNode->next;
     }
