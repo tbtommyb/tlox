@@ -39,6 +39,5 @@ typedef struct {
 } ParseRule;
 
 AstNode *parse(Parser *parser);
-Parser initParser();
 
 #endif // clox_parser_h

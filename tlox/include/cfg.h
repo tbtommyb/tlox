@@ -10,29 +10,34 @@
 typedef enum OperandType {
   OPERAND_LITERAL,
   OPERAND_REG,
-  OPERAND_LABEL
+  OPERAND_LABEL,
+  OPERAND_SYMBOL
 } OperandType;
 
 typedef enum IROp {
   IR_UNKNOWN,
   IR_ADD,
-  IR_ASSIGN,
+  IR_CONSTANT,
   IR_COND,
   IR_DIVIDE,
   IR_SUBTRACT,
   IR_MODULO,
   IR_MULTIPLY,
   IR_NEGATE,
+  IR_NIL,
   IR_NOT,
+  IR_POP,
   IR_PRINT,
   IR_CODE_START,
   IR_GOTO,
   IR_LABEL,
   IR_ELSE_LABEL,
-  IR_DEFINE,
-  IR_DEFINE_CONST,
-  IR_VARIABLE,
-  IR_VARIABLE_ASSIGN
+  IR_DEFINE_GLOBAL,
+  IR_DEFINE_LOCAL,
+  IR_GET_GLOBAL,
+  IR_GET_LOCAL,
+  IR_SET_GLOBAL,
+  IR_SET_LOCAL
 } IROp;
 
 typedef uint64_t Register;
@@ -46,6 +51,7 @@ typedef struct Operand {
     Value literal;
     Register source;
     LabelId label;
+    Symbol symbol;
   } val;
 } Operand;
 
@@ -76,10 +82,9 @@ typedef struct CFG {
 } CFG;
 
 BasicBlock *newBasicBlock(AstNode *node);
-CFG *newCFG(CompilerState state, AstNode *root);
+CFG *newCFG(Compiler *compiler, CompilerState *state, AstNode *root,
+            Chunk *chunk);
 Operation *newOperation(IROp opcode, Operand *first, Operand *second);
-Operand *newLiteralOperand(Value value);
-Operand *newRegisterOperand(Register reg);
 
 LinkedList *postOrderTraverse(CFG *cfg);
 void printCFG(CFG *cfg);

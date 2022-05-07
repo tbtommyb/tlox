@@ -1,9 +1,10 @@
-#import "codegen.h"
+#include "codegen.h"
+#include "assert.h"
 #include "chunk.h"
-#import "memory.h"
+#include "memory.h"
 
 static void emitByte(Chunk *chunk, uint8_t byte) {
-  writeChunk(chunk, byte, 123); // FIXME
+  writeChunk(chunk, byte, 123); // FIXME: line number would be from token
 }
 
 static void emitBytes(Chunk *chunk, uint8_t byte1, uint8_t byte2) {
@@ -16,18 +17,8 @@ static void emitReturn(Chunk *chunk) {
   emitByte(chunk, OP_RETURN);
 }
 
-static uint8_t makeConstant(Chunk *chunk, Value value) {
-  int constant = addConstant(chunk, value);
-  if (constant > UINT8_MAX) {
-    /* error("Too many constants in one chunk."); */
-    return 0;
-  }
-
-  return (uint8_t)constant;
-}
-
-static void emitConstant(Chunk *chunk, Value value) {
-  emitBytes(chunk, OP_CONSTANT, makeConstant(chunk, value));
+static void emitConstant(Chunk *chunk, uint8_t position) {
+  emitBytes(chunk, OP_CONSTANT, position);
 }
 
 Chunk *allocateChunk() {
@@ -36,7 +27,16 @@ Chunk *allocateChunk() {
   return chunk;
 }
 
-// Variables stuff
+static uint8_t makeConstant(Compiler *compiler, Chunk *chunk, Value value) {
+  int constant = addConstant(chunk, value);
+  if (constant > UINT8_MAX) {
+    error(compiler, "Too many constants in one chunk.");
+    return 0;
+  }
+
+  return (uint8_t)constant;
+}
+
 static int searchConstantsFor(Chunk *chunk, Value value) {
   // FIXME look in symbol table instead of runtime
   ValueArray constants = chunk->constants;
@@ -49,23 +49,38 @@ static int searchConstantsFor(Chunk *chunk, Value value) {
   return -1;
 }
 
-static uint8_t identifierConstant(Chunk *chunk, Value name) {
+static uint8_t identifierConstant(Compiler *compiler, Chunk *chunk,
+                                  Value name) {
   int constantIndex = searchConstantsFor(chunk, name);
   if (constantIndex != -1) {
     return constantIndex;
   }
-  return makeConstant(chunk, name);
+  return makeConstant(compiler, chunk, name);
 }
-// End variables stuff
 
-static void writeOperation(Operation *op, Chunk *chunk, Table *labels) {
+static int resolveLocal(Compiler *compiler, Token *name) {
+  for (int i = compiler->currentScope->localCount - 1; i >= 0; i--) {
+    Local *local = &compiler->currentScope->locals[i];
+    if (identifiersEqual(name, &local->name)) {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+static void writeOperation(Compiler *compiler, Operation *op, Chunk *chunk,
+                           Table *labels) {
   switch (op->opcode) {
   case IR_ADD:
     emitByte(chunk, OP_ADD);
     break;
-  case IR_ASSIGN:
-    emitConstant(chunk, op->first->val.literal); // TODO hardcode literals
+  case IR_CONSTANT: {
+    Value literal = op->first->val.literal;
+    uint8_t position = identifierConstant(compiler, chunk, literal);
+    emitConstant(chunk, position);
     break;
+  }
   case IR_CODE_START:
     break;
   case IR_COND: {
@@ -109,41 +124,69 @@ static void writeOperation(Operation *op, Chunk *chunk, Table *labels) {
   case IR_NEGATE:
     emitByte(chunk, OP_NEGATE);
     break;
+  case IR_NIL:
+    emitByte(chunk, OP_NIL);
+    break;
   case IR_NOT:
     emitByte(chunk, OP_NOT);
+    break;
+  case IR_POP:
+    emitByte(chunk, OP_POP);
     break;
   case IR_PRINT:
     emitByte(chunk, OP_PRINT);
     break;
-  case IR_DEFINE: {
-    Value name = op->first->val.literal;
-    int arg = identifierConstant(chunk, name);
-    emitBytes(chunk, OP_DEFINE_GLOBAL, (uint8_t)arg);
+  case IR_DEFINE_GLOBAL: {
+    Symbol symbol = op->first->val.symbol;
+    Value name = OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
+    uint8_t position = identifierConstant(compiler, chunk, name);
+
+    emitBytes(chunk, OP_DEFINE_GLOBAL, position);
     break;
   }
-  case IR_DEFINE_CONST: {
-    Value name = op->first->val.literal;
-    // Probably handles local consts too, but redefinitions should be caught
-    // earlier in semantic analysis using symbol table
-    /* if (searchConstantsFor(chunk, name) != -1) { */
-    /*   // FIXME */
-    /*   printf("ERR: Already a variable with this name in this scope\n"); */
-    /*   break; */
-    /* } */
-    int arg = identifierConstant(chunk, name);
-    emitBytes(chunk, OP_DEFINE_GLOBAL, (uint8_t)arg);
+  case IR_DEFINE_LOCAL: {
+    Symbol symbol = op->first->val.symbol;
+    Local *local =
+        &compiler->currentScope->locals[compiler->currentScope->localCount++];
+    local->name = symbol.name;
+    local->depth = compiler->currentScope->scopeDepth;
+    local->isCaptured = symbol.isCaptured;
+    local->isConst = symbol.isConst; // TODO: remove isConst
     break;
   }
-  case IR_VARIABLE: {
-    Value name = op->first->val.literal;
-    int arg = identifierConstant(chunk, name);
-    emitBytes(chunk, OP_GET_GLOBAL, (uint8_t)arg);
+  case IR_GET_GLOBAL: {
+    Symbol symbol = op->first->val.symbol;
+    Value name = OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
+    uint8_t position = identifierConstant(compiler, chunk, name);
+
+    emitBytes(chunk, OP_GET_GLOBAL, position);
     break;
   }
-  case IR_VARIABLE_ASSIGN: {
+  case IR_GET_LOCAL: {
+    Symbol symbol = op->first->val.symbol;
+    int position = resolveLocal(compiler, &symbol.name);
+
+    assert(position != -1);
+
+    emitBytes(chunk, OP_GET_LOCAL, (uint8_t)position);
+    break;
+  }
+  case IR_SET_GLOBAL: {
     Value name = op->first->val.literal;
-    int arg = identifierConstant(chunk, name);
-    emitBytes(chunk, OP_SET_GLOBAL, (uint8_t)arg);
+    Symbol symbol = op->second->val.symbol;
+    uint8_t position = identifierConstant(compiler, chunk, name);
+
+    emitBytes(chunk, OP_SET_GLOBAL, position);
+    emitByte(chunk, OP_POP);
+    break;
+  }
+  case IR_SET_LOCAL: {
+    Symbol symbol = op->second->val.symbol;
+    int position = resolveLocal(compiler, &symbol.name);
+
+    assert(position != -1);
+
+    emitBytes(chunk, OP_SET_LOCAL, (uint8_t)position);
     emitByte(chunk, OP_POP);
     break;
   }
@@ -152,13 +195,13 @@ static void writeOperation(Operation *op, Chunk *chunk, Table *labels) {
   }
 }
 
-static void generateBasicBlockCode(Chunk *chunk, BasicBlock *bb,
-                                   Table *labels) {
+static void generateBasicBlockCode(Compiler *compiler, Chunk *chunk,
+                                   BasicBlock *bb, Table *labels) {
   Operation *curr = bb->ops;
   int i = 0;
 
   while (curr != NULL && i < bb->opsCount) {
-    writeOperation(curr, chunk, labels);
+    writeOperation(compiler, curr, chunk, labels);
     curr = curr->next;
     i++;
   }
@@ -187,13 +230,12 @@ static void rewriteLabels(Chunk *chunk, Table *labels) {
   }
 }
 
-Chunk *generateChunk(CFG *cfg, Table *labels) {
-  Chunk *chunk = allocateChunk();
-
+// FIXME: rename
+void generateChunk(Compiler *compiler, CFG *cfg, Table *labels, Chunk *chunk) {
   LinkedList *postOrdered = postOrderTraverse(cfg);
   Node *tail = postOrdered->tail;
   while (tail != NULL) {
-    generateBasicBlockCode(chunk, tail->data, labels);
+    generateBasicBlockCode(compiler, chunk, tail->data, labels);
     tail = tail->prev;
   }
 
@@ -201,5 +243,4 @@ Chunk *generateChunk(CFG *cfg, Table *labels) {
 
   // TODO: should be pop after expression statements
   emitReturn(chunk);
-  return chunk;
 }

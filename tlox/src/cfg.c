@@ -111,7 +111,7 @@ static IROp tokenToUnaryOp(TokenType token) {
   }
 }
 
-Operand *newLiteralOperand(Value value) {
+static Operand *newLiteralOperand(Value value) {
   Operand *operand = allocateOperand(OPERAND_LITERAL);
   operand->val.literal = value;
 
@@ -119,16 +119,23 @@ Operand *newLiteralOperand(Value value) {
 }
 
 // TODO: cache operands rather than recreating
-Operand *newRegisterOperand(Register reg) {
+static Operand *newRegisterOperand(Register reg) {
   Operand *operand = allocateOperand(OPERAND_REG);
   operand->val.source = reg;
 
   return operand;
 }
 
-Operand *newLabelOperand(LabelId id) {
+static Operand *newLabelOperand(LabelId id) {
   Operand *operand = allocateOperand(OPERAND_LABEL);
   operand->val.label = id;
+
+  return operand;
+}
+
+static Operand *newSymbolOperand(Symbol symbol) {
+  Operand *operand = allocateOperand(OPERAND_SYMBOL);
+  operand->val.symbol = symbol;
 
   return operand;
 }
@@ -183,7 +190,8 @@ static Operation *tailOf(Operation *node) {
   return tail;
 }
 
-static Operation *walkAst(CompilerState state, BasicBlock *bb, AstNode *node) {
+static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
+                          SymbolTable *activeScope) {
   if (node == NULL) {
     return NULL;
   }
@@ -193,14 +201,14 @@ static Operation *walkAst(CompilerState state, BasicBlock *bb, AstNode *node) {
 
   switch (node->type) {
   case EXPR_LITERAL: {
-    Operand *value = newLiteralOperand(node->literal);
-    op = newOperation(IR_ASSIGN, value, NULL);
+    Operand *constantValue = newLiteralOperand(node->literal);
+    op = newOperation(IR_CONSTANT, constantValue, NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
   }
   case EXPR_UNARY: {
-    Operation *right = walkAst(state, bb, node->branches.right);
+    Operation *right = walkAst(compiler, bb, node->branches.right, activeScope);
     Operand *value = newRegisterOperand(bb->curr->destination);
     op = newOperation(tokenToUnaryOp(node->op), value, NULL);
     bb->curr->next = op;
@@ -208,10 +216,10 @@ static Operation *walkAst(CompilerState state, BasicBlock *bb, AstNode *node) {
     break;
   }
   case EXPR_BINARY: {
-    Operation *left = walkAst(state, bb, node->branches.left);
+    Operation *left = walkAst(compiler, bb, node->branches.left, activeScope);
     Operation *leftTail = tailOf(left);
 
-    Operation *right = walkAst(state, bb, node->branches.right);
+    Operation *right = walkAst(compiler, bb, node->branches.right, activeScope);
     Operation *rightTail = tailOf(right);
 
     op = newOperation(tokenToOp(node->op),
@@ -223,15 +231,27 @@ static Operation *walkAst(CompilerState state, BasicBlock *bb, AstNode *node) {
     break;
   }
   case EXPR_VARIABLE: {
-    Operand *name = newLiteralOperand(
-        OBJ_VAL(copyString(node->token.start, node->token.length)));
-    op = newOperation(IR_VARIABLE, name, NULL);
+    Value nameString =
+        OBJ_VAL(copyString(node->token.start, node->token.length));
+    Operand *name = newLiteralOperand(nameString);
+
+    Symbol symbol = {0};
+    if (!st_search(activeScope, node->token.start, node->token.length,
+                   &symbol)) {
+      errorAt(compiler, &node->token,
+              "Symbol is not defined in current scope.");
+      break;
+    }
+
+    IROp opcode = symbol.type == SCOPE_GLOBAL ? IR_GET_GLOBAL : IR_GET_LOCAL;
+
+    op = newOperation(opcode, newSymbolOperand(symbol), NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
   }
   case STMT_PRINT: {
-    walkAst(state, bb, node->expr);
+    walkAst(compiler, bb, node->expr, activeScope);
     Operand *value = newRegisterOperand(bb->curr->destination);
     op = newOperation(IR_PRINT, value, NULL);
     bb->curr->next = op;
@@ -240,7 +260,7 @@ static Operation *walkAst(CompilerState state, BasicBlock *bb, AstNode *node) {
   }
   case STMT_IF: {
     // TODO: tidy up implementation here
-    Operation *expr = walkAst(state, bb, node->expr);
+    Operation *expr = walkAst(compiler, bb, node->expr, activeScope);
     LabelId ifLabelId = getLabelId();
     LabelId elseLabelId = getLabelId();
     LabelId afterLabelId = getLabelId();
@@ -252,64 +272,63 @@ static Operation *walkAst(CompilerState state, BasicBlock *bb, AstNode *node) {
     Operation *ifLabel = newLabelOperation(ifLabelId, IR_LABEL);
     bb->curr->next = ifLabel;
     bb->curr = ifLabel;
-    walkAst(state, bb, node->branches.left);
+    walkAst(compiler, bb, node->branches.left, activeScope);
     Operation *afterOp = newGotoOperation(afterLabelId);
     bb->curr->next = afterOp;
     bb->curr = afterOp;
     Operation *elseLabel = newLabelOperation(elseLabelId, IR_ELSE_LABEL);
     bb->curr->next = elseLabel;
     bb->curr = elseLabel;
-    walkAst(state, bb, node->branches.right);
+    walkAst(compiler, bb, node->branches.right, activeScope);
     Operation *afterLabel = newLabelOperation(afterLabelId, IR_LABEL);
     bb->curr->next = afterLabel;
     bb->curr = afterLabel;
     break;
   }
+  case STMT_DEFINE_CONST:
   case STMT_DEFINE: {
-    Operand *name = newLiteralOperand(
-        OBJ_VAL(copyString(node->token.start, node->token.length)));
-
     if (node->expr == NULL) {
-      Operand *value = newLiteralOperand(NIL_VAL);
-      op = newOperation(IR_ASSIGN, value, NULL);
+      op = newOperation(IR_NIL, NULL, NULL);
       bb->curr->next = op;
       bb->curr = op;
     } else {
-      op = walkAst(state, bb, node->expr);
+      op = walkAst(compiler, bb, node->expr, activeScope);
     }
-    op = newOperation(IR_DEFINE, name, newRegisterOperand(op->destination));
 
-    bb->curr->next = op;
-    bb->curr = op;
-    break;
-  }
-  case STMT_DEFINE_CONST: {
-    ObjString *nameString = copyString(node->token.start, node->token.length);
-    Operand *name = newLiteralOperand(OBJ_VAL(nameString));
-
-    if (node->expr == NULL) {
-      Operand *value = newLiteralOperand(NIL_VAL);
-      op = newOperation(IR_ASSIGN, value, NULL);
-      bb->curr->next = op;
-      bb->curr = op;
-    } else {
-      op = walkAst(state, bb, node->expr);
+    Symbol symbol = {0};
+    if (!st_search(activeScope, node->token.start, node->token.length,
+                   &symbol)) {
+      errorAt(compiler, &node->token,
+              "Symbol is not defined in current scope.");
+      break;
     }
-    op = newOperation(IR_DEFINE_CONST, name,
-                      newRegisterOperand(op->destination));
 
+    IROp opcode =
+        symbol.type == SCOPE_GLOBAL ? IR_DEFINE_GLOBAL : IR_DEFINE_LOCAL;
+
+    // FIXME: Skipping register here. Need to fix this
+    op = newOperation(opcode, newSymbolOperand(symbol), NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
   }
   case STMT_ASSIGN: {
-    Operand *name = newLiteralOperand(
-        OBJ_VAL(copyString(node->token.start, node->token.length)));
-    op = walkAst(state, bb, node->expr);
+    Value nameString =
+        OBJ_VAL(copyString(node->token.start, node->token.length));
+    Operand *name = newLiteralOperand(nameString);
+    op = walkAst(compiler, bb, node->expr, activeScope);
 
-    op = newOperation(IR_VARIABLE_ASSIGN, name,
-                      newRegisterOperand(op->destination));
+    Symbol symbol = {0};
+    if (!st_search(activeScope, node->token.start, node->token.length,
+                   &symbol)) {
+      errorAt(compiler, &node->token,
+              "Symbol is not defined in current scope.");
+      break;
+    }
 
+    IROp opcode = symbol.type == SCOPE_GLOBAL ? IR_SET_GLOBAL : IR_SET_LOCAL;
+
+    op = newOperation(opcode, name, newSymbolOperand(symbol));
     bb->curr->next = op;
     bb->curr = op;
     break;
@@ -318,7 +337,7 @@ static Operation *walkAst(CompilerState state, BasicBlock *bb, AstNode *node) {
     Node *stmtNode = (Node *)node->stmts->head;
 
     while (stmtNode != NULL) {
-      walkAst(state, bb, stmtNode->data);
+      walkAst(compiler, bb, stmtNode->data, activeScope);
       stmtNode = stmtNode->next;
     }
     break;
@@ -327,8 +346,21 @@ static Operation *walkAst(CompilerState state, BasicBlock *bb, AstNode *node) {
     Node *blockNode = (Node *)node->stmts->head;
 
     while (blockNode != NULL) {
-      walkAst(state, bb, blockNode->data);
+      walkAst(compiler, bb, blockNode->data, node->st);
       blockNode = blockNode->next;
+    }
+
+    int locals = st_size(node->st);
+    while (locals > 0) {
+      Operation *op = newOperation(IR_POP, NULL, NULL);
+      bb->curr->next = op;
+      bb->curr = op;
+      locals--;
+      // FIXME: need to handle upvalues
+      /*   if (compiler->currentScope->locals[compiler->currentScope->localCount
+       * - 1] */
+      /*           .isCaptured) { */
+      /*     /\* emitByte(OP_CLOSE_UPVALUE); *\/ */
     }
     break;
   }
@@ -461,6 +493,13 @@ char *operandString(Operand *operand) {
     snprintf(str, length + 1, "L%llu", operand->val.label);
     return str;
   }
+  if (operand->type == OPERAND_SYMBOL) {
+    Token name = operand->val.symbol.name;
+    int length = snprintf(NULL, 0, "%.*s", name.length, name.start);
+    char *str = malloc(length + 1); // FIXME: free somewhere
+    snprintf(str, length + 1, "%.*s", name.length, name.start);
+    return str;
+  }
   return "?";
 }
 
@@ -468,8 +507,8 @@ char *opcodeString(IROp opcode) {
   switch (opcode) {
   case IR_ADD:
     return "+";
-  case IR_ASSIGN:
-    return "<-";
+  case IR_CONSTANT:
+    return "constant";
   case IR_CODE_START:
     return "<start>";
   case IR_COND:
@@ -484,22 +523,30 @@ char *opcodeString(IROp opcode) {
     return "*";
   case IR_NEGATE:
     return "-";
+  case IR_NIL:
+    return "nil";
   case IR_NOT:
     return "!";
+  case IR_POP:
+    return "pop";
   case IR_PRINT:
     return "print";
   case IR_GOTO:
     return "goto";
   case IR_LABEL:
     return "label";
-  case IR_DEFINE:
-    return "define";
-  case IR_DEFINE_CONST:
-    return "define const";
-  case IR_VARIABLE:
-    return "var";
-  case IR_VARIABLE_ASSIGN:
-    return "assign";
+  case IR_DEFINE_LOCAL:
+    return "l define";
+  case IR_DEFINE_GLOBAL:
+    return "g define";
+  case IR_GET_GLOBAL:
+    return "g var";
+  case IR_SET_GLOBAL:
+    return "g assign";
+  case IR_GET_LOCAL:
+    return "l var";
+  case IR_SET_LOCAL:
+    return "l assign";
   case IR_UNKNOWN:
   default:
     return "?";
@@ -579,10 +626,30 @@ void printCFG(CFG *cfg) {
   }
 }
 
-CFG *newCFG(CompilerState state, AstNode *root) {
+CFG *newCFG(Compiler *compiler, CompilerState *state, AstNode *root,
+            Chunk *chunk) {
   BasicBlock *irList = newBasicBlock(root);
 
-  walkAst(state, irList, root);
+  // Initialise context. Move somewhere else once functions supported
+  /* Symbol symbol = {0}; */
+  /* if (compiler->type != TYPE_FUNCTION) { */
+  /*   if (!st_get(compiler->currentScope->st, "this", 0, &symbol)) { */
+  /*     error(compiler, "'this' is not defined in current scope."); */
+  /*     return NULL; */
+  /*   } */
+  /* } else { */
+  /*   if (!st_get(compiler->currentScope->st, "", 0, &symbol)) { */
+  /*     error(compiler, "'\"\"' is not defined in current scope."); */
+  /*     return NULL; */
+  /*   } */
+  /* } */
+  /* Operation *op = newOperation(IR_DEFINE_LOCAL, newSymbolOperand(symbol),
+   * NULL); */
+  /* irList->curr->next = op; */
+  /* irList->curr = op; */
+  compiler->currentScope->localCount++;
+
+  walkAst(compiler, irList, root, compiler->currentScope->st);
 
   CFG *cfg = constructCFG(irList);
 

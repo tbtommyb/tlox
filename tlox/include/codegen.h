@@ -3,9 +3,10 @@
 
 #include "cfg.h"
 #include "chunk.h"
+#include "compiler.h"
 #include "table.h"
 
 Chunk *allocateChunk();
-Chunk *generateChunk(CFG *cfg, Table *labels);
+void generateChunk(Compiler *compiler, CFG *cfg, Table *labels, Chunk *chunk);
 
 #endif

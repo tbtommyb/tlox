@@ -7,6 +7,8 @@
 #include "object.h"
 #include "scanner.h"
 #include "semantic.h"
+#include "symbol_table.h"
 #include "table.h"
+#include "token.h"
 #include "value.h"
 #include "vm.h"

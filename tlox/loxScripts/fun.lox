@@ -1,6 +1,6 @@
-fun areWeHavingItYet() {
+fun areWeHavingItYet(name, age) {
   print "Yes we are!";
 }
 
 print areWeHavingItYet;
-print areWeHavingItYet();
+print areWeHavingItYet("Tom", 2 * 2);

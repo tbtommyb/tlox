@@ -14,6 +14,8 @@ static AstNode *allocateAstNode(NodeType type) {
   node->branches.left = NULL;
   node->branches.right = NULL;
   node->stmts = NULL;
+  node->params = NULL;
+  node->st = NULL;
 
   return node;
 }
@@ -42,6 +44,20 @@ AstNode *newUnaryExpr(AstNode *right, TokenType op) {
 AstNode *newVariableExpr(Token token) {
   AstNode *node = allocateAstNode(EXPR_VARIABLE);
   node->token = token;
+  return node;
+}
+
+AstNode *newFunctionExpr() {
+  AstNode *node = allocateAstNode(EXPR_FUNCTION);
+  node->stmts = linkedList_allocate();
+  node->params = linkedList_allocate();
+  return node;
+}
+
+AstNode *newCallExpr(Token name) {
+  AstNode *node = allocateAstNode(EXPR_CALL);
+  node->token = name;
+  node->params = linkedList_allocate();
   return node;
 }
 
@@ -93,6 +109,13 @@ AstNode *newBlockStmt() {
   return node;
 }
 
+AstNode *newFunctionStmt(Token name, AstNode *body) {
+  AstNode *node = allocateAstNode(STMT_FUNCTION);
+  node->token = name;
+  node->expr = body;
+  return node;
+}
+
 const char *tokenTypeStr(TokenType op) {
   switch (op) {
   case TOKEN_BANG:
@@ -140,6 +163,39 @@ void printAST(AstNode node, int indentation) {
   case EXPR_VARIABLE: {
     ObjString *nameString = copyString(node.token.start, node.token.length);
     printf("%*sVariable %s\n", indentation, "", nameString->chars);
+    break;
+  }
+  case EXPR_FUNCTION: {
+    Node *param = (Node *)node.params->head;
+    printf("%*sParams: ", indentation, "");
+    while (param != NULL) {
+      Token *name = param->data;
+      ObjString *paramName = copyString(name->start, name->length);
+      printf("%s", paramName->chars);
+      param = param->next;
+      if (param != NULL) {
+        printf(", ");
+      }
+    }
+    printf("\n");
+    printf("%*sBody:\n", indentation, "");
+    printAST(*node.expr, indentation + 2);
+    break;
+  }
+  case EXPR_CALL: {
+    ObjString *nameString = copyString(node.token.start, node.token.length);
+    printf("%*sExpr Call\n", indentation, "");
+    printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
+    Node *param = (Node *)node.params->head;
+    if (param == NULL) {
+      break;
+    }
+    printf("%*sArgs:\n", indentation + 2, "");
+    while (param != NULL) {
+      printAST(*(AstNode *)param->data, indentation + 4);
+      param = param->next;
+    }
+    printf("\n");
     break;
   }
   case STMT_DEFINE: {
@@ -204,6 +260,14 @@ void printAST(AstNode node, int indentation) {
       printAST(*(AstNode *)stmtNode->data, indentation + 2);
       stmtNode = stmtNode->next;
     }
+    break;
+  }
+  case STMT_FUNCTION: {
+    ObjString *nameString = copyString(node.token.start, node.token.length);
+    printf("%*sStmt Function\n", indentation, "");
+    printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
+    printf("%*sExpr:\n", indentation + 2, "");
+    printAST(*node.expr, indentation + 4);
     break;
   }
   }

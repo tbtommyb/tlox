@@ -11,6 +11,7 @@
 #include "parser.h"
 #include "scanner.h"
 #include "semantic.h"
+#include "symbol_table.h"
 #include "table.h"
 #include "value.h"
 
@@ -19,8 +20,15 @@
 #endif
 
 Table stringConstants;
-Table globalConsts;
 Table labels;
+
+static Token syntheticToken(const char *text) {
+  Token token;
+  token.start = text;
+  token.length = (int)strlen(text);
+  return token;
+}
+
 /* typedef struct ClassCompiler { */
 /*   struct ClassCompiler *enclosing; */
 /*   bool hasSuperclass; */
@@ -53,20 +61,6 @@ Table labels;
 /*     emitByte(OP_NIL); */
 /*   } */
 /*   emitByte(OP_RETURN); */
-/* } */
-
-/* static uint8_t makeConstant(Value value) { */
-/*   int constant = addConstant(currentChunk(), value); */
-/*   if (constant > UINT8_MAX) { */
-/*     error("Too many constants in one chunk."); */
-/*     return 0; */
-/*   } */
-
-/*   return (uint8_t)constant; */
-/* } */
-
-/* static void emitConstant(Value value) { */
-/*   emitBytes(OP_CONSTANT, makeConstant(value)); */
 /* } */
 
 /* static void patchJump(int offset) { */
@@ -116,17 +110,15 @@ static void initScope(Scope *scope, Compiler *compiler, FunctionType type) {
   scope->loopOffset = -1;
 
   compiler->currentScope = scope;
-
-  Local *local = &scope->locals[scope->localCount++];
-  local->depth = 0;
-  local->isCaptured = false;
+  scope->st = st_allocate();
+  st_init(scope->st, NULL);
 
   if (type != TYPE_FUNCTION) {
-    local->name.start = "this";
-    local->name.length = 4;
+    st_set(scope->st, "this", 4,
+           newSymbol(syntheticToken("this"), SCOPE_LOCAL, false, false, true));
   } else {
-    local->name.start = "";
-    local->name.length = 0;
+    st_set(scope->st, "", 0,
+           newSymbol(syntheticToken(""), SCOPE_LOCAL, false, false, true));
   }
 }
 
@@ -144,22 +136,6 @@ static void initScope(Scope *scope, Compiler *compiler, FunctionType type) {
 
 /*   current = current->enclosing; */
 /*   return function; */
-/* } */
-
-/* static int resolveLocal(OldCompiler *compiler, Token *name, */
-/*                         Local **foundLocal) { */
-/*   for (int i = compiler->localCount - 1; i >= 0; i--) { */
-/*     Local *local = &compiler->locals[i]; */
-/*     if (identifiersEqual(name, &local->name)) { */
-/*       if (local->depth == -1) { */
-/*         error("Can't read local variable in its own initializer."); */
-/*       } */
-/*       *foundLocal = local; */
-/*       return i; */
-/*     } */
-/*   } */
-
-/*   return -1; */
 /* } */
 
 /* static int addUpvalue(OldCompiler *compiler, uint8_t index, bool isLocal) {
@@ -203,103 +179,6 @@ static void initScope(Scope *scope, Compiler *compiler, FunctionType type) {
 /*   return -1; */
 /* } */
 
-/* static void addLocal(Token name, bool isConst) { */
-/*   if (current->localCount == UINT8_COUNT) { */
-/*     error("Too many local variables in function."); */
-/*     return; */
-/*   } */
-
-/*   Local *local = &current->locals[current->localCount++]; */
-/*   local->name = name; */
-/*   local->depth = -1; */
-/*   local->isCaptured = false; */
-/*   local->isConst = isConst; */
-/* } */
-
-// only does locals
-/* static void declareVariable(bool isConst) { */
-/*   Token *name = &parser.previous; */
-
-/*   if (current->scopeDepth == 0) { */
-/*     return; */
-/*   } */
-
-/*   for (int i = current->localCount - 1; i >= 0; i--) { */
-/*     Local *local = &current->locals[i]; */
-/*     if (local->depth != -1 && local->depth < current->scopeDepth) { */
-/*       break; */
-/*     } */
-
-/*     if (identifiersEqual(name, &local->name)) { */
-/*       error("Already a variable with this name in this scope."); */
-/*     } */
-/*   } */
-
-/*   addLocal(*name, isConst); */
-/* } */
-
-/* static uint8_t parseVariable(bool isConst, const char *errorMessage) { */
-/*   consume(TOKEN_IDENTIFIER, errorMessage); */
-
-/*   Token token = parser.previous; */
-/*   if (tableFindString(&globalConsts, token.start, token.length)) { */
-/*     error("Cannot redeclare a const variable"); */
-/*     return 0; */
-/*   } */
-
-/*   declareVariable(isConst); */
-
-/*   if (current->scopeDepth > 0) { */
-/*     return 0; */
-/*   } */
-/*   // we are in global scope. Check for a global variable with the same name
- */
-/*   if (searchConstantsFor(OBJ_VAL(copyString(token.start, token.length))) !=
- */
-/*       -1) { */
-/*     error("Already a variable with this name in this scope"); */
-/*     return 0; */
-/*   } */
-
-/*   if (isConst) { */
-/*     ObjString *varName = makeString(token.start, token.length); */
-/*     tableSet(&globalConsts, OBJ_VAL(varName), TRUE_VAL); */
-/*   } */
-
-/*   return identifierConstant(&token); */
-/* } */
-
-/* static void markInitialized() { */
-/*   if (current->scopeDepth == 0) { */
-/*     return; */
-/*   } */
-/*   current->locals[current->localCount - 1].depth = current->scopeDepth; */
-/* } */
-
-/* static void defineVariable(uint8_t global) { */
-/*   if (current->scopeDepth > 0) { */
-/*     markInitialized(); */
-/*     return; */
-/*   } */
-
-/*   emitBytes(OP_DEFINE_GLOBAL, global); */
-/* } */
-
-/* static uint8_t argumentList() { */
-/*   uint8_t argCount = 0; */
-/*   if (!check(TOKEN_RIGHT_PAREN)) { */
-/*     do { */
-/*       expression(); */
-/*       if (argCount == 255) { */
-/*         error("Can't have more than 255 arguments."); */
-/*       } */
-/*       argCount++; */
-/*     } while (match(TOKEN_COMMA)); */
-/*   } */
-/*   consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments."); */
-/*   return argCount; */
-/* } */
-
 /* static void and_(bool canAssign) { */
 /*   int endJump = emitJump(OP_JUMP_IF_FALSE); */
 
@@ -307,11 +186,6 @@ static void initScope(Scope *scope, Compiler *compiler, FunctionType type) {
 /*   parsePrecedence(PREC_AND); */
 
 /*   patchJump(endJump); */
-/* } */
-
-/* static void call(bool canAssign) { */
-/*   uint8_t argCount = argumentList(); */
-/*   emitBytes(OP_CALL, argCount); */
 /* } */
 
 /* static void dot(bool canAssign) { */
@@ -342,40 +216,6 @@ static void initScope(Scope *scope, Compiler *compiler, FunctionType type) {
 /*   } */
 /* } */
 
-/* static void function(FunctionType type) { */
-/*   OldCompiler compiler; */
-/*   initCompiler(&compiler, type); */
-/*   beginScope(); */
-
-/*   consume(TOKEN_LEFT_PAREN, "Expect '(' after function name."); */
-/*   if (!check(TOKEN_RIGHT_PAREN)) { */
-/*     do { */
-/*       current->function->arity++; */
-/*       if (current->function->arity > 255) { */
-/*         errorAtCurrent("Can't have more than 255 parameters."); */
-/*       } */
-/*       /\* uint8_t constant = parseVariable(false, "Expect parameter name.");
- * *\/ */
-/*       /\* defineVariable(constant); *\/ */
-/*     } while (match(TOKEN_COMMA)); */
-/*   } */
-/*   consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters."); */
-/*   consume(TOKEN_LEFT_BRACE, "Expect '{' before function body."); */
-/*   block(); */
-
-/*   ObjFunction *function = endCompiler(); */
-/*   if (function->upvalueCount > 0 || */
-/*       (type == TYPE_INITIALIZER || type == TYPE_METHOD)) { */
-/*     emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function))); */
-/*     for (int i = 0; i < function->upvalueCount; i++) { */
-/*       emitByte(compiler.upvalues[i].isLocal ? 1 : 0); */
-/*       emitByte(compiler.upvalues[i].index); */
-/*     } */
-/*   } else { */
-/*     emitBytes(OP_CONSTANT, makeConstant(OBJ_VAL(function))); */
-/*   } */
-/* } */
-
 /* static void method() { */
 /*   consume(TOKEN_IDENTIFIER, "Expect method name."); */
 /*   uint8_t constant = identifierConstant(&parser.previous); */
@@ -387,13 +227,6 @@ static void initScope(Scope *scope, Compiler *compiler, FunctionType type) {
 /*   } */
 /*   function(type); */
 /*   emitBytes(OP_METHOD, constant); */
-/* } */
-
-/* static void funDeclaration() { */
-/*   /\* uint8_t global = parseVariable(true, "Expect function name."); *\/ */
-/*   /\* markInitialized(); *\/ */
-/*   /\* function(TYPE_FUNCTION); *\/ */
-/*   /\* defineVariable(global); *\/ */
 /* } */
 
 /* static void whileStatement() { */
@@ -545,47 +378,6 @@ static void initScope(Scope *scope, Compiler *compiler, FunctionType type) {
 /*   emitLoop(current->loopOffset); */
 /* } */
 
-// TODO: how to represent variable ref in AST?
-// This is all codegen?
-/* static AstNode *namedVariable(Token name, bool canAssign) { */
-/*   uint8_t getOp, setOp; */
-/*   Local *local = NULL; */
-/*   int arg = resolveLocal(current, &name, &local); */
-/*   bool isGlobalConstant = false; */
-
-/*   if (arg != -1) { */
-/*     getOp = OP_GET_LOCAL; */
-/*     setOp = OP_SET_LOCAL; */
-/*   } else if ((arg = resolveUpvalue(current, &name, &local)) != -1) { */
-/*     getOp = OP_GET_UPVALUE; */
-/*     setOp = OP_SET_UPVALUE; */
-/*   } else { */
-/*     isGlobalConstant = */
-/*         tableFindString(&globalConsts, name.start, name.length) != NULL; */
-/*     arg = identifierConstant(&name); */
-/*     getOp = OP_GET_GLOBAL; */
-/*     setOp = OP_SET_GLOBAL; */
-/*   } */
-
-/*   if (canAssign && match(TOKEN_EQUAL)) { */
-/*     if ((local != NULL && local->isConst) || isGlobalConstant) { */
-/*       error("Cannot reassign constant variable."); */
-/*       return NULL; */
-/*     } */
-/*     expression(); */
-/*     emitBytes(setOp, (uint8_t)arg); */
-/*   } else { */
-/*     emitBytes(getOp, (uint8_t)arg); */
-/*   } */
-/* } */
-
-/* static Token syntheticToken(const char *text) { */
-/*   Token token; */
-/*   token.start = text; */
-/*   token.length = (int)strlen(text); */
-/*   return token; */
-/* } */
-
 /* static void super_(bool canAssign) { */
 /*   if (currentClass == NULL) { */
 /*     error("Can't use 'super' outside of a class."); */
@@ -655,11 +447,6 @@ static void initScope(Scope *scope, Compiler *compiler, FunctionType type) {
 /*   currentClass = currentClass->enclosing; */
 /* } */
 
-/* static void grouping(bool canAssign) { */
-/*   expression(); */
-/*   consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression."); */
-/* } */
-
 /* static void or_(bool canAssign) { */
 /*   int elseJump = emitJump(OP_JUMP_IF_FALSE); */
 /*   int endJump = emitJump(OP_JUMP); */
@@ -669,11 +456,6 @@ static void initScope(Scope *scope, Compiler *compiler, FunctionType type) {
 
 /*   parsePrecedence(PREC_OR); */
 /*   patchJump(endJump); */
-/* } */
-
-/* static void string(bool canAssign) { */
-/*   emitConstant(OBJ_VAL( */
-/*       copyString(parser.previous.start + 1, parser.previous.length - 2))); */
 /* } */
 
 /* static void this_(bool canAssign) { */
@@ -755,18 +537,15 @@ static void initScope(Scope *scope, Compiler *compiler, FunctionType type) {
 /* } */
 
 ObjFunction *compile(Compiler *compiler, const char *source) {
-  // FIXME: move to Compiler
   initScanner(source);
 
   initTable(&stringConstants);
-  initTable(&globalConsts);
   initTable(&labels);
 
-  Scope scope;
+  Scope scope = {0};
   initScope(&scope, compiler, TYPE_SCRIPT);
 
   CompilerState state = {.stringConstants = &stringConstants,
-                         .globalConsts = &globalConsts,
                          .labels = &labels};
 
   ObjString *functionName = NULL;
@@ -783,21 +562,32 @@ ObjFunction *compile(Compiler *compiler, const char *source) {
     return NULL;
   }
 
-  analyse(ast, compiler, &state);
+  analyse(ast, compiler);
 
   if (compiler->hadError) {
     return NULL;
   }
 
-  CFG *cfg = newCFG(state, ast);
+  Chunk *chunk = allocateChunk();
+
+  CFG *cfg = newCFG(compiler, &state, ast, chunk);
+
+  if (compiler->hadError) {
+    return NULL;
+  }
+
 #ifdef DEBUG_PRINT_CODE
   printCFG(cfg);
 #endif
 
-  Chunk *chunk = generateChunk(cfg, &labels);
+  generateChunk(compiler, cfg, &labels, chunk);
   ObjFunction *function = newFunction();
   function->chunk = *chunk;
   function->name = functionName;
+
+  if (compiler->hadError) {
+    return NULL;
+  }
 
 #ifdef DEBUG_PRINT_CODE
   disassembleChunk(chunk,
@@ -806,21 +596,20 @@ ObjFunction *compile(Compiler *compiler, const char *source) {
 
   /* ObjFunction *function = endCompiler(); */
   freeTable(&stringConstants);
-  freeTable(&globalConsts);
   freeTable(&labels);
 
   return compiler->hadError ? NULL : function;
 }
 
-Compiler initCompiler(FunctionType type, FILE *ostream, FILE *errstream) {
-  Parser parser = initParser();
-  Compiler compiler = {.hadError = false,
-                       .panicMode = false,
-                       .ostream = ostream,
-                       .errstream = errstream,
-                       .parser = &parser,
-                       .currentScope = NULL,
-                       .type = type};
-  parser.compiler = &compiler; // FIXME: is this stack reference bad?
-  return compiler;
+void initCompiler(Parser *parser, Compiler *compiler, FunctionType type,
+                  FILE *ostream, FILE *errstream) {
+  compiler->hadError = false;
+  compiler->panicMode = false;
+  compiler->ostream = ostream;
+  compiler->errstream = errstream;
+  compiler->parser = parser;
+  compiler->currentScope = NULL;
+  compiler->type = type;
+  parser->compiler = compiler; // FIXME: is this stack reference bad?
+  return;
 }

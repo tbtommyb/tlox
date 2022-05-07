@@ -4,6 +4,6 @@
 #include "ast.h"
 #include "compiler.h"
 
-void analyse(AstNode *ast, Compiler *compiler, CompilerState *state);
+void analyse(AstNode *ast, Compiler *compiler);
 
 #endif // SEMANTIC_H_

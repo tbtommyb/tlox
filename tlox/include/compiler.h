@@ -4,6 +4,8 @@
 #include "common.h"
 #include "object.h"
 #include "parser.h"
+#include "symbol_table.h"
+#include "token.h"
 #include "vm.h"
 #include <stdio.h>
 
@@ -15,7 +17,6 @@ typedef enum {
 } FunctionType;
 
 typedef struct CompilerState {
-  Table *globalConsts;
   Table *stringConstants;
   Table *labels;
 } CompilerState;
@@ -32,6 +33,7 @@ typedef struct {
   bool isLocal;
 } Upvalue;
 
+// FIXME: for now this is a mix of compile time and run time data
 typedef struct Scope {
   struct Scope *enclosing;
 
@@ -42,6 +44,9 @@ typedef struct Scope {
 
   int loopOffset;
   int currentStackDepth;
+
+  // FIXME: store symbol table elsewhere. CompilerState?
+  SymbolTable *st;
 } Scope;
 
 typedef struct Compiler {
@@ -57,7 +62,8 @@ typedef struct Compiler {
 void errorAt(Compiler *compiler, Token *token, const char *message);
 void error(Compiler *compiler, const char *message);
 void errorAtCurrent(Compiler *compiler, const char *message);
-Compiler initCompiler(FunctionType type, FILE *ostream, FILE *errstream);
+void initCompiler(Parser *parser, Compiler *compiler, FunctionType type,
+                  FILE *ostream, FILE *errstream);
 ObjFunction *compile(Compiler *compiler, const char *source);
 void markCompilerRoots();
 

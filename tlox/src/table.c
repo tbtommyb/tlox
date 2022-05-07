@@ -8,6 +8,8 @@
 
 #define TABLE_MAX_LOAD 0.75
 
+Table *allocateTable() { return (Table *)reallocate(NULL, 0, sizeof(Table)); }
+
 void initTable(Table *table) {
   table->count = 0;
   table->capacity = 0;
@@ -123,6 +125,8 @@ void tableAddAll(Table *from, Table *to) {
     }
   }
 }
+
+int tableSize(Table *table) { return table->count; }
 
 ObjString *tableFindString(Table *table, const char *chars, int length) {
   if (table->count == 0) {

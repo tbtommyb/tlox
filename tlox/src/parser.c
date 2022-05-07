@@ -1,9 +1,19 @@
 #include "parser.h"
 #include "ast.h"
 #include "compiler.h"
+#include "memory.h"
 #include "scanner.h"
 #include <stdlib.h>
 
+// just use syntheticToken?
+static Token *allocateToken(Token token) {
+  Token *heapToken = (Token *)reallocate(NULL, 0, sizeof(Token));
+  heapToken->length = token.length;
+  heapToken->line = token.line;
+  heapToken->start = token.start;
+  heapToken->type = token.type;
+  return heapToken;
+}
 static void advance(Parser *parser) {
   parser->previousPrevious = parser->previous;
   parser->previous = parser->current;
@@ -38,21 +48,6 @@ static bool match(Parser *parser, TokenType type) {
   return true;
 }
 
-/* static void beginScope(Parser *parser) { current->scopeDepth++; } */
-/* static void endScope(Parser *parser) { */
-/*   current->scopeDepth--; */
-/*   while (current->localCount > 0 && */
-/*          current->locals[current->localCount - 1].depth >
- * current->scopeDepth) { */
-/*     if (current->locals[current->localCount - 1].isCaptured) { */
-/*       emitByte(OP_CLOSE_UPVALUE); */
-/*     } else { */
-/*       emitByte(OP_POP); */
-/*     } */
-/*     current->localCount--; */
-/*   } */
-/* } */
-
 static AstNode *expression(Parser *parser);
 static AstNode *statement(Parser *parser);
 static AstNode *declaration(Parser *parser);
@@ -68,14 +63,12 @@ static void returnStatement(Parser *parser) {
     error(parser->compiler, "Can't return from top-level code.");
   }
   if (match(parser, TOKEN_SEMICOLON)) {
-    /* emitReturn(parser); */
   } else {
     if (parser->compiler->type == TYPE_INITIALIZER) {
       error(parser->compiler, "Can't return a value from an initializer.");
     }
     expression(parser);
     consume(parser, TOKEN_SEMICOLON, "Expect ';' after return value.");
-    /* emitByte(OP_RETURN); */
   }
 }
 
@@ -179,8 +172,6 @@ static AstNode *varDeclaration(Parser *parser, bool isConst) {
   }
   consume(parser, TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 
-  /* defineVariable(global); */
-
   return node;
 }
 
@@ -213,18 +204,61 @@ static AstNode *variable(Parser *parser, bool canAssign) {
   return newVariableExpr(token);
 }
 
+static AstNode *function(Parser *parser, FunctionType type) {
+  /* OldCompiler compiler; */
+  /* initCompiler(&compiler, type); */
+  /* beginScope(); */
+  AstNode *node = newFunctionExpr();
+
+  int arity = 0;
+  consume(parser, TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+  if (!check(parser, TOKEN_RIGHT_PAREN)) {
+    do {
+      arity++;
+      if (arity > 255) {
+        errorAtCurrent(parser->compiler,
+                       "Can't have more than 255 parameters.");
+      }
+      Token paramName = parseVariable(parser, "Expect parameter name.");
+      linkedList_append(node->params, allocateToken(paramName));
+    } while (match(parser, TOKEN_COMMA));
+  }
+  consume(parser, TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
+  consume(parser, TOKEN_LEFT_BRACE, "Expect '{' before function body.");
+  node->expr = block(parser);
+
+  return node;
+  /* ObjFunction *function = endCompiler(); */
+  /* if (function->upvalueCount > 0 || */
+  /*     (type == TYPE_INITIALIZER || type == TYPE_METHOD)) { */
+  /*   emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function))); */
+  /*   for (int i = 0; i < function->upvalueCount; i++) { */
+  /*     emitByte(compiler.upvalues[i].isLocal ? 1 : 0); */
+  /*     emitByte(compiler.upvalues[i].index); */
+  /*   } */
+  /* } else { */
+  /*   emitBytes(OP_CONSTANT, makeConstant(OBJ_VAL(function))); */
+  /* } */
+}
+
+static AstNode *funDeclaration(Parser *parser) {
+  Token name = parseVariable(parser, "Expect function name.");
+  AstNode *body = function(parser, TYPE_FUNCTION);
+  return newFunctionStmt(name, body);
+}
+
 static AstNode *declaration(Parser *parser) {
   if (match(parser, TOKEN_CONST)) {
     return varDeclaration(parser, true);
   } else if (match(parser, TOKEN_VAR)) {
     return varDeclaration(parser, false);
+  } else if (match(parser, TOKEN_FUN)) {
+    return funDeclaration(parser);
   } else {
     return statement(parser);
   }
-  /* if (match(TOKEN_CLASS)) { */
+  /* if (match(TOKEN_CLASS)) {
   /*   classDeclaration(); */
-  /* } else if (match(TOKEN_FUN)) { */
-  /*   funDeclaration(); */
   /* } else { */
   /*   statement(); */
   /* } */
@@ -280,14 +314,48 @@ static AstNode *number(Parser *parser, bool canAssign) {
   return newLiteralExpr(NUMBER_VAL(value));
 }
 
+static AstNode *string(Parser *parser, bool canAssign) {
+  return newLiteralExpr(OBJ_VAL(
+      copyString(parser->previous.start + 1, parser->previous.length - 2)));
+}
+
+static AstNode *grouping(Parser *parser, bool canAssign) {
+  AstNode *node = expression(parser);
+  consume(parser, TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
+  return node;
+}
+
+static void argumentList(Parser *parser, AstNode *parent) {
+  uint8_t argCount = 0;
+  if (!check(parser, TOKEN_RIGHT_PAREN)) {
+    do {
+      linkedList_append(parent->params, expression(parser));
+      if (argCount == 255) {
+        errorAt(parser->compiler, &parser->previous,
+                "Can't have more than 255 arguments.");
+      }
+      argCount++;
+    } while (match(parser, TOKEN_COMMA));
+  }
+  consume(parser, TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
+}
+
+static AstNode *call(Parser *parser, bool canAssign) {
+  AstNode *expr = newCallExpr(parser->previousPrevious);
+  argumentList(parser, expr);
+
+  return expr;
+  /* emitBytes(OP_CALL, argCount); */
+}
+
 ParseRule rules[] = {
-    /* [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL}, */
-    /* [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE}, */
+    [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
+    [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
     [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
     /* [TOKEN_LEFT_BRACKET] = {arrayLiteral, leftBracket, PREC_CALL}, */
     /* [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE}, */
-    /* [TOKEN_COMMA] = {NULL, NULL, PREC_NONE}, */
+    [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
     /* [TOKEN_DOT] = {NULL, dot, PREC_CALL}, */
     [TOKEN_MINUS] = {unary, binary, PREC_TERM},
     [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
@@ -304,19 +372,19 @@ ParseRule rules[] = {
     /* [TOKEN_LESS] = {NULL, binary, PREC_COMPARISON}, */
     /* [TOKEN_LESS_EQUAL] = {NULL, binary, PREC_COMPARISON}, */
     [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE},
-    /* [TOKEN_STRING] = {string, NULL, PREC_NONE}, */
+    [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
     /* [TOKEN_AND] = {NULL, and_, PREC_AND}, */
     /* [TOKEN_CLASS] = {NULL, NULL, PREC_NONE}, */
     /* [TOKEN_ELSE] = {NULL, NULL, PREC_NONE}, */
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
     /* [TOKEN_FOR] = {NULL, NULL, PREC_NONE}, */
-    /* [TOKEN_FUN] = {NULL, NULL, PREC_NONE}, */
+    [TOKEN_FUN] = {NULL, NULL, PREC_NONE},
     [TOKEN_IF] = {NULL, NULL, PREC_NONE},
-    /* [TOKEN_NIL] = {literal, NULL, PREC_NONE}, */
+    [TOKEN_NIL] = {literal, NULL, PREC_NONE},
     /* [TOKEN_OR] = {NULL, or_, PREC_OR}, */
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
-    /* [TOKEN_RETURN] = {NULL, NULL, PREC_NONE}, */
+    [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
     /* [TOKEN_SUPER] = {super_, NULL, PREC_NONE}, */
     /* [TOKEN_THIS] = {this_, NULL, PREC_NONE}, */
     [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
@@ -373,11 +441,4 @@ AstNode *parse(Parser *parser) {
   }
 
   return ast;
-}
-
-Parser initParser() {
-  Parser parser;
-  parser.compiler = NULL;
-
-  return parser;
 }

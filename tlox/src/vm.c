@@ -817,7 +817,9 @@ static InterpretResult run() {
 }
 
 InterpretResult interpret(const char *source) {
-  Compiler compiler = initCompiler(TYPE_SCRIPT, vm.ostream, vm.errstream);
+  Parser parser = {0};
+  Compiler compiler = {0};
+  initCompiler(&parser, &compiler, TYPE_SCRIPT, vm.ostream, vm.errstream);
   ObjFunction *function = compile(&compiler, source);
   if (function == NULL) {
     return INTERPRET_COMPILE_ERROR;
