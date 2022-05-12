@@ -1,6 +1,7 @@
 #ifndef clox_common_h
 #define clox_common_h
 
+#include "token.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -17,5 +18,23 @@
 
 typedef struct Parser Parser;
 typedef struct Compiler Compiler;
+
+typedef enum {
+  TYPE_FUNCTION,
+  TYPE_SCRIPT,
+  TYPE_METHOD,
+  TYPE_INITIALIZER,
+} FunctionType;
+
+typedef struct {
+  Token name;
+  int depth;
+  bool isCaptured;
+} Local;
+
+typedef struct {
+  uint8_t index;
+  bool isLocal;
+} Upvalue;
 
 #endif

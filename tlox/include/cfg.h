@@ -4,6 +4,7 @@
 #include "ast.h"
 #include "compiler.h"
 #include "scanner.h"
+#include "scope.h"
 #include "value.h"
 #include <stdint.h>
 
@@ -17,9 +18,11 @@ typedef enum OperandType {
 typedef enum IROp {
   IR_UNKNOWN,
   IR_ADD,
+  IR_CALL,
   IR_CONSTANT,
   IR_COND,
   IR_DIVIDE,
+  IR_END_SCOPE,
   IR_SUBTRACT,
   IR_MODULO,
   IR_MULTIPLY,
@@ -28,6 +31,7 @@ typedef enum IROp {
   IR_NOT,
   IR_POP,
   IR_PRINT,
+  IR_RETURN,
   IR_CODE_START,
   IR_GOTO,
   IR_LABEL,
@@ -79,12 +83,13 @@ typedef struct BasicBlock {
 
 typedef struct CFG {
   BasicBlock *start;
+  Token name;
+  Scope *scope;
 } CFG;
 
 BasicBlock *newBasicBlock(AstNode *node);
-CFG *newCFG(Compiler *compiler, CompilerState *state, AstNode *root,
-            Chunk *chunk);
 Operation *newOperation(IROp opcode, Operand *first, Operand *second);
+void createIR(Compiler *compiler, CompilerState *state, AstNode *root);
 
 LinkedList *postOrderTraverse(CFG *cfg);
 void printCFG(CFG *cfg);

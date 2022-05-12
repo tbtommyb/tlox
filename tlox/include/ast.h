@@ -1,8 +1,10 @@
 #ifndef clox_ast_h
 #define clox_ast_h
 
+#include "common.h"
 #include "linked_list.h"
 #include "scanner.h"
+#include "scope.h"
 #include "symbol_table.h"
 #include "value.h"
 
@@ -20,7 +22,8 @@ typedef enum {
   STMT_FUNCTION,
   STMT_IF,
   STMT_MODULE,
-  STMT_PRINT
+  STMT_PRINT,
+  STMT_RETURN
 } NodeType;
 
 typedef struct AstNode AstNode;
@@ -39,7 +42,8 @@ struct AstNode {
   LinkedList *stmts;
   LinkedList *params;
   Token token;
-  SymbolTable *st;
+  Scope *scope;
+  int arity;
 };
 
 static inline bool isNodeType(AstNode node, NodeType type) {
@@ -61,6 +65,7 @@ AstNode *newIfStmt(AstNode *condition, AstNode *thenBranch,
 AstNode *newModuleStmt();
 AstNode *newBlockStmt();
 AstNode *newFunctionStmt(Token name, AstNode *funcExpr);
+AstNode *newReturnStmt(AstNode *expr);
 
 void printAST(AstNode root, int indentation);
 

@@ -14,6 +14,8 @@ LinkedList *linkedList_allocate() {
 Node *linkedList_append(LinkedList *list, void *data) {
   Node *node = (Node *)reallocate(NULL, 0, sizeof(Node));
   node->data = data;
+  node->prev = NULL;
+  node->next = NULL;
 
   if (list->tail == NULL) {
     list->head = list->tail = node;

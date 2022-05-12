@@ -10,6 +10,7 @@
 #include "memory.h"
 #include "parser.h"
 #include "scanner.h"
+#include "scope.h"
 #include "semantic.h"
 #include "symbol_table.h"
 #include "table.h"
@@ -21,13 +22,6 @@
 
 Table stringConstants;
 Table labels;
-
-static Token syntheticToken(const char *text) {
-  Token token;
-  token.start = text;
-  token.length = (int)strlen(text);
-  return token;
-}
 
 /* typedef struct ClassCompiler { */
 /*   struct ClassCompiler *enclosing; */
@@ -100,26 +94,6 @@ void error(Compiler *compiler, const char *message) {
 
 void errorAtCurrent(Compiler *compiler, const char *message) {
   errorAt(compiler, &compiler->parser->current, message);
-}
-
-static void initScope(Scope *scope, Compiler *compiler, FunctionType type) {
-  scope->enclosing = compiler->currentScope;
-
-  scope->localCount = 0;
-  scope->scopeDepth = 0;
-  scope->loopOffset = -1;
-
-  compiler->currentScope = scope;
-  scope->st = st_allocate();
-  st_init(scope->st, NULL);
-
-  if (type != TYPE_FUNCTION) {
-    st_set(scope->st, "this", 4,
-           newSymbol(syntheticToken("this"), SCOPE_LOCAL, false, false, true));
-  } else {
-    st_set(scope->st, "", 0,
-           newSymbol(syntheticToken(""), SCOPE_LOCAL, false, false, true));
-  }
 }
 
 /* static ObjFunction *endCompiler() { */
@@ -542,17 +516,12 @@ ObjFunction *compile(Compiler *compiler, const char *source) {
   initTable(&stringConstants);
   initTable(&labels);
 
-  Scope scope = {0};
-  initScope(&scope, compiler, TYPE_SCRIPT);
+  Scope *scope = scope_allocate(TYPE_SCRIPT);
+  scope_init(scope, compiler);
 
   CompilerState state = {.stringConstants = &stringConstants,
+                         .functions = linkedList_allocate(),
                          .labels = &labels};
-
-  ObjString *functionName = NULL;
-  if (compiler->type != TYPE_SCRIPT) {
-    functionName = copyString(compiler->parser->previous.start,
-                              compiler->parser->previous.length);
-  }
 
   AstNode *ast = parse(compiler->parser);
 #ifdef DEBUG_PRINT_CODE
@@ -562,43 +531,57 @@ ObjFunction *compile(Compiler *compiler, const char *source) {
     return NULL;
   }
 
-  analyse(ast, compiler);
+  analyse(ast, compiler, TYPE_SCRIPT);
 
   if (compiler->hadError) {
     return NULL;
   }
 
-  Chunk *chunk = allocateChunk();
-
-  CFG *cfg = newCFG(compiler, &state, ast, chunk);
-
-  if (compiler->hadError) {
-    return NULL;
-  }
-
-#ifdef DEBUG_PRINT_CODE
-  printCFG(cfg);
-#endif
-
-  generateChunk(compiler, cfg, &labels, chunk);
-  ObjFunction *function = newFunction();
-  function->chunk = *chunk;
-  function->name = functionName;
+  createIR(compiler, &state, ast);
 
   if (compiler->hadError) {
     return NULL;
   }
 
 #ifdef DEBUG_PRINT_CODE
-  disassembleChunk(chunk,
-                   functionName != NULL ? functionName->chars : "<script>");
+  Node *curr = state.functions->tail;
+  while (curr != NULL) {
+    CFG *cfg = (CFG *)curr->data;
+    printCFG(cfg);
+    curr = curr->prev;
+  }
 #endif
 
-  /* ObjFunction *function = endCompiler(); */
+  // TODO: move into some kind of linker file?
+  LinkedList *functions = linkedList_allocate();
+  curr = state.functions->tail;
+  // We skip the final one, main, as it is handled sparately
+  while (curr != NULL && curr->prev != NULL) {
+    ObjFunction *f = compileFunction(compiler, curr->data, &labels);
+    linkedList_append(functions, f);
+    curr = curr->prev;
+  }
+  ObjFunction *main = compileMain(compiler, state.functions->head->data,
+                                  functions->head, &labels);
+  linkedList_append(functions, main);
+
+  if (compiler->hadError) {
+    return NULL;
+  }
+
+#ifdef DEBUG_PRINT_CODE
+  curr = functions->head;
+  while (curr != NULL) {
+    ObjFunction *f = (ObjFunction *)curr->data;
+    disassembleChunk(&f->chunk, f->name != NULL ? f->name->chars : "<script>");
+    curr = curr->next;
+  }
+#endif
+
   freeTable(&stringConstants);
   freeTable(&labels);
 
-  return compiler->hadError ? NULL : function;
+  return compiler->hadError ? NULL : main;
 }
 
 void initCompiler(Parser *parser, Compiler *compiler, FunctionType type,

@@ -1,6 +1,5 @@
 #include "parser.h"
 #include "ast.h"
-#include "compiler.h"
 #include "memory.h"
 #include "scanner.h"
 #include <stdlib.h>
@@ -58,18 +57,16 @@ static AstNode *printStatement(Parser *parser) {
   return newPrintStmt(expr);
 }
 
-static void returnStatement(Parser *parser) {
-  if (parser->compiler->type == TYPE_SCRIPT) {
-    error(parser->compiler, "Can't return from top-level code.");
+static AstNode *returnStatement(Parser *parser) {
+  AstNode *returnExpr = NULL;
+  Token returnToken = parser->previous;
+  if (!match(parser, TOKEN_SEMICOLON)) {
+    returnExpr = expression(parser);
   }
-  if (match(parser, TOKEN_SEMICOLON)) {
-  } else {
-    if (parser->compiler->type == TYPE_INITIALIZER) {
-      error(parser->compiler, "Can't return a value from an initializer.");
-    }
-    expression(parser);
-    consume(parser, TOKEN_SEMICOLON, "Expect ';' after return value.");
-  }
+  consume(parser, TOKEN_SEMICOLON, "Expect ';' after return value.");
+  AstNode *node = newReturnStmt(returnExpr);
+  node->token = returnToken;
+  return node;
 }
 
 static void synchronize(Parser *parser) {
@@ -207,7 +204,6 @@ static AstNode *variable(Parser *parser, bool canAssign) {
 static AstNode *function(Parser *parser, FunctionType type) {
   /* OldCompiler compiler; */
   /* initCompiler(&compiler, type); */
-  /* beginScope(); */
   AstNode *node = newFunctionExpr();
 
   int arity = 0;
@@ -226,6 +222,7 @@ static AstNode *function(Parser *parser, FunctionType type) {
   consume(parser, TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
   consume(parser, TOKEN_LEFT_BRACE, "Expect '{' before function body.");
   node->expr = block(parser);
+  node->arity = arity;
 
   return node;
   /* ObjFunction *function = endCompiler(); */
@@ -259,8 +256,6 @@ static AstNode *declaration(Parser *parser) {
   }
   /* if (match(TOKEN_CLASS)) {
   /*   classDeclaration(); */
-  /* } else { */
-  /*   statement(); */
   /* } */
   if (parser->compiler->panicMode) {
     synchronize(parser);
@@ -273,19 +268,15 @@ static AstNode *statement(Parser *parser) {
   } else if (match(parser, TOKEN_IF)) {
     return ifStatement(parser);
   } else if (match(parser, TOKEN_LEFT_BRACE)) {
-    /* beginScope(parser); */
     AstNode *node = block(parser);
-    /* endScope(parser); */
     return node;
+  } else if (match(parser, TOKEN_RETURN)) {
+    return returnStatement(parser);
   } else {
     return expressionStatement(parser);
   }
-  /* } else if (match(TOKEN_RETURN)) { */
-  /*   returnStatement(); */
   /* } else if (match(TOKEN_FOR)) { */
   /*   forStatement(); */
-  /* } else if (match(TOKEN_IF)) { */
-  /*   ifStatement(); */
   /* } else if (match(TOKEN_WHILE)) { */
   /*   whileStatement(); */
   /* } else if (match(TOKEN_SWITCH)) { */

@@ -3,40 +3,42 @@
 #include "compiler.h"
 #include "symbol_table.h"
 
-static SymbolTable *beginScope(Compiler *compiler) {
-  SymbolTable *childSt = st_allocate();
-  st_init(childSt, compiler->currentScope->st);
-  compiler->currentScope->st = childSt;
-  return childSt;
+static Scope *beginScope(Compiler *compiler, FunctionType type) {
+  Scope *scope = scope_allocate(type);
+  scope_init(scope, compiler);
+  compiler->currentScope = scope;
+  return scope;
 }
 
 static void endScope(Compiler *compiler) {
-  compiler->currentScope->st = compiler->currentScope->st->parent;
+  compiler->currentScope = compiler->currentScope->enclosing;
 }
 
 static bool isGlobalScope(Scope *scope) {
-  return scope->st != NULL && scope->st->parent == NULL;
+  return scope != NULL && scope->enclosing == NULL;
 }
 
-void analyse(AstNode *node, Compiler *compiler) {
+// TODO: do a function-only pass first so that functions don't need to be
+// declared before use
+void analyse(AstNode *node, Compiler *compiler, FunctionType currentEnv) {
   if (node == NULL) {
     return;
   }
   bool variableIsConst = false;
   switch (node->type) {
   case EXPR_BINARY: {
-    analyse(node->branches.left, compiler);
-    analyse(node->branches.right, compiler);
+    analyse(node->branches.left, compiler, currentEnv);
+    analyse(node->branches.right, compiler, currentEnv);
     break;
   }
   case EXPR_UNARY: {
-    analyse(node->branches.right, compiler);
+    analyse(node->branches.right, compiler, currentEnv);
     break;
   }
   case EXPR_VARIABLE: {
     Symbol symbol = {0};
-    if (!st_search(compiler->currentScope->st, node->token.start,
-                   node->token.length, &symbol)) {
+    if (!scope_search(compiler->currentScope, node->token.start,
+                      node->token.length, &symbol)) {
       errorAt(compiler, &node->token, "Undefined variable.");
       break;
     }
@@ -49,8 +51,8 @@ void analyse(AstNode *node, Compiler *compiler) {
   }
   case STMT_ASSIGN: {
     Symbol symbol = {0};
-    if (!st_search(compiler->currentScope->st, node->token.start,
-                   node->token.length, &symbol)) {
+    if (!scope_search(compiler->currentScope, node->token.start,
+                      node->token.length, &symbol)) {
       errorAt(compiler, &node->token, "Undefined variable.");
       break;
     }
@@ -66,8 +68,8 @@ void analyse(AstNode *node, Compiler *compiler) {
   }
   case STMT_DEFINE: {
     Symbol existing = {0};
-    if (st_search(compiler->currentScope->st, node->token.start,
-                  node->token.length, &existing)) {
+    if (scope_search(compiler->currentScope, node->token.start,
+                     node->token.length, &existing)) {
       if (existing.isConst) {
         errorAt(compiler, &node->token, "Cannot redefine a const variable.");
         break;
@@ -80,22 +82,24 @@ void analyse(AstNode *node, Compiler *compiler) {
     ScopeType scopeType =
         isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
     Symbol *symbol =
-        newSymbol(node->token, scopeType, false, variableIsConst, false);
-    st_set(compiler->currentScope->st, node->token.start, node->token.length,
-           symbol);
+        newSymbol(node->token, scopeType, false, variableIsConst, false, 0);
+    scope_set(compiler->currentScope, node->token.start, node->token.length,
+              symbol);
 
-    analyse(node->expr, compiler);
+    analyse(node->expr, compiler, currentEnv);
 
     symbol->isDefined = true;
-    st_set(compiler->currentScope->st, node->token.start, node->token.length,
-           symbol);
+    scope_set(compiler->currentScope, node->token.start, node->token.length,
+              symbol);
+    compiler->currentScope->localCount++;
     break;
   }
   case STMT_MODULE: {
+    node->scope = compiler->currentScope;
     Node *stmtNode = (Node *)node->stmts->head;
 
     while (stmtNode != NULL) {
-      analyse(stmtNode->data, compiler);
+      analyse(stmtNode->data, compiler, currentEnv);
       stmtNode = stmtNode->next;
     }
     break;
@@ -103,22 +107,98 @@ void analyse(AstNode *node, Compiler *compiler) {
   case STMT_BLOCK: {
     Node *blockNode = (Node *)node->stmts->head;
 
-    node->st = beginScope(compiler);
+    node->scope = beginScope(compiler, compiler->currentScope->type);
+    node->scope->scopeDepth = node->scope->enclosing->scopeDepth + 1;
     while (blockNode != NULL) {
-      analyse(blockNode->data, compiler);
+      analyse(blockNode->data, compiler, currentEnv);
       blockNode = blockNode->next;
     }
     endScope(compiler);
     break;
   }
   case STMT_PRINT: {
-    analyse(node->expr, compiler);
+    analyse(node->expr, compiler, currentEnv);
+    break;
+  }
+  case STMT_RETURN: {
+    if (compiler->currentScope->type != TYPE_FUNCTION) {
+      errorAt(compiler, &node->token, "Can't return from top-level code.");
+    }
+    /* if (parser->compiler->type == TYPE_INITIALIZER) { */
+    /*   error(parser->compiler, "Can't return a value from an initializer.");
+     */
+    /* } */
+    analyse(node->expr, compiler, currentEnv);
     break;
   }
   case STMT_IF: {
-    analyse(node->expr, compiler);
-    analyse(node->branches.left, compiler);
-    analyse(node->branches.right, compiler);
+    analyse(node->expr, compiler, currentEnv);
+    analyse(node->branches.left, compiler, currentEnv);
+    analyse(node->branches.right, compiler, currentEnv);
+    break;
+  }
+  case STMT_FUNCTION: {
+    Symbol existing = {0};
+    if (scope_search(compiler->currentScope, node->token.start,
+                     node->token.length, &existing)) {
+      if (existing.isConst) {
+        errorAt(compiler, &node->token, "Cannot redefine a const variable.");
+        break;
+      } else {
+        errorAt(compiler, &node->token,
+                "Already a variable with this name in this scope.");
+        break;
+      }
+    }
+    ScopeType scopeType =
+        isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
+    // FIXME: need better symbol creation
+    Symbol *symbol =
+        newSymbol(node->token, scopeType, false, true, true, node->arity);
+    scope_set(compiler->currentScope, node->token.start, node->token.length,
+              symbol);
+
+    analyse(node->expr, compiler, TYPE_FUNCTION);
+    break;
+  }
+  case EXPR_FUNCTION: {
+    node->scope = beginScope(compiler, TYPE_FUNCTION);
+
+    Node *paramNode = (Node *)node->params->head;
+
+    while (paramNode != NULL) {
+      Token *name = paramNode->data;
+      Symbol *symbol =
+          newSymbol(*name, SCOPE_FUNCTION_PARAM, false, true, true, 0);
+      st_set(compiler->currentScope->st, name->start, name->length, symbol);
+      paramNode = paramNode->next;
+    }
+
+    analyse(node->expr, compiler, currentEnv);
+
+    endScope(compiler);
+
+    break;
+  }
+  case EXPR_CALL: {
+    Symbol symbol = {0};
+    if (!scope_search(compiler->currentScope, node->token.start,
+                      node->token.length, &symbol)) {
+      errorAt(compiler, &node->token, "Function not found.");
+      break;
+    }
+    Node *paramNode = (Node *)node->params->head;
+
+    int callArity = 0;
+    while (paramNode != NULL) {
+      analyse(paramNode->data, compiler, currentEnv);
+      paramNode = paramNode->next;
+      callArity++;
+    }
+
+    /* if (callArity != symbol.arity) { */
+    /*   errorAt(compiler, &node->token, "Function wrong arity."); */
+    /* } */
     break;
   }
   }

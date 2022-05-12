@@ -7,5 +7,6 @@
 bool identifiersEqual(Token *a, Token *b);
 void initScanner(const char *source);
 Token scanToken();
+Token syntheticToken(const char *text);
 
 #endif

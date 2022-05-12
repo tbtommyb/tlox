@@ -66,6 +66,11 @@
 },
 {
   "directory": "/Users/thomasbarrett/coding/crafting-interpreters/tlox/src",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/tlox -I/Users/thomasbarrett/coding/crafting-interpreters/tlox/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/scope.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/tlox/src/scope.c",
+  "file": "/Users/thomasbarrett/coding/crafting-interpreters/tlox/src/scope.c"
+},
+{
+  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/tlox/src",
   "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/tlox -I/Users/thomasbarrett/coding/crafting-interpreters/tlox/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/symbol_table.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/tlox/src/symbol_table.c",
   "file": "/Users/thomasbarrett/coding/crafting-interpreters/tlox/src/symbol_table.c"
 },

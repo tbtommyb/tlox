@@ -192,11 +192,12 @@ static bool isFalsey(Value value) {
 }
 
 static bool call(Obj *callee, ObjFunction *function, int argCount) {
-  if (argCount != function->arity) {
-    runtimeError("Expected %d arguments but got %d 1.", function->arity,
-                 argCount);
-    return false;
-  }
+  // move to semantic
+  /* if (argCount != function->arity) { */
+  /*   runtimeError("Expected %d arguments but got %d 1.", function->arity, */
+  /*                argCount); */
+  /*   return false; */
+  /* } */
 
   if (vm.frameCount == FRAMES_MAX) {
     runtimeError("Stack overflow.");

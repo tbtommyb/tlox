@@ -1,4 +1,5 @@
 #include "ast.h"
+#include "compiler.h"
 #include "linked_list.h"
 #include "memory.h"
 #include "scanner.h"
@@ -15,7 +16,8 @@ static AstNode *allocateAstNode(NodeType type) {
   node->branches.right = NULL;
   node->stmts = NULL;
   node->params = NULL;
-  node->st = NULL;
+  node->arity = 0;
+  node->scope = NULL;
 
   return node;
 }
@@ -49,7 +51,6 @@ AstNode *newVariableExpr(Token token) {
 
 AstNode *newFunctionExpr() {
   AstNode *node = allocateAstNode(EXPR_FUNCTION);
-  node->stmts = linkedList_allocate();
   node->params = linkedList_allocate();
   return node;
 }
@@ -100,6 +101,10 @@ AstNode *newIfStmt(AstNode *condition, AstNode *thenBranch,
 AstNode *newModuleStmt() {
   AstNode *node = allocateAstNode(STMT_MODULE);
   node->stmts = linkedList_allocate();
+  Token name;
+  name.start = "main";
+  name.length = 4;
+  node->token = name;
   return node;
 }
 
@@ -116,7 +121,13 @@ AstNode *newFunctionStmt(Token name, AstNode *body) {
   return node;
 }
 
-const char *tokenTypeStr(TokenType op) {
+AstNode *newReturnStmt(AstNode *expr) {
+  AstNode *node = allocateAstNode(STMT_RETURN);
+  node->expr = expr;
+  return node;
+}
+
+char *tokenTypeStr(TokenType op) {
   switch (op) {
   case TOKEN_BANG:
     return "!";
@@ -240,6 +251,12 @@ void printAST(AstNode node, int indentation) {
   }
   case STMT_PRINT: {
     printf("%*sStmt Print\n", indentation, "");
+    printf("%*sExpr:\n", indentation + 2, "");
+    printAST(*node.expr, indentation + 4);
+    break;
+  }
+  case STMT_RETURN: {
+    printf("%*sStmt Return\n", indentation, "");
     printf("%*sExpr:\n", indentation + 2, "");
     printAST(*node.expr, indentation + 4);
     break;

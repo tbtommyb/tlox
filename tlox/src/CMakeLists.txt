@@ -12,6 +12,7 @@ set(LIB_SOURCES
   parser.c
   scanner.c
   semantic.c
+  scope.c
   symbol_table.c
   table.c
   value.c

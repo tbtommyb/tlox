@@ -473,6 +473,30 @@ scanner.c.s:
 	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/scanner.c.s
 .PHONY : scanner.c.s
 
+scope.o: scope.c.o
+.PHONY : scope.o
+
+# target to build an object file
+scope.c.o:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/scope.c.o
+.PHONY : scope.c.o
+
+scope.i: scope.c.i
+.PHONY : scope.i
+
+# target to preprocess a source file
+scope.c.i:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/scope.c.i
+.PHONY : scope.c.i
+
+scope.s: scope.c.s
+.PHONY : scope.s
+
+# target to generate assembly for a file
+scope.c.s:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/scope.c.s
+.PHONY : scope.c.s
+
 semantic.o: semantic.c.o
 .PHONY : semantic.o
 
@@ -643,6 +667,9 @@ help:
 	@echo "... scanner.o"
 	@echo "... scanner.i"
 	@echo "... scanner.s"
+	@echo "... scope.o"
+	@echo "... scope.i"
+	@echo "... scope.s"
 	@echo "... semantic.o"
 	@echo "... semantic.i"
 	@echo "... semantic.s"

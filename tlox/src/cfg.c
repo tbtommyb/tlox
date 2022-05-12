@@ -1,4 +1,5 @@
 #include "cfg.h"
+#include "compiler.h"
 #include "memory.h"
 #include "scanner.h"
 
@@ -47,6 +48,7 @@ char *valueToString(Value value) {
 
 static Operation *allocateOperation() {
   Operation *op = (Operation *)reallocate(NULL, 0, sizeof(Operation));
+  op->id = 0;
   op->first = NULL;
   op->second = NULL;
   op->next = NULL;
@@ -74,9 +76,11 @@ static Operand *allocateOperand(OperandType type) {
   return operand;
 }
 
-static CFG *allocateCFG() {
+static CFG *allocateCFG(Token name) {
   CFG *cfg = (CFG *)reallocate(NULL, 0, sizeof(CFG));
   cfg->start = NULL;
+  cfg->name = name;
+  cfg->scope = NULL;
 
   return cfg;
 }
@@ -191,7 +195,7 @@ static Operation *tailOf(Operation *node) {
 }
 
 static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
-                          SymbolTable *activeScope) {
+                          Scope *activeScope, LinkedList *pendingNodes) {
   if (node == NULL) {
     return NULL;
   }
@@ -208,7 +212,8 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     break;
   }
   case EXPR_UNARY: {
-    Operation *right = walkAst(compiler, bb, node->branches.right, activeScope);
+    Operation *right =
+        walkAst(compiler, bb, node->branches.right, activeScope, pendingNodes);
     Operand *value = newRegisterOperand(bb->curr->destination);
     op = newOperation(tokenToUnaryOp(node->op), value, NULL);
     bb->curr->next = op;
@@ -216,10 +221,12 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     break;
   }
   case EXPR_BINARY: {
-    Operation *left = walkAst(compiler, bb, node->branches.left, activeScope);
+    Operation *left =
+        walkAst(compiler, bb, node->branches.left, activeScope, pendingNodes);
     Operation *leftTail = tailOf(left);
 
-    Operation *right = walkAst(compiler, bb, node->branches.right, activeScope);
+    Operation *right =
+        walkAst(compiler, bb, node->branches.right, activeScope, pendingNodes);
     Operation *rightTail = tailOf(right);
 
     op = newOperation(tokenToOp(node->op),
@@ -236,8 +243,8 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     Operand *name = newLiteralOperand(nameString);
 
     Symbol symbol = {0};
-    if (!st_search(activeScope, node->token.start, node->token.length,
-                   &symbol)) {
+    if (!scope_search(activeScope, node->token.start, node->token.length,
+                      &symbol)) {
       errorAt(compiler, &node->token,
               "Symbol is not defined in current scope.");
       break;
@@ -251,7 +258,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     break;
   }
   case STMT_PRINT: {
-    walkAst(compiler, bb, node->expr, activeScope);
+    walkAst(compiler, bb, node->expr, activeScope, pendingNodes);
     Operand *value = newRegisterOperand(bb->curr->destination);
     op = newOperation(IR_PRINT, value, NULL);
     bb->curr->next = op;
@@ -260,7 +267,8 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   }
   case STMT_IF: {
     // TODO: tidy up implementation here
-    Operation *expr = walkAst(compiler, bb, node->expr, activeScope);
+    Operation *expr =
+        walkAst(compiler, bb, node->expr, activeScope, pendingNodes);
     LabelId ifLabelId = getLabelId();
     LabelId elseLabelId = getLabelId();
     LabelId afterLabelId = getLabelId();
@@ -272,14 +280,14 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     Operation *ifLabel = newLabelOperation(ifLabelId, IR_LABEL);
     bb->curr->next = ifLabel;
     bb->curr = ifLabel;
-    walkAst(compiler, bb, node->branches.left, activeScope);
+    walkAst(compiler, bb, node->branches.left, activeScope, pendingNodes);
     Operation *afterOp = newGotoOperation(afterLabelId);
     bb->curr->next = afterOp;
     bb->curr = afterOp;
     Operation *elseLabel = newLabelOperation(elseLabelId, IR_ELSE_LABEL);
     bb->curr->next = elseLabel;
     bb->curr = elseLabel;
-    walkAst(compiler, bb, node->branches.right, activeScope);
+    walkAst(compiler, bb, node->branches.right, activeScope, pendingNodes);
     Operation *afterLabel = newLabelOperation(afterLabelId, IR_LABEL);
     bb->curr->next = afterLabel;
     bb->curr = afterLabel;
@@ -292,12 +300,12 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
       bb->curr->next = op;
       bb->curr = op;
     } else {
-      op = walkAst(compiler, bb, node->expr, activeScope);
+      op = walkAst(compiler, bb, node->expr, activeScope, pendingNodes);
     }
 
     Symbol symbol = {0};
-    if (!st_search(activeScope, node->token.start, node->token.length,
-                   &symbol)) {
+    if (!scope_search(activeScope, node->token.start, node->token.length,
+                      &symbol)) {
       errorAt(compiler, &node->token,
               "Symbol is not defined in current scope.");
       break;
@@ -307,7 +315,8 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
         symbol.type == SCOPE_GLOBAL ? IR_DEFINE_GLOBAL : IR_DEFINE_LOCAL;
 
     // FIXME: Skipping register here. Need to fix this
-    op = newOperation(opcode, newSymbolOperand(symbol), NULL);
+    Operand *scopeOperand = newLiteralOperand(POINTER_VAL(activeScope));
+    op = newOperation(opcode, newSymbolOperand(symbol), scopeOperand);
     bb->curr->next = op;
     bb->curr = op;
     break;
@@ -316,11 +325,11 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     Value nameString =
         OBJ_VAL(copyString(node->token.start, node->token.length));
     Operand *name = newLiteralOperand(nameString);
-    op = walkAst(compiler, bb, node->expr, activeScope);
+    op = walkAst(compiler, bb, node->expr, activeScope, pendingNodes);
 
     Symbol symbol = {0};
-    if (!st_search(activeScope, node->token.start, node->token.length,
-                   &symbol)) {
+    if (!scope_search(activeScope, node->token.start, node->token.length,
+                      &symbol)) {
       errorAt(compiler, &node->token,
               "Symbol is not defined in current scope.");
       break;
@@ -337,7 +346,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     Node *stmtNode = (Node *)node->stmts->head;
 
     while (stmtNode != NULL) {
-      walkAst(compiler, bb, stmtNode->data, activeScope);
+      walkAst(compiler, bb, stmtNode->data, activeScope, pendingNodes);
       stmtNode = stmtNode->next;
     }
     break;
@@ -346,22 +355,75 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     Node *blockNode = (Node *)node->stmts->head;
 
     while (blockNode != NULL) {
-      walkAst(compiler, bb, blockNode->data, node->st);
+      walkAst(compiler, bb, blockNode->data, node->scope, pendingNodes);
       blockNode = blockNode->next;
     }
 
-    int locals = st_size(node->st);
-    while (locals > 0) {
-      Operation *op = newOperation(IR_POP, NULL, NULL);
+    Operand *pointer = newLiteralOperand(POINTER_VAL(node->scope));
+    Operation *op = newOperation(IR_END_SCOPE, pointer, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+    break;
+  }
+  case STMT_FUNCTION: {
+    // FIXME: bit of a hack to get the name working
+    node->expr->token = node->token;
+    linkedList_append(pendingNodes, node->expr);
+    break;
+  }
+  case EXPR_FUNCTION: {
+    Node *paramNode = (Node *)node->params->head;
+    while (paramNode != NULL) {
+      Symbol symbol = {0};
+      Token *name = paramNode->data;
+      if (!scope_search(node->scope, name->start, name->length, &symbol)) {
+        errorAt(compiler, name, "Symbol is not defined in current scope.");
+        break;
+      }
+      Operand *pointer = newLiteralOperand(POINTER_VAL(node->scope));
+      op = newOperation(IR_DEFINE_LOCAL, newSymbolOperand(symbol), pointer);
       bb->curr->next = op;
       bb->curr = op;
-      locals--;
-      // FIXME: need to handle upvalues
-      /*   if (compiler->currentScope->locals[compiler->currentScope->localCount
-       * - 1] */
-      /*           .isCaptured) { */
-      /*     /\* emitByte(OP_CLOSE_UPVALUE); *\/ */
+      paramNode = paramNode->next;
     }
+    walkAst(compiler, bb, node->expr, activeScope, pendingNodes);
+    break;
+  }
+  case STMT_RETURN: {
+    Operation *expr =
+        walkAst(compiler, bb, node->expr, activeScope, pendingNodes);
+    op = newOperation(IR_RETURN, newRegisterOperand(expr->destination), NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+    break;
+  }
+  case EXPR_CALL: {
+    Symbol symbol = {0};
+    if (!scope_search(activeScope, node->token.start, node->token.length,
+                      &symbol)) {
+      errorAt(compiler, &node->token,
+              "Symbol is not defined in current scope.");
+      break;
+    }
+
+    Operand *constantValue = newSymbolOperand(symbol);
+    IROp opcode = symbol.type == SCOPE_GLOBAL ? IR_GET_GLOBAL : IR_GET_LOCAL;
+    op = newOperation(opcode, constantValue, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+
+    int arity = 0;
+    Node *paramNode = (Node *)node->params->head;
+    while (paramNode != NULL) {
+      arity++;
+      walkAst(compiler, bb, paramNode->data, node->scope, pendingNodes);
+      paramNode = paramNode->next;
+    }
+    Operand *arityOperand = newLiteralOperand(NUMBER_VAL(arity));
+
+    op = newOperation(IR_CALL, arityOperand, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
     break;
   }
   }
@@ -383,9 +445,10 @@ BasicBlock *newBasicBlock(AstNode *node) {
 }
 
 // TODO: make beautiful
-CFG *constructCFG(BasicBlock *irList) {
-  CFG *cfg = allocateCFG();
+CFG *constructCFG(BasicBlock *irList, Token name, Scope *scope) {
+  CFG *cfg = allocateCFG(name);
   cfg->start = allocateBasicBlock();
+  cfg->scope = scope;
 
   initTable(&labelBasicBlockMapping);
 
@@ -507,6 +570,8 @@ char *opcodeString(IROp opcode) {
   switch (opcode) {
   case IR_ADD:
     return "+";
+  case IR_CALL:
+    return "call";
   case IR_CONSTANT:
     return "constant";
   case IR_CODE_START:
@@ -547,6 +612,10 @@ char *opcodeString(IROp opcode) {
     return "l var";
   case IR_SET_LOCAL:
     return "l assign";
+  case IR_RETURN:
+    return "return";
+  case IR_END_SCOPE:
+    return "end scope";
   case IR_UNKNOWN:
   default:
     return "?";
@@ -582,11 +651,12 @@ LinkedList *postOrderTraverse(CFG *cfg) {
   return ordered;
 }
 
+// TODO: print in less structured format that doesn't need alignment
 void printBasicBlock(BasicBlock *bb) {
   Operation *curr = bb->ops;
 
   if (bb->labelId == -1) {
-    printf("Basic block %llu (main)", bb->id);
+    printf("Basic block %llu", bb->id);
   } else {
     printf("Basic block %llu (L%lld)", bb->id, bb->labelId);
   }
@@ -618,6 +688,7 @@ void printBasicBlock(BasicBlock *bb) {
 }
 
 void printCFG(CFG *cfg) {
+  printf("CFG: %.*s\n", cfg->name.length, cfg->name.start);
   LinkedList *ordered = postOrderTraverse(cfg);
   Node *tail = ordered->tail;
   while (tail != NULL) {
@@ -626,8 +697,8 @@ void printCFG(CFG *cfg) {
   }
 }
 
-CFG *newCFG(Compiler *compiler, CompilerState *state, AstNode *root,
-            Chunk *chunk) {
+static CFG *newCFG(Compiler *compiler, CompilerState *state, AstNode *root,
+                   LinkedList *pendingNodes, Token name) {
   BasicBlock *irList = newBasicBlock(root);
 
   // Initialise context. Move somewhere else once functions supported
@@ -647,11 +718,27 @@ CFG *newCFG(Compiler *compiler, CompilerState *state, AstNode *root,
    * NULL); */
   /* irList->curr->next = op; */
   /* irList->curr = op; */
-  compiler->currentScope->localCount++;
+  root->scope->localCount++;
 
-  walkAst(compiler, irList, root, compiler->currentScope->st);
+  walkAst(compiler, irList, root, root->scope, pendingNodes);
 
-  CFG *cfg = constructCFG(irList);
+  CFG *cfg = constructCFG(irList, name, root->scope);
 
   return cfg;
+}
+
+void createIR(Compiler *compiler, CompilerState *state, AstNode *root) {
+  LinkedList *pendingNodes = linkedList_allocate();
+  linkedList_append(pendingNodes, root);
+
+  Node *curr = pendingNodes->head;
+  while (curr != NULL) {
+    // FIXME: semantic check should have stored a Scope in this node
+    // retrieve and add to CFG
+    AstNode *data = (AstNode *)curr->data;
+    CFG *cfg = newCFG(compiler, state, data, pendingNodes, data->token);
+    linkedList_append(state->functions, cfg);
+
+    curr = curr->next;
+  }
 }
