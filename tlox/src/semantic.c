@@ -91,7 +91,6 @@ void analyse(AstNode *node, Compiler *compiler, FunctionType currentEnv) {
     symbol->isDefined = true;
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);
-    compiler->currentScope->localCount++;
     break;
   }
   case STMT_MODULE: {
@@ -108,11 +107,12 @@ void analyse(AstNode *node, Compiler *compiler, FunctionType currentEnv) {
     Node *blockNode = (Node *)node->stmts->head;
 
     node->scope = beginScope(compiler, compiler->currentScope->type);
-    node->scope->scopeDepth = node->scope->enclosing->scopeDepth + 1;
+
     while (blockNode != NULL) {
       analyse(blockNode->data, compiler, currentEnv);
       blockNode = blockNode->next;
     }
+
     endScope(compiler);
     break;
   }

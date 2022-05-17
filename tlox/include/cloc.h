@@ -2,6 +2,7 @@
 #include "common.h"
 #include "compiler.h"
 #include "debug.h"
+#include "execution_context.h"
 #include "lox_array.h"
 #include "memory.h"
 #include "object.h"

@@ -3,6 +3,7 @@
 
 #include "ast.h"
 #include "compiler.h"
+#include "execution_context.h"
 #include "scanner.h"
 #include "scope.h"
 #include "value.h"
@@ -22,6 +23,7 @@ typedef enum IROp {
   IR_CONSTANT,
   IR_COND,
   IR_DIVIDE,
+  IR_BEGIN_SCOPE,
   IR_END_SCOPE,
   IR_SUBTRACT,
   IR_MODULO,
@@ -84,7 +86,7 @@ typedef struct BasicBlock {
 typedef struct CFG {
   BasicBlock *start;
   Token name;
-  Scope *scope;
+  ExecutionContext context;
 } CFG;
 
 BasicBlock *newBasicBlock(AstNode *node);

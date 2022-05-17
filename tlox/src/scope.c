@@ -9,10 +9,6 @@ Scope *scope_allocate(FunctionType type) {
   scope->type = type;
   scope->enclosing = NULL;
   scope->st = st_allocate();
-  scope->localCount = 0;
-  scope->scopeDepth = 0;
-  scope->loopOffset = -1;
-  scope->currentStackDepth = 0;
 
   return scope;
 }

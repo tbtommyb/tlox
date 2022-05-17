@@ -58,9 +58,9 @@ static uint8_t identifierConstant(Compiler *compiler, Chunk *chunk,
   return makeConstant(compiler, chunk, name);
 }
 
-static int resolveLocal(Scope *scope, Token *name) {
-  for (int i = scope->localCount - 1; i >= 0; i--) {
-    Local local = scope->locals[i];
+static int resolveLocal(ExecutionContext *context, Token *name) {
+  for (int i = context->localCount - 1; i >= 0; i--) {
+    Local local = context->locals[i];
     if (identifiersEqual(name, &local.name)) {
       return i;
     }
@@ -70,7 +70,7 @@ static int resolveLocal(Scope *scope, Token *name) {
 }
 
 static void writeOperation(Compiler *compiler, Operation *op, Chunk *chunk,
-                           Table *labels, Scope *scope) {
+                           Table *labels, ExecutionContext *context) {
   switch (op->opcode) {
   case IR_ADD:
     emitByte(chunk, OP_ADD);
@@ -151,11 +151,10 @@ static void writeOperation(Compiler *compiler, Operation *op, Chunk *chunk,
     break;
   }
   case IR_DEFINE_LOCAL: {
-    Scope *blockScope = (Scope *)AS_POINTER(op->second->val.literal);
     Symbol symbol = op->first->val.symbol;
-    Local *local = &scope->locals[scope->localCount++];
+    Local *local = &context->locals[context->localCount++];
     local->name = symbol.name;
-    local->depth = blockScope->scopeDepth;
+    local->depth = context->scopeDepth;
     local->isCaptured = symbol.isCaptured;
     break;
   }
@@ -169,7 +168,7 @@ static void writeOperation(Compiler *compiler, Operation *op, Chunk *chunk,
   }
   case IR_GET_LOCAL: {
     Symbol symbol = op->first->val.symbol;
-    int position = resolveLocal(scope, &symbol.name);
+    int position = resolveLocal(context, &symbol.name);
 
     assert(position != -1);
 
@@ -187,7 +186,7 @@ static void writeOperation(Compiler *compiler, Operation *op, Chunk *chunk,
   }
   case IR_SET_LOCAL: {
     Symbol symbol = op->second->val.symbol;
-    int position = resolveLocal(scope, &symbol.name);
+    int position = resolveLocal(context, &symbol.name);
 
     assert(position != -1);
 
@@ -199,19 +198,25 @@ static void writeOperation(Compiler *compiler, Operation *op, Chunk *chunk,
     emitByte(chunk, OP_RETURN);
     break;
   }
+  case IR_BEGIN_SCOPE: {
+    context->scopeDepth++;
+    break;
+  }
   case IR_END_SCOPE: {
-    Scope *blockScope = (Scope *)AS_POINTER(op->first->val.literal);
-    for (int i = 0; i < blockScope->localCount; i++) {
+    context->scopeDepth--;
+    while (context->localCount > 0 &&
+           context->locals[context->localCount - 1].depth >
+               context->scopeDepth) {
       emitByte(chunk, OP_POP);
-      scope->localCount--;
-      /*   // FIXME: need to handle upvalues */
-      /*   /\*   if
-       * (compiler->currentScope->locals[compiler->currentScope->localCount */
-      /*    * - 1] *\/ */
-      /*   /\*           .isCaptured) { *\/ */
-      /*   /\*     /\\* emitByte(OP_CLOSE_UPVALUE); *\\/ *\/ */
-      /* } */
+      context->localCount--;
     }
+    /*   // FIXME: need to handle upvalues */
+    /*   /\*   if
+     * (compiler->currentScope->locals[compiler->currentScope->localCount */
+    /*    * - 1] *\/ */
+    /*   /\*           .isCaptured) { *\/ */
+    /*   /\*     /\\* emitByte(OP_CLOSE_UPVALUE); *\\/ *\/ */
+    /* } */
     break;
   }
   default:
@@ -221,12 +226,12 @@ static void writeOperation(Compiler *compiler, Operation *op, Chunk *chunk,
 
 static void generateBasicBlockCode(Compiler *compiler, Chunk *chunk,
                                    BasicBlock *bb, Table *labels,
-                                   Scope *scope) {
+                                   ExecutionContext *context) {
   Operation *curr = bb->ops;
   int i = 0;
 
   while (curr != NULL && i < bb->opsCount) {
-    writeOperation(compiler, curr, chunk, labels, scope);
+    writeOperation(compiler, curr, chunk, labels, context);
     curr = curr->next;
     i++;
   }
@@ -260,14 +265,11 @@ void generateChunk(Compiler *compiler, CFG *cfg, Table *labels, Chunk *chunk) {
   LinkedList *postOrdered = postOrderTraverse(cfg);
   Node *tail = postOrdered->tail;
   while (tail != NULL) {
-    generateBasicBlockCode(compiler, chunk, tail->data, labels, cfg->scope);
+    generateBasicBlockCode(compiler, chunk, tail->data, labels, &cfg->context);
     tail = tail->prev;
   }
 
   rewriteLabels(chunk, labels);
-
-  // TODO: should be pop after expression statements
-  /* emitReturn(chunk); */
 }
 
 static void linkFunctions(Compiler *compiler, ObjFunction *main, Node *fs) {

@@ -80,7 +80,12 @@ static CFG *allocateCFG(Token name) {
   CFG *cfg = (CFG *)reallocate(NULL, 0, sizeof(CFG));
   cfg->start = NULL;
   cfg->name = name;
-  cfg->scope = NULL;
+  cfg->context = (ExecutionContext){.upvalues = {},
+                                    .locals = {},
+                                    .localCount = 0,
+                                    .scopeDepth = 0,
+                                    .loopOffset = -1,
+                                    .currentStackDepth = 0};
 
   return cfg;
 }
@@ -352,6 +357,10 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     break;
   }
   case STMT_BLOCK: {
+    op = newOperation(IR_BEGIN_SCOPE, NULL, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+
     Node *blockNode = (Node *)node->stmts->head;
 
     while (blockNode != NULL) {
@@ -359,8 +368,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
       blockNode = blockNode->next;
     }
 
-    Operand *pointer = newLiteralOperand(POINTER_VAL(node->scope));
-    Operation *op = newOperation(IR_END_SCOPE, pointer, NULL);
+    op = newOperation(IR_END_SCOPE, NULL, NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
@@ -448,7 +456,6 @@ BasicBlock *newBasicBlock(AstNode *node) {
 CFG *constructCFG(BasicBlock *irList, Token name, Scope *scope) {
   CFG *cfg = allocateCFG(name);
   cfg->start = allocateBasicBlock();
-  cfg->scope = scope;
 
   initTable(&labelBasicBlockMapping);
 
@@ -614,6 +621,8 @@ char *opcodeString(IROp opcode) {
     return "l assign";
   case IR_RETURN:
     return "return";
+  case IR_BEGIN_SCOPE:
+    return "begin scope";
   case IR_END_SCOPE:
     return "end scope";
   case IR_UNKNOWN:
@@ -718,11 +727,11 @@ static CFG *newCFG(Compiler *compiler, CompilerState *state, AstNode *root,
    * NULL); */
   /* irList->curr->next = op; */
   /* irList->curr = op; */
-  root->scope->localCount++;
 
   walkAst(compiler, irList, root, root->scope, pendingNodes);
 
   CFG *cfg = constructCFG(irList, name, root->scope);
+  cfg->context.localCount++;
 
   return cfg;
 }
@@ -733,8 +742,6 @@ void createIR(Compiler *compiler, CompilerState *state, AstNode *root) {
 
   Node *curr = pendingNodes->head;
   while (curr != NULL) {
-    // FIXME: semantic check should have stored a Scope in this node
-    // retrieve and add to CFG
     AstNode *data = (AstNode *)curr->data;
     CFG *cfg = newCFG(compiler, state, data, pendingNodes, data->token);
     linkedList_append(state->functions, cfg);

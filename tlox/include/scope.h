@@ -4,20 +4,9 @@
 #include "common.h"
 #include "symbol_table.h"
 
-// FIXME: for now this is a mix of compile time and run time data
 typedef struct Scope {
   struct Scope *enclosing;
   FunctionType type;
-
-  Upvalue upvalues[UINT8_COUNT];
-  Local locals[UINT8_COUNT];
-  int localCount;
-  int scopeDepth;
-
-  int loopOffset;
-  int currentStackDepth;
-
-  // FIXME: store symbol table elsewhere. CompilerState?
   SymbolTable *st;
 } Scope;
 
