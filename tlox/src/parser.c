@@ -202,8 +202,6 @@ static AstNode *variable(Parser *parser, bool canAssign) {
 }
 
 static AstNode *function(Parser *parser, FunctionType type) {
-  /* OldCompiler compiler; */
-  /* initCompiler(&compiler, type); */
   AstNode *node = newFunctionExpr();
 
   int arity = 0;
@@ -283,9 +281,6 @@ static AstNode *statement(Parser *parser) {
   /*   switchStatement(); */
   /* } else if (match(TOKEN_CONTINUE)) { */
   /*   continueStatement(); */
-  /* } else { */
-  /*   expressionStatement(); */
-  /* } */
 }
 
 static AstNode *unary(Parser *parser, bool canAssign) {
@@ -336,7 +331,6 @@ static AstNode *call(Parser *parser, bool canAssign) {
   argumentList(parser, expr);
 
   return expr;
-  /* emitBytes(OP_CALL, argCount); */
 }
 
 ParseRule rules[] = {

@@ -69,22 +69,63 @@ static int resolveLocal(ExecutionContext *context, Token *name) {
   return -1;
 }
 
-static void writeOperation(Compiler *compiler, Operation *op, Chunk *chunk,
+static int addUpvalue(ExecutionContext *context, ObjFunction *f, uint8_t index,
+                      bool isLocal) {
+  int upvalueCount = f->upvalueCount;
+
+  for (int i = 0; i < upvalueCount; i++) {
+    Upvalue *upvalue = &context->upvalues[i];
+    if (upvalue->index == index && upvalue->isLocal == isLocal) {
+      return i;
+    }
+  }
+
+  if (upvalueCount == UINT8_COUNT) {
+    /* error("Too many closure variables in function."); */
+    return 0;
+  }
+
+  context->upvalues[upvalueCount].isLocal = isLocal;
+  context->upvalues[upvalueCount].index = index;
+  return f->upvalueCount++;
+}
+
+static int resolveUpvalue(ExecutionContext *context, ObjFunction *f,
+                          Token *name) {
+  if (context->enclosing == NULL) {
+    return -1;
+  }
+
+  int local = resolveLocal(context->enclosing, name);
+  if (local != -1) {
+    context->enclosing->locals[local].isCaptured = true;
+    return addUpvalue(context, f, (uint8_t)local, true);
+  }
+
+  int upvalue = resolveUpvalue(context->enclosing, f, name);
+  if (upvalue != -1) {
+    return addUpvalue(context, f, (uint8_t)upvalue, false);
+  }
+
+  return -1;
+}
+
+static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
                            Table *labels, ExecutionContext *context) {
   switch (op->opcode) {
   case IR_ADD:
-    emitByte(chunk, OP_ADD);
+    emitByte(&f->chunk, OP_ADD);
     break;
   case IR_CONSTANT: {
     Value literal = op->first->val.literal;
-    uint8_t position = identifierConstant(compiler, chunk, literal);
-    emitConstant(chunk, position);
+    uint8_t position = identifierConstant(compiler, &f->chunk, literal);
+    emitConstant(&f->chunk, position);
     break;
   }
   case IR_CALL: {
     Value arity = op->first->val.literal;
 
-    emitBytes(chunk, OP_CALL, AS_NUMBER(arity));
+    emitBytes(&f->chunk, OP_CALL, AS_NUMBER(arity));
     break;
   }
   case IR_CODE_START:
@@ -92,62 +133,62 @@ static void writeOperation(Compiler *compiler, Operation *op, Chunk *chunk,
   case IR_COND: {
     // Write label ID into instruction stream and later rewrite symbolic
     // addresses
-    emitByte(chunk, OP_JUMP_IF_FALSE);
-    emitByte(chunk, (op->second->val.label >> 8) & 0xff);
-    emitByte(chunk, op->second->val.label & 0xff);
-    emitByte(chunk, OP_POP);
+    emitByte(&f->chunk, OP_JUMP_IF_FALSE);
+    emitByte(&f->chunk, (op->second->val.label >> 8) & 0xff);
+    emitByte(&f->chunk, op->second->val.label & 0xff);
+    emitByte(&f->chunk, OP_POP);
     break;
   }
   case IR_GOTO: {
-    emitByte(chunk, OP_JUMP);
-    emitByte(chunk, (op->first->val.label >> 8) & 0xff);
-    emitByte(chunk, op->first->val.label & 0xff);
+    emitByte(&f->chunk, OP_JUMP);
+    emitByte(&f->chunk, (op->first->val.label >> 8) & 0xff);
+    emitByte(&f->chunk, op->first->val.label & 0xff);
     break;
   }
   case IR_LABEL: {
     tableSet(labels, NUMBER_VAL(op->first->val.label),
-             NUMBER_VAL(chunk->count - 1));
+             NUMBER_VAL(f->chunk.count - 1));
     break;
   }
   case IR_ELSE_LABEL: {
     tableSet(labels, NUMBER_VAL(op->first->val.label),
-             NUMBER_VAL(chunk->count - 1));
-    emitByte(chunk, OP_POP);
+             NUMBER_VAL(f->chunk.count - 1));
+    emitByte(&f->chunk, OP_POP);
     break;
   }
   case IR_DIVIDE:
-    emitByte(chunk, OP_DIVIDE);
+    emitByte(&f->chunk, OP_DIVIDE);
     break;
   case IR_SUBTRACT:
-    emitByte(chunk, OP_SUBTRACT);
+    emitByte(&f->chunk, OP_SUBTRACT);
     break;
   case IR_MODULO:
-    emitByte(chunk, OP_MODULO);
+    emitByte(&f->chunk, OP_MODULO);
     break;
   case IR_MULTIPLY:
-    emitByte(chunk, OP_MULTIPLY);
+    emitByte(&f->chunk, OP_MULTIPLY);
     break;
   case IR_NEGATE:
-    emitByte(chunk, OP_NEGATE);
+    emitByte(&f->chunk, OP_NEGATE);
     break;
   case IR_NIL:
-    emitByte(chunk, OP_NIL);
+    emitByte(&f->chunk, OP_NIL);
     break;
   case IR_NOT:
-    emitByte(chunk, OP_NOT);
+    emitByte(&f->chunk, OP_NOT);
     break;
   case IR_POP:
-    emitByte(chunk, OP_POP);
+    emitByte(&f->chunk, OP_POP);
     break;
   case IR_PRINT:
-    emitByte(chunk, OP_PRINT);
+    emitByte(&f->chunk, OP_PRINT);
     break;
   case IR_DEFINE_GLOBAL: {
     Symbol symbol = op->first->val.symbol;
     Value name = OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
-    uint8_t position = identifierConstant(compiler, chunk, name);
+    uint8_t position = identifierConstant(compiler, &f->chunk, name);
 
-    emitBytes(chunk, OP_DEFINE_GLOBAL, position);
+    emitBytes(&f->chunk, OP_DEFINE_GLOBAL, position);
     break;
   }
   case IR_DEFINE_LOCAL: {
@@ -161,41 +202,55 @@ static void writeOperation(Compiler *compiler, Operation *op, Chunk *chunk,
   case IR_GET_GLOBAL: {
     Symbol symbol = op->first->val.symbol;
     Value name = OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
-    uint8_t position = identifierConstant(compiler, chunk, name);
+    uint8_t position = identifierConstant(compiler, &f->chunk, name);
 
-    emitBytes(chunk, OP_GET_GLOBAL, position);
+    emitBytes(&f->chunk, OP_GET_GLOBAL, position);
     break;
   }
   case IR_GET_LOCAL: {
     Symbol symbol = op->first->val.symbol;
+
+    OpCode op = OP_GET_LOCAL;
     int position = resolveLocal(context, &symbol.name);
 
-    assert(position != -1);
+    if (position == -1) {
+      position = resolveUpvalue(context, f, &symbol.name);
+      op = OP_GET_UPVALUE;
+    }
 
-    emitBytes(chunk, OP_GET_LOCAL, (uint8_t)position);
+    /* assert(position != -1); */
+
+    emitBytes(&f->chunk, op, (uint8_t)position);
     break;
   }
   case IR_SET_GLOBAL: {
     Value name = op->first->val.literal;
     Symbol symbol = op->second->val.symbol;
-    uint8_t position = identifierConstant(compiler, chunk, name);
+    uint8_t position = identifierConstant(compiler, &f->chunk, name);
 
-    emitBytes(chunk, OP_SET_GLOBAL, position);
-    emitByte(chunk, OP_POP);
+    emitBytes(&f->chunk, OP_SET_GLOBAL, position);
+    emitByte(&f->chunk, OP_POP);
     break;
   }
   case IR_SET_LOCAL: {
     Symbol symbol = op->second->val.symbol;
+
+    OpCode op = OP_SET_LOCAL;
     int position = resolveLocal(context, &symbol.name);
+
+    if (position == -1) {
+      position = resolveUpvalue(context, f, &symbol.name);
+      op = OP_SET_UPVALUE;
+    }
 
     assert(position != -1);
 
-    emitBytes(chunk, OP_SET_LOCAL, (uint8_t)position);
-    emitByte(chunk, OP_POP);
+    emitBytes(&f->chunk, op, (uint8_t)position);
+    emitByte(&f->chunk, OP_POP);
     break;
   }
   case IR_RETURN: {
-    emitByte(chunk, OP_RETURN);
+    emitByte(&f->chunk, OP_RETURN);
     break;
   }
   case IR_BEGIN_SCOPE: {
@@ -207,16 +262,13 @@ static void writeOperation(Compiler *compiler, Operation *op, Chunk *chunk,
     while (context->localCount > 0 &&
            context->locals[context->localCount - 1].depth >
                context->scopeDepth) {
-      emitByte(chunk, OP_POP);
+      if (context->locals[context->localCount - 1].isCaptured) {
+        emitByte(&f->chunk, OP_CLOSE_UPVALUE);
+      } else {
+        emitByte(&f->chunk, OP_POP);
+      }
       context->localCount--;
     }
-    /*   // FIXME: need to handle upvalues */
-    /*   /\*   if
-     * (compiler->currentScope->locals[compiler->currentScope->localCount */
-    /*    * - 1] *\/ */
-    /*   /\*           .isCaptured) { *\/ */
-    /*   /\*     /\\* emitByte(OP_CLOSE_UPVALUE); *\\/ *\/ */
-    /* } */
     break;
   }
   default:
@@ -224,14 +276,14 @@ static void writeOperation(Compiler *compiler, Operation *op, Chunk *chunk,
   }
 }
 
-static void generateBasicBlockCode(Compiler *compiler, Chunk *chunk,
+static void generateBasicBlockCode(Compiler *compiler, ObjFunction *f,
                                    BasicBlock *bb, Table *labels,
                                    ExecutionContext *context) {
   Operation *curr = bb->ops;
   int i = 0;
 
   while (curr != NULL && i < bb->opsCount) {
-    writeOperation(compiler, curr, chunk, labels, context);
+    writeOperation(compiler, curr, f, labels, context);
     curr = curr->next;
     i++;
   }
@@ -261,23 +313,34 @@ static void rewriteLabels(Chunk *chunk, Table *labels) {
 }
 
 // FIXME: rename
-void generateChunk(Compiler *compiler, CFG *cfg, Table *labels, Chunk *chunk) {
-  LinkedList *postOrdered = postOrderTraverse(cfg);
+void generateChunk(Compiler *compiler, CFG *cfg, Table *labels,
+                   ObjFunction *f) {
+  LinkedList *postOrdered = postOrderTraverseBasicBlock(cfg);
   Node *tail = postOrdered->tail;
   while (tail != NULL) {
-    generateBasicBlockCode(compiler, chunk, tail->data, labels, &cfg->context);
+    generateBasicBlockCode(compiler, f, tail->data, labels, cfg->context);
     tail = tail->prev;
   }
 
-  rewriteLabels(chunk, labels);
+  rewriteLabels(&f->chunk, labels);
 }
 
-static void linkFunctions(Compiler *compiler, ObjFunction *main, Node *fs) {
+static void linkFunctions(Compiler *compiler, ObjFunction *main, Node *fs,
+                          ExecutionContext *context) {
   Node *curr = fs;
   while (curr != NULL) {
     ObjFunction *f = (ObjFunction *)curr->data;
     int constantPosition = makeConstant(compiler, &main->chunk, OBJ_VAL(f));
-    emitBytes(&main->chunk, OP_CONSTANT, constantPosition);
+    OpCode op = OP_CONSTANT;
+    if (f->upvalueCount > 0) {
+      // FIXME: handle methods and initialisers
+      op = OP_CLOSURE;
+    }
+    emitBytes(&main->chunk, op, constantPosition);
+    for (int i = 0; i < f->upvalueCount; i++) {
+      emitByte(&main->chunk, context->upvalues[i].isLocal ? 1 : 0);
+      emitByte(&main->chunk, context->upvalues[i].index);
+    }
 
     Value name = OBJ_VAL(copyString(f->name->chars, f->name->length));
     uint8_t globalPosition = identifierConstant(compiler, &main->chunk, name);
@@ -286,24 +349,50 @@ static void linkFunctions(Compiler *compiler, ObjFunction *main, Node *fs) {
   }
 }
 
-ObjFunction *compileFunction(Compiler *compiler, CFG *cfg, Table *labels) {
+/* ObjFunction *compileFunction(Compiler *compiler, CFG *cfg, Table *labels) {
+ */
+/*   ObjFunction *f = newFunction(); */
+/*   // Here I need a list of function name, CFG pairs that I can recursively
+ * call */
+/*   // compileFunction on */
+/*   f->name = copyString(cfg->name.start, cfg->name.length); */
+/*   generateChunk(compiler, cfg, labels, f); */
+/*   emitByte(&f->chunk, OP_NIL); */
+/*   emitByte(&f->chunk, OP_RETURN); */
+
+/*   return f; */
+/* } */
+
+ObjFunction *compileWorkUnit(Compiler *compiler, WorkUnit *wu, Table *labels) {
   ObjFunction *f = newFunction();
-  f->name = copyString(cfg->name.start, cfg->name.length);
-  generateChunk(compiler, cfg, labels, &f->chunk);
+  f->name = copyString(wu->name.start, wu->name.length);
+  wu->f = f;
+
+  Node *child = wu->cfg->childFunctions->head;
+  while (child != NULL) {
+    WorkUnit *childWu = child->data;
+    ObjFunction *childF = compileWorkUnit(compiler, childWu, labels);
+    int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
+    emitBytes(&f->chunk, OP_CONSTANT, position);
+    emitBytes(&f->chunk, OP_DEFINE_GLOBAL, position);
+    child = child->next;
+  }
+
+  generateChunk(compiler, wu->cfg, labels, f);
   emitByte(&f->chunk, OP_NIL);
   emitByte(&f->chunk, OP_RETURN);
 
   return f;
 }
 
-ObjFunction *compileMain(Compiler *compiler, CFG *cfg, Node *fs,
-                         Table *labels) {
-  ObjFunction *f = newFunction();
-  linkFunctions(compiler, f, fs);
-  f->name = copyString(cfg->name.start, cfg->name.length);
-  generateChunk(compiler, cfg, labels, &f->chunk);
-  emitByte(&f->chunk, OP_NIL);
-  emitByte(&f->chunk, OP_RETURN);
+/* ObjFunction *compileMain(Compiler *compiler, CFG *cfg, Node *fs, */
+/*                          Table *labels) { */
+/*   ObjFunction *f = newFunction(); */
+/*   linkFunctions(compiler, f, fs, cfg->context); */
+/*   f->name = copyString(cfg->name.start, cfg->name.length); */
+/*   generateChunk(compiler, cfg, labels, f); */
+/*   emitByte(&f->chunk, OP_NIL); */
+/*   emitByte(&f->chunk, OP_RETURN); */
 
-  return f;
-}
+/*   return f; */
+/* } */

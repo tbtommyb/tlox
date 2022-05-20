@@ -86,14 +86,25 @@ typedef struct BasicBlock {
 typedef struct CFG {
   BasicBlock *start;
   Token name;
-  ExecutionContext context;
+  ExecutionContext *context;
+  LinkedList *childFunctions; // move to wu
 } CFG;
+
+typedef struct WorkUnit {
+  ExecutionContext *enclosing;
+  AstNode *node;
+  Token name;
+  CFG *cfg;
+  ObjFunction *f;
+} WorkUnit;
 
 BasicBlock *newBasicBlock(AstNode *node);
 Operation *newOperation(IROp opcode, Operand *first, Operand *second);
-void createIR(Compiler *compiler, CompilerState *state, AstNode *root);
+WorkUnit *createWorkUnits(Compiler *compiler, CompilerState *state,
+                          AstNode *root);
 
-LinkedList *postOrderTraverse(CFG *cfg);
+LinkedList *postOrderTraverseBasicBlock(CFG *cfg);
 void printCFG(CFG *cfg);
+void printWorkUnits(WorkUnit *root);
 
 #endif

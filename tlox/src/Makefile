@@ -329,6 +329,30 @@ debug.c.s:
 	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/debug.c.s
 .PHONY : debug.c.s
 
+execution_context.o: execution_context.c.o
+.PHONY : execution_context.o
+
+# target to build an object file
+execution_context.c.o:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/execution_context.c.o
+.PHONY : execution_context.c.o
+
+execution_context.i: execution_context.c.i
+.PHONY : execution_context.i
+
+# target to preprocess a source file
+execution_context.c.i:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/execution_context.c.i
+.PHONY : execution_context.c.i
+
+execution_context.s: execution_context.c.s
+.PHONY : execution_context.s
+
+# target to generate assembly for a file
+execution_context.c.s:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/execution_context.c.s
+.PHONY : execution_context.c.s
+
 linked_list.o: linked_list.c.o
 .PHONY : linked_list.o
 
@@ -649,6 +673,9 @@ help:
 	@echo "... debug.o"
 	@echo "... debug.i"
 	@echo "... debug.s"
+	@echo "... execution_context.o"
+	@echo "... execution_context.i"
+	@echo "... execution_context.s"
 	@echo "... linked_list.o"
 	@echo "... linked_list.i"
 	@echo "... linked_list.s"

@@ -1,5 +1,6 @@
 #include <stdio.h>
 
+#include "cfg.h"
 #include "debug.h"
 #include "object.h"
 #include "value.h"
@@ -174,4 +175,15 @@ void disassembleChunk(Chunk *chunk, const char *name) {
   for (int offset = 0; offset < chunk->count;) {
     offset = disassembleInstruction(chunk, offset);
   }
+}
+
+void disassembleWorkUnits(WorkUnit *root) {
+  Node *child = root->cfg->childFunctions->head;
+  while (child != NULL) {
+    WorkUnit *wu = child->data;
+    disassembleWorkUnits(wu);
+    child = child->next;
+  }
+  disassembleChunk(&root->f->chunk,
+                   copyString(root->name.start, root->name.length)->chars);
 }

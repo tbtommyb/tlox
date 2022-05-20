@@ -5,6 +5,7 @@ set(LIB_SOURCES
   codegen.c
   compiler.c
   debug.c
+  execution_context.c
   memory.c
   linked_list.c
   lox_array.c

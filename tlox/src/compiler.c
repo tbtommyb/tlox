@@ -96,63 +96,6 @@ void errorAtCurrent(Compiler *compiler, const char *message) {
   errorAt(compiler, &compiler->parser->current, message);
 }
 
-/* static ObjFunction *endCompiler() { */
-/*   emitReturn(); */
-
-/*   ObjFunction *function = current->function; */
-/* #ifdef DEBUG_PRINT_CODE */
-/*   if (!parser.hadError) { */
-/*     disassembleChunk(currentChunk(), function->name != NULL */
-/*                                          ? function->name->chars */
-/*                                          : "<script>"); */
-/*   } */
-/* #endif */
-
-/*   current = current->enclosing; */
-/*   return function; */
-/* } */
-
-/* static int addUpvalue(OldCompiler *compiler, uint8_t index, bool isLocal) {
- */
-/*   int upvalueCount = compiler->function->upvalueCount; */
-
-/*   for (int i = 0; i < upvalueCount; i++) { */
-/*     Upvalue *upvalue = &compiler->upvalues[i]; */
-/*     if (upvalue->index == index && upvalue->isLocal == isLocal) { */
-/*       return i; */
-/*     } */
-/*   } */
-
-/*   if (upvalueCount == UINT8_COUNT) { */
-/*     error("Too many closure variables in function."); */
-/*     return 0; */
-/*   } */
-
-/*   compiler->upvalues[upvalueCount].isLocal = isLocal; */
-/*   compiler->upvalues[upvalueCount].index = index; */
-/*   return compiler->function->upvalueCount++; */
-/* } */
-
-/* static int resolveUpvalue(OldCompiler *compiler, Token *name, */
-/*                           Local **localVar) { */
-/*   if (compiler->enclosing == NULL) { */
-/*     return -1; */
-/*   } */
-
-/*   int local = resolveLocal(compiler->enclosing, name, localVar); */
-/*   if (local != -1) { */
-/*     compiler->enclosing->locals[local].isCaptured = true; */
-/*     return addUpvalue(compiler, (uint8_t)local, true); */
-/*   } */
-
-/*   int upvalue = resolveUpvalue(compiler->enclosing, name, localVar); */
-/*   if (upvalue != -1) { */
-/*     return addUpvalue(compiler, (uint8_t)upvalue, false); */
-/*   } */
-
-/*   return -1; */
-/* } */
-
 /* static void and_(bool canAssign) { */
 /*   int endJump = emitJump(OP_JUMP_IF_FALSE); */
 
@@ -537,51 +480,30 @@ ObjFunction *compile(Compiler *compiler, const char *source) {
     return NULL;
   }
 
-  createIR(compiler, &state, ast);
+  WorkUnit *mainWorkUnit = createWorkUnits(compiler, &state, ast);
 
   if (compiler->hadError) {
     return NULL;
   }
 
 #ifdef DEBUG_PRINT_CODE
-  Node *curr = state.functions->tail;
-  while (curr != NULL) {
-    CFG *cfg = (CFG *)curr->data;
-    printCFG(cfg);
-    curr = curr->prev;
-  }
+  printWorkUnits(mainWorkUnit);
 #endif
 
-  // TODO: move into some kind of linker file?
-  LinkedList *functions = linkedList_allocate();
-  curr = state.functions->tail;
-  // We skip the final one, main, as it is handled sparately
-  while (curr != NULL && curr->prev != NULL) {
-    ObjFunction *f = compileFunction(compiler, curr->data, &labels);
-    linkedList_append(functions, f);
-    curr = curr->prev;
-  }
-  ObjFunction *main = compileMain(compiler, state.functions->head->data,
-                                  functions->head, &labels);
-  linkedList_append(functions, main);
+  ObjFunction *mainFunction = compileWorkUnit(compiler, mainWorkUnit, &labels);
 
   if (compiler->hadError) {
     return NULL;
   }
 
 #ifdef DEBUG_PRINT_CODE
-  curr = functions->head;
-  while (curr != NULL) {
-    ObjFunction *f = (ObjFunction *)curr->data;
-    disassembleChunk(&f->chunk, f->name != NULL ? f->name->chars : "<script>");
-    curr = curr->next;
-  }
+  disassembleWorkUnits(mainWorkUnit);
 #endif
 
   freeTable(&stringConstants);
   freeTable(&labels);
 
-  return compiler->hadError ? NULL : main;
+  return compiler->hadError ? NULL : mainFunction;
 }
 
 void initCompiler(Parser *parser, Compiler *compiler, FunctionType type,

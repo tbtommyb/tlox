@@ -31,6 +31,11 @@
 },
 {
   "directory": "/Users/thomasbarrett/coding/crafting-interpreters/tlox/src",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/tlox -I/Users/thomasbarrett/coding/crafting-interpreters/tlox/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/execution_context.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/tlox/src/execution_context.c",
+  "file": "/Users/thomasbarrett/coding/crafting-interpreters/tlox/src/execution_context.c"
+},
+{
+  "directory": "/Users/thomasbarrett/coding/crafting-interpreters/tlox/src",
   "command": "/Library/Developer/CommandLineTools/usr/bin/cc -DHAVE_CONFIG_H -I/Users/thomasbarrett/coding/crafting-interpreters/tlox -I/Users/thomasbarrett/coding/crafting-interpreters/tlox/src/../include -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -o CMakeFiles/cloc.dir/memory.c.o -c /Users/thomasbarrett/coding/crafting-interpreters/tlox/src/memory.c",
   "file": "/Users/thomasbarrett/coding/crafting-interpreters/tlox/src/memory.c"
 },
