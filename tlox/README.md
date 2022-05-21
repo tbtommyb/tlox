@@ -38,3 +38,4 @@ In addition to Lox's feature set, t-lox has some additional features:
 - [x] challenges from closures
 - [ ] function expressions
 - [ ] ||, && etc
+- [ ] `return * 2` segfaults

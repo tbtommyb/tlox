@@ -1,0 +1,10 @@
+fun test(n) {
+  fun inner() {
+    return 2 * 22;
+  }
+
+  return inner();
+}
+
+var output = test(100);
+print output;

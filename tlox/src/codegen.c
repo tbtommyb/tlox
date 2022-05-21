@@ -213,10 +213,10 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     OpCode op = OP_GET_LOCAL;
     int position = resolveLocal(context, &symbol.name);
 
-    if (position == -1) {
-      position = resolveUpvalue(context, f, &symbol.name);
-      op = OP_GET_UPVALUE;
-    }
+    /* if (position == -1) { */
+    /*   position = resolveUpvalue(context, f, &symbol.name); */
+    /*   op = OP_GET_UPVALUE; */
+    /* } */
 
     /* assert(position != -1); */
 
@@ -238,10 +238,10 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     OpCode op = OP_SET_LOCAL;
     int position = resolveLocal(context, &symbol.name);
 
-    if (position == -1) {
-      position = resolveUpvalue(context, f, &symbol.name);
-      op = OP_SET_UPVALUE;
-    }
+    /* if (position == -1) { */
+    /*   position = resolveUpvalue(context, f, &symbol.name); */
+    /*   op = OP_SET_UPVALUE; */
+    /* } */
 
     assert(position != -1);
 
@@ -325,42 +325,30 @@ void generateChunk(Compiler *compiler, CFG *cfg, Table *labels,
   rewriteLabels(&f->chunk, labels);
 }
 
-static void linkFunctions(Compiler *compiler, ObjFunction *main, Node *fs,
-                          ExecutionContext *context) {
-  Node *curr = fs;
-  while (curr != NULL) {
-    ObjFunction *f = (ObjFunction *)curr->data;
-    int constantPosition = makeConstant(compiler, &main->chunk, OBJ_VAL(f));
-    OpCode op = OP_CONSTANT;
-    if (f->upvalueCount > 0) {
-      // FIXME: handle methods and initialisers
-      op = OP_CLOSURE;
-    }
-    emitBytes(&main->chunk, op, constantPosition);
-    for (int i = 0; i < f->upvalueCount; i++) {
-      emitByte(&main->chunk, context->upvalues[i].isLocal ? 1 : 0);
-      emitByte(&main->chunk, context->upvalues[i].index);
-    }
-
-    Value name = OBJ_VAL(copyString(f->name->chars, f->name->length));
-    uint8_t globalPosition = identifierConstant(compiler, &main->chunk, name);
-    emitBytes(&main->chunk, OP_DEFINE_GLOBAL, globalPosition);
-    curr = curr->next;
-  }
-}
-
-/* ObjFunction *compileFunction(Compiler *compiler, CFG *cfg, Table *labels) {
+/* static void linkFunctions(Compiler *compiler, ObjFunction *main, Node *fs, */
+/*                           ExecutionContext *context) { */
+/*   Node *curr = fs; */
+/*   while (curr != NULL) { */
+/*     ObjFunction *f = (ObjFunction *)curr->data; */
+/*     int constantPosition = makeConstant(compiler, &main->chunk, OBJ_VAL(f));
  */
-/*   ObjFunction *f = newFunction(); */
-/*   // Here I need a list of function name, CFG pairs that I can recursively
- * call */
-/*   // compileFunction on */
-/*   f->name = copyString(cfg->name.start, cfg->name.length); */
-/*   generateChunk(compiler, cfg, labels, f); */
-/*   emitByte(&f->chunk, OP_NIL); */
-/*   emitByte(&f->chunk, OP_RETURN); */
+/*     OpCode op = OP_CONSTANT; */
+/*     if (f->upvalueCount > 0) { */
+/*       // FIXME: handle methods and initialisers */
+/*       op = OP_CLOSURE; */
+/*     } */
+/*     emitBytes(&main->chunk, op, constantPosition); */
+/*     for (int i = 0; i < f->upvalueCount; i++) { */
+/*       emitByte(&main->chunk, context->upvalues[i].isLocal ? 1 : 0); */
+/*       emitByte(&main->chunk, context->upvalues[i].index); */
+/*     } */
 
-/*   return f; */
+/*     Value name = OBJ_VAL(copyString(f->name->chars, f->name->length)); */
+/*     uint8_t globalPosition = identifierConstant(compiler, &main->chunk,
+ * name); */
+/*     emitBytes(&main->chunk, OP_DEFINE_GLOBAL, globalPosition); */
+/*     curr = curr->next; */
+/*   } */
 /* } */
 
 ObjFunction *compileWorkUnit(Compiler *compiler, WorkUnit *wu, Table *labels) {
@@ -372,9 +360,20 @@ ObjFunction *compileWorkUnit(Compiler *compiler, WorkUnit *wu, Table *labels) {
   while (child != NULL) {
     WorkUnit *childWu = child->data;
     ObjFunction *childF = compileWorkUnit(compiler, childWu, labels);
+    ExecutionContext *ec = wu->cfg->context;
     int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
     emitBytes(&f->chunk, OP_CONSTANT, position);
-    emitBytes(&f->chunk, OP_DEFINE_GLOBAL, position);
+    if (ec->enclosing == NULL) {
+      int namePosition =
+          identifierConstant(compiler, &f->chunk, OBJ_VAL(childF->name));
+      emitBytes(&f->chunk, OP_DEFINE_GLOBAL, namePosition);
+    } else {
+      ec->localCount++; // not sure why this is needed
+      Local *local = &ec->locals[ec->localCount++];
+      local->name = childWu->name;
+      local->depth = ec->scopeDepth;
+      local->isCaptured = false;
+    }
     child = child->next;
   }
 
@@ -384,15 +383,3 @@ ObjFunction *compileWorkUnit(Compiler *compiler, WorkUnit *wu, Table *labels) {
 
   return f;
 }
-
-/* ObjFunction *compileMain(Compiler *compiler, CFG *cfg, Node *fs, */
-/*                          Table *labels) { */
-/*   ObjFunction *f = newFunction(); */
-/*   linkFunctions(compiler, f, fs, cfg->context); */
-/*   f->name = copyString(cfg->name.start, cfg->name.length); */
-/*   generateChunk(compiler, cfg, labels, f); */
-/*   emitByte(&f->chunk, OP_NIL); */
-/*   emitByte(&f->chunk, OP_RETURN); */
-
-/*   return f; */
-/* } */

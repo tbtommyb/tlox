@@ -390,7 +390,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     // FIXME: bit of a hack to get the name working
     node->expr->token = node->token;
 
-    WorkUnit *wu = wu_allocate(NULL, node->expr, node->token);
+    WorkUnit *wu = wu_allocate(activeCFG->context, node->expr, node->token);
     linkedList_append(pendingNodes, wu);
     linkedList_append(activeCFG->childFunctions, wu);
     break;
@@ -759,7 +759,7 @@ static CFG *newCFG(Compiler *compiler, CompilerState *state, WorkUnit *wu,
   // split IR list into CFG
   constructCFG(cfg, irList, wu->node->token, wu->node->scope);
 
-  cfg->context->localCount++;
+  cfg->context->localCount++; // this or function
 
   return cfg;
 }

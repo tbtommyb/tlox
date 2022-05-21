@@ -457,6 +457,7 @@ ObjFunction *compile(Compiler *compiler, const char *source) {
   initScanner(source);
 
   initTable(&stringConstants);
+  // should this still be global?
   initTable(&labels);
 
   Scope *scope = scope_allocate(TYPE_SCRIPT);
