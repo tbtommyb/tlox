@@ -19,6 +19,7 @@ typedef enum {
   STMT_BLOCK,
   STMT_DEFINE,
   STMT_DEFINE_CONST,
+  STMT_EXPR,
   STMT_FUNCTION,
   STMT_IF,
   STMT_MODULE,
@@ -66,6 +67,7 @@ AstNode *newModuleStmt();
 AstNode *newBlockStmt();
 AstNode *newFunctionStmt(Token name, AstNode *funcExpr);
 AstNode *newReturnStmt(AstNode *expr);
+AstNode *newExprStmt(AstNode *expr);
 
 void printAST(AstNode root, int indentation);
 

@@ -59,6 +59,7 @@ static uint8_t identifierConstant(Compiler *compiler, Chunk *chunk,
 }
 
 static int resolveLocal(ExecutionContext *context, Token *name) {
+  // FIXME: values read from stack are offset by one
   for (int i = context->localCount - 1; i >= 0; i--) {
     Local local = context->locals[i];
     if (identifiersEqual(name, &local.name)) {
@@ -213,12 +214,12 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     OpCode op = OP_GET_LOCAL;
     int position = resolveLocal(context, &symbol.name);
 
-    /* if (position == -1) { */
-    /*   position = resolveUpvalue(context, f, &symbol.name); */
-    /*   op = OP_GET_UPVALUE; */
-    /* } */
+    if (position == -1) {
+      position = resolveUpvalue(context, f, &symbol.name);
+      op = OP_GET_UPVALUE;
+    }
 
-    /* assert(position != -1); */
+    assert(position != -1);
 
     emitBytes(&f->chunk, op, (uint8_t)position);
     break;
@@ -238,10 +239,10 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     OpCode op = OP_SET_LOCAL;
     int position = resolveLocal(context, &symbol.name);
 
-    /* if (position == -1) { */
-    /*   position = resolveUpvalue(context, f, &symbol.name); */
-    /*   op = OP_SET_UPVALUE; */
-    /* } */
+    if (position == -1) {
+      position = resolveUpvalue(context, f, &symbol.name);
+      op = OP_SET_UPVALUE;
+    }
 
     assert(position != -1);
 
@@ -257,18 +258,57 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     context->scopeDepth++;
     break;
   }
+  case IR_FUNCTION: {
+    Value wuPtr = op->first->val.literal;
+    WorkUnit *wu = AS_POINTER(wuPtr);
+    ObjFunction *childF = compileWorkUnit(compiler, wu, labels);
+    int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
+
+    OpCode op = OP_CONSTANT;
+    if (childF->upvalueCount > 0) {
+      // FIXME: handle methods and initialisers
+      op = OP_CLOSURE;
+    }
+    emitBytes(&f->chunk, op, position);
+    for (int i = 0; i < childF->upvalueCount; i++) {
+      // Not sure going through wu->cfg->context is best/correct here
+      emitByte(&f->chunk, wu->cfg->context->upvalues[i].isLocal ? 1 : 0);
+      emitByte(&f->chunk, wu->cfg->context->upvalues[i].index);
+    }
+
+    if (context->enclosing == NULL) {
+      int namePosition =
+          identifierConstant(compiler, &f->chunk, OBJ_VAL(childF->name));
+      emitBytes(&f->chunk, OP_DEFINE_GLOBAL, namePosition);
+    } else {
+      Local *local = &context->locals[context->localCount++];
+      local->name = wu->name;
+      local->depth = context->scopeDepth;
+      local->isCaptured = false;
+    }
+    break;
+  }
   case IR_END_SCOPE: {
     context->scopeDepth--;
-    while (context->localCount > 0 &&
-           context->locals[context->localCount - 1].depth >
-               context->scopeDepth) {
-      if (context->locals[context->localCount - 1].isCaptured) {
-        emitByte(&f->chunk, OP_CLOSE_UPVALUE);
-      } else {
-        emitByte(&f->chunk, OP_POP);
+
+    // IR_END_SCOPE at scopeDepth 0 is at function end, so let return
+    // handle clearing the stack
+    if (context->scopeDepth > 0) {
+      while (context->localCount > 0 &&
+             context->locals[context->localCount - 1].depth >
+                 context->scopeDepth) {
+        if (context->locals[context->localCount - 1].isCaptured) {
+          emitByte(&f->chunk, OP_CLOSE_UPVALUE);
+        } else {
+          emitByte(&f->chunk, OP_POP);
+        }
+        context->localCount--;
       }
-      context->localCount--;
     }
+    break;
+  }
+  case IR_STMT_EXPR: {
+    emitByte(&f->chunk, OP_POP);
     break;
   }
   default:
@@ -325,23 +365,15 @@ void generateChunk(Compiler *compiler, CFG *cfg, Table *labels,
   rewriteLabels(&f->chunk, labels);
 }
 
-/* static void linkFunctions(Compiler *compiler, ObjFunction *main, Node *fs, */
+/* static void linkFunctions(Compiler *compiler, ObjFunction *main, Node *fs,
+ */
 /*                           ExecutionContext *context) { */
 /*   Node *curr = fs; */
 /*   while (curr != NULL) { */
 /*     ObjFunction *f = (ObjFunction *)curr->data; */
-/*     int constantPosition = makeConstant(compiler, &main->chunk, OBJ_VAL(f));
+/*     int constantPosition = makeConstant(compiler, &main->chunk,
+ * OBJ_VAL(f));
  */
-/*     OpCode op = OP_CONSTANT; */
-/*     if (f->upvalueCount > 0) { */
-/*       // FIXME: handle methods and initialisers */
-/*       op = OP_CLOSURE; */
-/*     } */
-/*     emitBytes(&main->chunk, op, constantPosition); */
-/*     for (int i = 0; i < f->upvalueCount; i++) { */
-/*       emitByte(&main->chunk, context->upvalues[i].isLocal ? 1 : 0); */
-/*       emitByte(&main->chunk, context->upvalues[i].index); */
-/*     } */
 
 /*     Value name = OBJ_VAL(copyString(f->name->chars, f->name->length)); */
 /*     uint8_t globalPosition = identifierConstant(compiler, &main->chunk,
@@ -356,30 +388,8 @@ ObjFunction *compileWorkUnit(Compiler *compiler, WorkUnit *wu, Table *labels) {
   f->name = copyString(wu->name.start, wu->name.length);
   wu->f = f;
 
-  Node *child = wu->cfg->childFunctions->head;
-  while (child != NULL) {
-    WorkUnit *childWu = child->data;
-    ObjFunction *childF = compileWorkUnit(compiler, childWu, labels);
-    ExecutionContext *ec = wu->cfg->context;
-    int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
-    emitBytes(&f->chunk, OP_CONSTANT, position);
-    if (ec->enclosing == NULL) {
-      int namePosition =
-          identifierConstant(compiler, &f->chunk, OBJ_VAL(childF->name));
-      emitBytes(&f->chunk, OP_DEFINE_GLOBAL, namePosition);
-    } else {
-      ec->localCount++; // not sure why this is needed
-      Local *local = &ec->locals[ec->localCount++];
-      local->name = childWu->name;
-      local->depth = ec->scopeDepth;
-      local->isCaptured = false;
-    }
-    child = child->next;
-  }
-
   generateChunk(compiler, wu->cfg, labels, f);
-  emitByte(&f->chunk, OP_NIL);
-  emitByte(&f->chunk, OP_RETURN);
+  emitReturn(&f->chunk);
 
   return f;
 }

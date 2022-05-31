@@ -127,6 +127,12 @@ AstNode *newReturnStmt(AstNode *expr) {
   return node;
 }
 
+AstNode *newExprStmt(AstNode *expr) {
+  AstNode *node = allocateAstNode(STMT_EXPR);
+  node->expr = expr;
+  return node;
+}
+
 char *tokenTypeStr(TokenType op) {
   switch (op) {
   case TOKEN_BANG:
@@ -257,6 +263,12 @@ void printAST(AstNode node, int indentation) {
   }
   case STMT_RETURN: {
     printf("%*sStmt Return\n", indentation, "");
+    printf("%*sExpr:\n", indentation + 2, "");
+    printAST(*node.expr, indentation + 4);
+    break;
+  }
+  case STMT_EXPR: {
+    printf("%*sStmt Expr\n", indentation, "");
     printf("%*sExpr:\n", indentation + 2, "");
     printAST(*node.expr, indentation + 4);
     break;

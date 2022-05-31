@@ -120,6 +120,10 @@ void analyse(AstNode *node, Compiler *compiler, FunctionType currentEnv) {
     analyse(node->expr, compiler, currentEnv);
     break;
   }
+  case STMT_EXPR: {
+    analyse(node->expr, compiler, currentEnv);
+    break;
+  }
   case STMT_RETURN: {
     if (compiler->currentScope->type != TYPE_FUNCTION) {
       errorAt(compiler, &node->token, "Can't return from top-level code.");
@@ -152,12 +156,13 @@ void analyse(AstNode *node, Compiler *compiler, FunctionType currentEnv) {
     }
     ScopeType scopeType =
         isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
-    // FIXME: need better symbol creation
+    // FIXME: need better symbol creation.
     Symbol *symbol =
         newSymbol(node->token, scopeType, false, true, true, node->arity);
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);
 
+    node->expr->token = node->token;
     analyse(node->expr, compiler, TYPE_FUNCTION);
     break;
   }
@@ -166,17 +171,32 @@ void analyse(AstNode *node, Compiler *compiler, FunctionType currentEnv) {
 
     Node *paramNode = (Node *)node->params->head;
 
+    int arity = 0;
     while (paramNode != NULL) {
       Token *name = paramNode->data;
       Symbol *symbol =
           newSymbol(*name, SCOPE_FUNCTION_PARAM, false, true, true, 0);
       st_set(compiler->currentScope->st, name->start, name->length, symbol);
       paramNode = paramNode->next;
+      arity++;
     }
 
     analyse(node->expr, compiler, currentEnv);
 
     endScope(compiler);
+
+    // Create empty symbol on heap
+    Symbol *functionSymbol =
+        newSymbol(node->token, SCOPE_GLOBAL, false, false, false, 0);
+    bool found = st_get(compiler->currentScope->st, node->token.start,
+                        node->token.length, functionSymbol);
+    if (!found) {
+      errorAt(compiler, &node->token, "Function definition is not in scope.");
+      break;
+    }
+    functionSymbol->arity = arity;
+    st_set(compiler->currentScope->st, node->token.start, node->token.length,
+           functionSymbol);
 
     break;
   }
@@ -196,9 +216,10 @@ void analyse(AstNode *node, Compiler *compiler, FunctionType currentEnv) {
       callArity++;
     }
 
-    /* if (callArity != symbol.arity) { */
-    /*   errorAt(compiler, &node->token, "Function wrong arity."); */
-    /* } */
+    if (callArity != symbol.arity) {
+      errorAt(compiler, &node->token, "Wrong function arity.");
+    }
+    node->scope = compiler->currentScope;
     break;
   }
   }

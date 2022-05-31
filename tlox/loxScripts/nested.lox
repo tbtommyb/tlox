@@ -1,10 +1,11 @@
-fun test(n) {
-  fun inner() {
-    return 2 * 22;
+fun test(arg1, arg2) {
+  var scale = 2;
+  fun inner(arg3, arg4) {
+    return arg3 * arg4 * scale;
   }
 
-  return inner();
+  return inner(arg1, arg2);
 }
 
-var output = test(100);
+var output = test(10, 200);
 print output;

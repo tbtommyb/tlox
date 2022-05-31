@@ -25,6 +25,7 @@ typedef enum IROp {
   IR_DIVIDE,
   IR_BEGIN_SCOPE,
   IR_END_SCOPE,
+  IR_FUNCTION,
   IR_SUBTRACT,
   IR_MODULO,
   IR_MULTIPLY,
@@ -43,7 +44,8 @@ typedef enum IROp {
   IR_GET_GLOBAL,
   IR_GET_LOCAL,
   IR_SET_GLOBAL,
-  IR_SET_LOCAL
+  IR_SET_LOCAL,
+  IR_STMT_EXPR
 } IROp;
 
 typedef uint64_t Register;
@@ -88,6 +90,7 @@ typedef struct CFG {
   Token name;
   ExecutionContext *context;
   LinkedList *childFunctions; // move to wu
+  int arity;                  // temp location
 } CFG;
 
 typedef struct WorkUnit {
@@ -100,8 +103,7 @@ typedef struct WorkUnit {
 
 BasicBlock *newBasicBlock(AstNode *node);
 Operation *newOperation(IROp opcode, Operand *first, Operand *second);
-WorkUnit *createWorkUnits(Compiler *compiler, CompilerState *state,
-                          AstNode *root);
+WorkUnit *createWorkUnit(Compiler *compiler, AstNode *root);
 
 LinkedList *postOrderTraverseBasicBlock(CFG *cfg);
 void printCFG(CFG *cfg);

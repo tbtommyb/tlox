@@ -481,7 +481,7 @@ ObjFunction *compile(Compiler *compiler, const char *source) {
     return NULL;
   }
 
-  WorkUnit *mainWorkUnit = createWorkUnits(compiler, &state, ast);
+  WorkUnit *mainWorkUnit = createWorkUnit(compiler, ast);
 
   if (compiler->hadError) {
     return NULL;

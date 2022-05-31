@@ -173,9 +173,8 @@ static AstNode *varDeclaration(Parser *parser, bool isConst) {
 }
 
 static AstNode *expressionStatement(Parser *parser) {
-  AstNode *node = expression(parser);
+  AstNode *node = newExprStmt(expression(parser));
   consume(parser, TOKEN_SEMICOLON, "Expect ';' after expression.");
-  /* emitByte(OP_POP); */
   return node;
 }
 
@@ -223,17 +222,6 @@ static AstNode *function(Parser *parser, FunctionType type) {
   node->arity = arity;
 
   return node;
-  /* ObjFunction *function = endCompiler(); */
-  /* if (function->upvalueCount > 0 || */
-  /*     (type == TYPE_INITIALIZER || type == TYPE_METHOD)) { */
-  /*   emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function))); */
-  /*   for (int i = 0; i < function->upvalueCount; i++) { */
-  /*     emitByte(compiler.upvalues[i].isLocal ? 1 : 0); */
-  /*     emitByte(compiler.upvalues[i].index); */
-  /*   } */
-  /* } else { */
-  /*   emitBytes(OP_CONSTANT, makeConstant(OBJ_VAL(function))); */
-  /* } */
 }
 
 static AstNode *funDeclaration(Parser *parser) {
