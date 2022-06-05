@@ -99,20 +99,32 @@ static CFG *allocateCFG(Token name) {
   return cfg;
 }
 
-static IROp tokenToOp(TokenType token) {
+static IROp tokenToBinaryOp(TokenType token) {
   switch (token) {
-  case TOKEN_PLUS:
-    return IR_ADD;
-  case TOKEN_MINUS:
-    return IR_SUBTRACT;
   case TOKEN_BANG:
     return IR_NOT;
+  case TOKEN_BANG_EQUAL:
+    return IR_NOT_EQUAL;
+  case TOKEN_EQUAL_EQUAL:
+    return IR_EQUAL;
+  case TOKEN_GREATER:
+    return IR_GREATER;
+  case TOKEN_GREATER_EQUAL:
+    return IR_GREATER_EQUAL;
+  case TOKEN_LESS:
+    return IR_LESS;
+  case TOKEN_LESS_EQUAL:
+    return IR_LESS_EQUAL;
+  case TOKEN_MINUS:
+    return IR_SUBTRACT;
+  case TOKEN_PERCENT:
+    return IR_MODULO;
+  case TOKEN_PLUS:
+    return IR_ADD;
   case TOKEN_SLASH:
     return IR_DIVIDE;
   case TOKEN_STAR:
     return IR_MULTIPLY;
-  case TOKEN_PERCENT:
-    return IR_MODULO;
   default:
     return IR_UNKNOWN;
   }
@@ -243,7 +255,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
         walkAst(compiler, bb, node->branches.right, activeScope, activeCFG);
     Operation *rightTail = tailOf(right);
 
-    op = newOperation(tokenToOp(node->op),
+    op = newOperation(tokenToBinaryOp(node->op),
                       newRegisterOperand(leftTail->destination),
                       newRegisterOperand(rightTail->destination));
 
@@ -606,8 +618,20 @@ char *opcodeString(IROp opcode) {
     return "cond";
   case IR_DIVIDE:
     return "/";
-  case IR_SUBTRACT:
-    return "-";
+  case IR_EQUAL:
+    return "==";
+  case IR_GREATER:
+    return ">";
+  case IR_GREATER_EQUAL:
+    return ">=";
+  case IR_LESS:
+    return "<";
+  case IR_LESS_EQUAL:
+    return "<=";
+  case IR_NOT:
+    return "!";
+  case IR_NOT_EQUAL:
+    return "!=";
   case IR_MODULO:
     return "%";
   case IR_MULTIPLY:
@@ -616,8 +640,6 @@ char *opcodeString(IROp opcode) {
     return "-";
   case IR_NIL:
     return "nil";
-  case IR_NOT:
-    return "!";
   case IR_POP:
     return "pop";
   case IR_PRINT:
@@ -646,6 +668,8 @@ char *opcodeString(IROp opcode) {
     return "end scope";
   case IR_FUNCTION:
     return "function";
+  case IR_SUBTRACT:
+    return "-";
   case IR_UNKNOWN:
   default:
     return "?";

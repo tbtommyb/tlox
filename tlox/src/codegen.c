@@ -178,6 +178,24 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
   case IR_NOT:
     emitByte(&f->chunk, OP_NOT);
     break;
+  case IR_NOT_EQUAL:
+    emitBytes(&f->chunk, OP_EQUAL, OP_NOT);
+    break;
+  case IR_EQUAL:
+    emitByte(&f->chunk, OP_EQUAL);
+    break;
+  case IR_GREATER:
+    emitByte(&f->chunk, OP_GREATER);
+    break;
+  case IR_GREATER_EQUAL:
+    emitBytes(&f->chunk, OP_LESS, OP_NOT);
+    break;
+  case IR_LESS:
+    emitByte(&f->chunk, OP_LESS);
+    break;
+  case IR_LESS_EQUAL:
+    emitBytes(&f->chunk, OP_GREATER, OP_NOT);
+    break;
   case IR_POP:
     emitByte(&f->chunk, OP_POP);
     break;
