@@ -98,6 +98,13 @@ AstNode *newIfStmt(AstNode *condition, AstNode *thenBranch,
   return node;
 }
 
+AstNode *newWhileStmt(AstNode *condition, AstNode *thenBranch) {
+  AstNode *node = allocateAstNode(STMT_WHILE);
+  node->expr = condition;
+  node->branches.left = thenBranch;
+  return node;
+}
+
 AstNode *newModuleStmt() {
   AstNode *node = allocateAstNode(STMT_MODULE);
   node->stmts = linkedList_allocate();
@@ -265,6 +272,14 @@ void printAST(AstNode node, int indentation) {
       printf("%*sElse:\n", indentation + 2, "");
       printAST(*node.branches.right, indentation + 4);
     }
+    break;
+  }
+  case STMT_WHILE: {
+    printf("%*sStmt While\n", indentation, "");
+    printf("%*sCondition:\n", indentation + 2, "");
+    printAST(*node.expr, indentation + 4);
+    printf("%*sThen:\n", indentation + 2, "");
+    printAST(*node.branches.left, indentation + 4);
     break;
   }
   case STMT_PRINT: {

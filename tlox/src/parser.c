@@ -192,6 +192,16 @@ static AstNode *ifStatement(Parser *parser) {
   return newIfStmt(condition, thenBranch, elseBranch);
 }
 
+static AstNode *whileStatement(Parser *parser) {
+  consume(parser, TOKEN_LEFT_PAREN, "Expect '(' after 'while'.");
+  AstNode *condition = expression(parser);
+  consume(parser, TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
+
+  AstNode *thenBranch = statement(parser);
+
+  return newWhileStmt(condition, thenBranch);
+}
+
 static AstNode *variable(Parser *parser, bool canAssign) {
   Token token = parser->previous;
   if (canAssign && match(parser, TOKEN_EQUAL)) {
@@ -258,13 +268,13 @@ static AstNode *statement(Parser *parser) {
     return node;
   } else if (match(parser, TOKEN_RETURN)) {
     return returnStatement(parser);
+  } else if (match(parser, TOKEN_WHILE)) {
+    return whileStatement(parser);
   } else {
     return expressionStatement(parser);
   }
   /* } else if (match(TOKEN_FOR)) { */
   /*   forStatement(); */
-  /* } else if (match(TOKEN_WHILE)) { */
-  /*   whileStatement(); */
   /* } else if (match(TOKEN_SWITCH)) { */
   /*   switchStatement(); */
   /* } else if (match(TOKEN_CONTINUE)) { */

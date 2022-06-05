@@ -24,7 +24,8 @@ typedef enum {
   STMT_IF,
   STMT_MODULE,
   STMT_PRINT,
-  STMT_RETURN
+  STMT_RETURN,
+  STMT_WHILE
 } NodeType;
 
 typedef struct AstNode AstNode;
@@ -63,6 +64,7 @@ AstNode *newAssignStmt(Token token, AstNode *expr);
 AstNode *newPrintStmt(AstNode *expr);
 AstNode *newIfStmt(AstNode *condition, AstNode *thenBranch,
                    AstNode *elseBranch);
+AstNode *newWhileStmt(AstNode *condition, AstNode *thenBranch);
 AstNode *newModuleStmt();
 AstNode *newBlockStmt();
 AstNode *newFunctionStmt(Token name, AstNode *funcExpr);

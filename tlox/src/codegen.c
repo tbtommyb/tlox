@@ -146,6 +146,12 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     emitByte(&f->chunk, op->first->val.label & 0xff);
     break;
   }
+  case IR_LOOP: {
+    emitByte(&f->chunk, OP_LOOP);
+    emitByte(&f->chunk, (op->first->val.label >> 8) & 0xff);
+    emitByte(&f->chunk, op->first->val.label & 0xff);
+    break;
+  }
   case IR_LABEL: {
     tableSet(labels, NUMBER_VAL(op->first->val.label),
              NUMBER_VAL(f->chunk.count - 1));
@@ -196,9 +202,6 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
   case IR_LESS_EQUAL:
     emitBytes(&f->chunk, OP_GREATER, OP_NOT);
     break;
-  case IR_POP:
-    emitByte(&f->chunk, OP_POP);
-    break;
   case IR_PRINT:
     emitByte(&f->chunk, OP_PRINT);
     break;
@@ -243,29 +246,30 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     break;
   }
   case IR_SET_GLOBAL: {
-    Value name = op->first->val.literal;
-    Symbol symbol = op->second->val.symbol;
-    uint8_t position = identifierConstant(compiler, &f->chunk, name);
+    Symbol symbol = op->first->val.symbol;
+    Value nameString =
+        OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
+    // FIXME: not actually used?
+    Register source = op->second->val.source;
+    uint8_t position = identifierConstant(compiler, &f->chunk, nameString);
 
     emitBytes(&f->chunk, OP_SET_GLOBAL, position);
-    emitByte(&f->chunk, OP_POP);
     break;
   }
   case IR_SET_LOCAL: {
-    Symbol symbol = op->second->val.symbol;
+    Symbol symbol = op->first->val.symbol;
 
-    OpCode op = OP_SET_LOCAL;
+    OpCode opcode = OP_SET_LOCAL;
     int position = resolveLocal(context, &symbol.name);
 
     if (position == -1) {
       position = resolveUpvalue(context, f, &symbol.name);
-      op = OP_SET_UPVALUE;
+      opcode = OP_SET_UPVALUE;
     }
 
     assert(position != -1);
 
-    emitBytes(&f->chunk, op, (uint8_t)position);
-    emitByte(&f->chunk, OP_POP);
+    emitBytes(&f->chunk, opcode, (uint8_t)position);
     break;
   }
   case IR_RETURN: {
@@ -309,19 +313,15 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
   case IR_END_SCOPE: {
     context->scopeDepth--;
 
-    // IR_END_SCOPE at scopeDepth 0 is at function end, so let return
-    // handle clearing the stack
-    if (context->scopeDepth > 0) {
-      while (context->localCount > 0 &&
-             context->locals[context->localCount - 1].depth >
-                 context->scopeDepth) {
-        if (context->locals[context->localCount - 1].isCaptured) {
-          emitByte(&f->chunk, OP_CLOSE_UPVALUE);
-        } else {
-          emitByte(&f->chunk, OP_POP);
-        }
-        context->localCount--;
+    while (context->localCount > 0 &&
+           context->locals[context->localCount - 1].depth >
+               context->scopeDepth) {
+      if (context->locals[context->localCount - 1].isCaptured) {
+        emitByte(&f->chunk, OP_CLOSE_UPVALUE);
+      } else {
+        emitByte(&f->chunk, OP_POP);
       }
+      context->localCount--;
     }
     break;
   }
@@ -366,6 +366,20 @@ static void rewriteLabels(Chunk *chunk, Table *labels) {
       chunk->code[index + 2] = offset & 0xff;
       index++;
     }
+    if (chunk->code[index] == OP_LOOP) {
+      uint8_t hi = chunk->code[index + 1];
+      uint8_t lo = chunk->code[index + 2];
+      LabelId labelId = (hi << 8) | lo;
+      Value location;
+      if (!tableGet(labels, NUMBER_VAL(labelId), &location)) {
+        // error
+        printf("No position found for label %llu\n", labelId);
+      }
+      int offset = index - (int)AS_NUMBER(location) + 2;
+      chunk->code[index + 1] = (offset >> 8) & 0xff;
+      chunk->code[index + 2] = offset & 0xff;
+      index++;
+    }
     index++;
   }
 }
@@ -382,24 +396,6 @@ void generateChunk(Compiler *compiler, CFG *cfg, Table *labels,
 
   rewriteLabels(&f->chunk, labels);
 }
-
-/* static void linkFunctions(Compiler *compiler, ObjFunction *main, Node *fs,
- */
-/*                           ExecutionContext *context) { */
-/*   Node *curr = fs; */
-/*   while (curr != NULL) { */
-/*     ObjFunction *f = (ObjFunction *)curr->data; */
-/*     int constantPosition = makeConstant(compiler, &main->chunk,
- * OBJ_VAL(f));
- */
-
-/*     Value name = OBJ_VAL(copyString(f->name->chars, f->name->length)); */
-/*     uint8_t globalPosition = identifierConstant(compiler, &main->chunk,
- * name); */
-/*     emitBytes(&main->chunk, OP_DEFINE_GLOBAL, globalPosition); */
-/*     curr = curr->next; */
-/*   } */
-/* } */
 
 ObjFunction *compileWorkUnit(Compiler *compiler, WorkUnit *wu, Table *labels) {
   ObjFunction *f = newFunction();

@@ -297,8 +297,11 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     LabelId ifLabelId = getLabelId();
     LabelId elseLabelId = getLabelId();
     LabelId afterLabelId = getLabelId();
-    op = newOperation(IR_COND, newRegisterOperand(bb->curr->destination),
-                      newLabelOperand(elseLabelId));
+
+    bool elseBranchPresent = node->branches.right != NULL;
+    op = newOperation(
+        IR_COND, newRegisterOperand(bb->curr->destination),
+        newLabelOperand(elseBranchPresent ? elseLabelId : afterLabelId));
     bb->curr->next = op;
     bb->curr = op;
 
@@ -306,16 +309,50 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     bb->curr->next = ifLabel;
     bb->curr = ifLabel;
     walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
-    Operation *afterOp = newGotoOperation(afterLabelId);
-    bb->curr->next = afterOp;
-    bb->curr = afterOp;
-    Operation *elseLabel = newLabelOperation(elseLabelId, IR_ELSE_LABEL);
-    bb->curr->next = elseLabel;
-    bb->curr = elseLabel;
-    walkAst(compiler, bb, node->branches.right, activeScope, activeCFG);
+
+    if (elseBranchPresent) {
+      Operation *afterOp = newGotoOperation(afterLabelId);
+      bb->curr->next = afterOp;
+      bb->curr = afterOp;
+      Operation *elseLabel = newLabelOperation(elseLabelId, IR_ELSE_LABEL);
+      bb->curr->next = elseLabel;
+      bb->curr = elseLabel;
+      walkAst(compiler, bb, node->branches.right, activeScope, activeCFG);
+    }
     Operation *afterLabel = newLabelOperation(afterLabelId, IR_LABEL);
     bb->curr->next = afterLabel;
     bb->curr = afterLabel;
+    break;
+  }
+  case STMT_WHILE: {
+    // TODO: tidy up implementation here
+    LabelId exprLabelId = getLabelId();
+    LabelId ifLabelId = getLabelId();
+    LabelId afterLabelId = getLabelId();
+
+    Operation *exprLabel = newLabelOperation(exprLabelId, IR_LABEL);
+    bb->curr->next = exprLabel;
+    bb->curr = exprLabel;
+
+    Operation *expr = walkAst(compiler, bb, node->expr, activeScope, activeCFG);
+    op = newOperation(IR_COND, newRegisterOperand(bb->curr->destination),
+                      newLabelOperand(afterLabelId));
+    bb->curr->next = op;
+    bb->curr = op;
+
+    Operation *ifLabel = newLabelOperation(ifLabelId, IR_LABEL);
+    bb->curr->next = ifLabel;
+    bb->curr = ifLabel;
+    walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
+
+    op = newOperation(IR_LOOP, newLabelOperand(exprLabelId), NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+
+    Operation *afterLabel = newLabelOperation(afterLabelId, IR_ELSE_LABEL);
+    bb->curr->next = afterLabel;
+    bb->curr = afterLabel;
+
     break;
   }
   case STMT_DEFINE_CONST:
@@ -347,9 +384,6 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     break;
   }
   case STMT_ASSIGN: {
-    Value nameString =
-        OBJ_VAL(copyString(node->token.start, node->token.length));
-    Operand *name = newLiteralOperand(nameString);
     op = walkAst(compiler, bb, node->expr, activeScope, activeCFG);
 
     Symbol symbol = {0};
@@ -362,7 +396,8 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
 
     IROp opcode = symbol.type == SCOPE_GLOBAL ? IR_SET_GLOBAL : IR_SET_LOCAL;
 
-    op = newOperation(opcode, name, newSymbolOperand(symbol));
+    op = newOperation(opcode, newSymbolOperand(symbol),
+                      newRegisterOperand(op->destination));
     bb->curr->next = op;
     bb->curr = op;
     break;
@@ -421,8 +456,19 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
       bb->curr = op;
       paramNode = paramNode->next;
     }
-    activeCFG->arity = node->arity;
-    walkAst(compiler, bb, node->expr, activeScope, activeCFG);
+    activeCFG->arity = node->arity; // FIXME: unused?
+
+    op = newOperation(IR_BEGIN_SCOPE, NULL, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+
+    Node *blockNode = (Node *)node->expr->stmts->head;
+
+    while (blockNode != NULL) {
+      walkAst(compiler, bb, blockNode->data, node->expr->scope, activeCFG);
+      blockNode = blockNode->next;
+    }
+
     break;
   }
   case STMT_RETURN: {
@@ -640,14 +686,14 @@ char *opcodeString(IROp opcode) {
     return "-";
   case IR_NIL:
     return "nil";
-  case IR_POP:
-    return "pop";
   case IR_PRINT:
     return "print";
   case IR_GOTO:
     return "goto";
   case IR_LABEL:
     return "label";
+  case IR_LOOP:
+    return "loop";
   case IR_DEFINE_LOCAL:
     return "l define";
   case IR_DEFINE_GLOBAL:
@@ -670,6 +716,8 @@ char *opcodeString(IROp opcode) {
     return "function";
   case IR_SUBTRACT:
     return "-";
+  case IR_STMT_EXPR:
+    return "stmt expr";
   case IR_UNKNOWN:
   default:
     return "?";
