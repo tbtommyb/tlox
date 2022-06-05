@@ -21,6 +21,7 @@ typedef enum {
   STMT_DEFINE_CONST,
   STMT_EXPR,
   STMT_FUNCTION,
+  STMT_FOR,
   STMT_IF,
   STMT_MODULE,
   STMT_PRINT,
@@ -36,7 +37,10 @@ struct AstNode {
   NodeType type;
   Value literal;
   TokenType op;
+  AstNode *preExpr;
+  AstNode *condExpr;
   AstNode *expr;
+  AstNode *postExpr;
   struct {
     AstNode *left;
     AstNode *right;
@@ -65,6 +69,8 @@ AstNode *newPrintStmt(AstNode *expr);
 AstNode *newIfStmt(AstNode *condition, AstNode *thenBranch,
                    AstNode *elseBranch);
 AstNode *newWhileStmt(AstNode *condition, AstNode *thenBranch);
+AstNode *newForStmt(AstNode *initNode, AstNode *conditionNode,
+                    AstNode *postNode, AstNode *bodyNode);
 AstNode *newModuleStmt();
 AstNode *newBlockStmt();
 AstNode *newFunctionStmt(Token name, AstNode *funcExpr);

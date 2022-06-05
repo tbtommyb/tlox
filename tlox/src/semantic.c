@@ -146,6 +146,17 @@ void analyse(AstNode *node, Compiler *compiler, FunctionType currentEnv) {
     analyse(node->branches.left, compiler, currentEnv);
     break;
   }
+  case STMT_FOR: {
+    node->scope = beginScope(compiler, compiler->currentScope->type);
+
+    analyse(node->preExpr, compiler, currentEnv);
+    analyse(node->condExpr, compiler, currentEnv);
+    analyse(node->postExpr, compiler, currentEnv);
+    analyse(node->expr, compiler, currentEnv);
+
+    endScope(compiler);
+    break;
+  }
   case STMT_FUNCTION: {
     Symbol existing = {0};
     if (scope_search(compiler->currentScope, node->token.start,

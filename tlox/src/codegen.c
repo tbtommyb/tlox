@@ -205,6 +205,9 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
   case IR_PRINT:
     emitByte(&f->chunk, OP_PRINT);
     break;
+  case IR_POP:
+    emitByte(&f->chunk, OP_POP);
+    break;
   case IR_DEFINE_GLOBAL: {
     Symbol symbol = op->first->val.symbol;
     Value name = OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
@@ -360,13 +363,14 @@ static void rewriteLabels(Chunk *chunk, Table *labels) {
       if (!tableGet(labels, NUMBER_VAL(labelId), &location)) {
         // error
         printf("No position found for label %llu\n", labelId);
+        return;
       }
       int offset = (int)AS_NUMBER(location) - index - 2;
       chunk->code[index + 1] = (offset >> 8) & 0xff;
       chunk->code[index + 2] = offset & 0xff;
       index++;
-    }
-    if (chunk->code[index] == OP_LOOP) {
+      index++;
+    } else if (chunk->code[index] == OP_LOOP) {
       uint8_t hi = chunk->code[index + 1];
       uint8_t lo = chunk->code[index + 2];
       LabelId labelId = (hi << 8) | lo;
@@ -374,10 +378,19 @@ static void rewriteLabels(Chunk *chunk, Table *labels) {
       if (!tableGet(labels, NUMBER_VAL(labelId), &location)) {
         // error
         printf("No position found for label %llu\n", labelId);
+        return;
       }
       int offset = index - (int)AS_NUMBER(location) + 2;
       chunk->code[index + 1] = (offset >> 8) & 0xff;
       chunk->code[index + 2] = offset & 0xff;
+      index++;
+      index++;
+    } else if (chunk->code[index] == OP_GET_LOCAL ||
+               chunk->code[index] == OP_DEFINE_GLOBAL ||
+               chunk->code[index] == OP_GET_GLOBAL ||
+               chunk->code[index] == OP_SET_GLOBAL ||
+               chunk->code[index] == OP_SET_LOCAL ||
+               chunk->code[index] == OP_CALL) {
       index++;
     }
     index++;

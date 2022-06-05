@@ -105,6 +105,17 @@ AstNode *newWhileStmt(AstNode *condition, AstNode *thenBranch) {
   return node;
 }
 
+AstNode *newForStmt(AstNode *initNode, AstNode *conditionNode,
+                    AstNode *postNode, AstNode *bodyNode) {
+
+  AstNode *node = allocateAstNode(STMT_FOR);
+  node->preExpr = initNode;
+  node->condExpr = conditionNode;
+  node->postExpr = postNode;
+  node->expr = bodyNode;
+  return node;
+}
+
 AstNode *newModuleStmt() {
   AstNode *node = allocateAstNode(STMT_MODULE);
   node->stmts = linkedList_allocate();
@@ -280,6 +291,24 @@ void printAST(AstNode node, int indentation) {
     printAST(*node.expr, indentation + 4);
     printf("%*sThen:\n", indentation + 2, "");
     printAST(*node.branches.left, indentation + 4);
+    break;
+  }
+  case STMT_FOR: {
+    printf("%*sStmt For\n", indentation, "");
+    if (node.preExpr) {
+      printf("%*sInit:\n", indentation + 2, "");
+      printAST(*node.preExpr, indentation + 4);
+    }
+    if (node.condExpr) {
+      printf("%*sCondition:\n", indentation + 2, "");
+      printAST(*node.condExpr, indentation + 4);
+    }
+    if (node.postExpr) {
+      printf("%*sPost:\n", indentation + 2, "");
+      printAST(*node.postExpr, indentation + 4);
+    }
+    printf("%*sBody:\n", indentation + 2, "");
+    printAST(*node.expr, indentation + 4);
     break;
   }
   case STMT_PRINT: {

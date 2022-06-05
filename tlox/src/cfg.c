@@ -355,6 +355,86 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
 
     break;
   }
+  case STMT_FOR: {
+    // FIXME: create scope
+    LabelId preLabelId = getLabelId();
+    LabelId condLabelId = getLabelId();
+    LabelId bodyLabelId = getLabelId();
+    LabelId postLabelId = getLabelId();
+    LabelId afterLabelId = getLabelId();
+
+    Operation *preExprLabel = newLabelOperation(preLabelId, IR_LABEL);
+    bb->curr->next = preExprLabel;
+    bb->curr = preExprLabel;
+
+    op = newOperation(IR_BEGIN_SCOPE, NULL, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+
+    if (node->preExpr != NULL) {
+      walkAst(compiler, bb, node->preExpr, node->scope, activeCFG);
+    }
+
+    Operation *condExprLabel = newLabelOperation(condLabelId, IR_LABEL);
+    bb->curr->next = condExprLabel;
+    bb->curr = condExprLabel;
+
+    if (node->condExpr != NULL) {
+      Operation *condExpr =
+          walkAst(compiler, bb, node->condExpr, node->scope, activeCFG);
+      Operation *condOp =
+          newOperation(IR_COND, newRegisterOperand(condExpr->destination),
+                       newLabelOperand(afterLabelId));
+      bb->curr->next = condOp;
+      bb->curr = condOp;
+    }
+    Operation *jumpToBody = newGotoOperation(bodyLabelId);
+    bb->curr->next = jumpToBody;
+    bb->curr = jumpToBody;
+
+    Operation *postExprLabel = newLabelOperation(postLabelId, IR_LABEL);
+    bb->curr->next = postExprLabel;
+    bb->curr = postExprLabel;
+
+    if (node->postExpr != NULL) {
+      walkAst(compiler, bb, node->postExpr, node->scope, activeCFG);
+      // FIXME: don't like having POP in IR
+      Operation *popPostExpr = newOperation(IR_POP, NULL, NULL);
+      bb->curr->next = popPostExpr;
+      bb->curr = popPostExpr;
+    }
+
+    Operation *loopOp =
+        newOperation(IR_LOOP, newLabelOperand(condLabelId), NULL);
+    bb->curr->next = loopOp;
+    bb->curr = loopOp;
+
+    Operation *bodyExprLabel = newLabelOperation(bodyLabelId, IR_LABEL);
+    bb->curr->next = bodyExprLabel;
+    bb->curr = bodyExprLabel;
+
+    Node *blockNode = (Node *)node->expr->stmts->head;
+
+    while (blockNode != NULL) {
+      walkAst(compiler, bb, blockNode->data, node->expr->scope, activeCFG);
+      blockNode = blockNode->next;
+    }
+
+    Operation *secondLoop =
+        newOperation(IR_LOOP, newLabelOperand(postLabelId), NULL);
+    bb->curr->next = secondLoop;
+    bb->curr = secondLoop;
+
+    Operation *afterLabel = newLabelOperation(afterLabelId, IR_ELSE_LABEL);
+    bb->curr->next = afterLabel;
+    bb->curr = afterLabel;
+
+    op = newOperation(IR_END_SCOPE, NULL, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+
+    break;
+  }
   case STMT_DEFINE_CONST:
   case STMT_DEFINE: {
     if (node->expr == NULL) {
@@ -586,6 +666,7 @@ void constructCFG(CFG *cfg, BasicBlock *irList) {
         tableSet(&labelBasicBlockMapping, NUMBER_VAL(labelId),
                  POINTER_VAL(labelBB));
       }
+      currentBB->trueEdge = labelBB;
       currentBB = labelBB;
       currentBB->ops = currentOp->next;
     } else if (currentOp->opcode == IR_GOTO) {
@@ -602,7 +683,9 @@ void constructCFG(CFG *cfg, BasicBlock *irList) {
       }
 
       currentBB->trueEdge = elseBranchBB;
-    } else if (currentOp->next != NULL && currentOp->next->opcode == IR_LABEL) {
+    } else if (currentOp->next != NULL &&
+               (currentOp->next->opcode == IR_LABEL ||
+                currentOp->next->opcode == IR_ELSE_LABEL)) {
       Value labelBBPtr;
       BasicBlock *labelBB = NULL;
       LabelId labelId = currentOp->next->first->val.label;
@@ -706,6 +789,8 @@ char *opcodeString(IROp opcode) {
     return "l var";
   case IR_SET_LOCAL:
     return "l assign";
+  case IR_POP:
+    return "pop";
   case IR_RETURN:
     return "return";
   case IR_BEGIN_SCOPE:
@@ -816,24 +901,6 @@ void printWorkUnits(WorkUnit *root) {
 
 static CFG *newCFG(Compiler *compiler, WorkUnit *wu) {
   BasicBlock *irList = newBasicBlock(wu->node);
-
-  // Initialise context. Move somewhere else once functions supported
-  /* Symbol symbol = {0}; */
-  /* if (compiler->type != TYPE_FUNCTION) { */
-  /*   if (!st_get(compiler->currentScope->st, "this", 0, &symbol)) { */
-  /*     error(compiler, "'this' is not defined in current scope."); */
-  /*     return NULL; */
-  /*   } */
-  /* } else { */
-  /*   if (!st_get(compiler->currentScope->st, "", 0, &symbol)) { */
-  /*     error(compiler, "'\"\"' is not defined in current scope."); */
-  /*     return NULL; */
-  /*   } */
-  /* } */
-  /* Operation *op = newOperation(IR_DEFINE_LOCAL, newSymbolOperand(symbol),
-   * NULL); */
-  /* irList->curr->next = op; */
-  /* irList->curr = op; */
 
   CFG *cfg = allocateCFG(wu->node->token);
   cfg->context->enclosing = wu->enclosing;

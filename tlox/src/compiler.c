@@ -30,24 +30,6 @@ Table labels;
 
 /* ClassCompiler *currentClass = NULL; */
 
-/* static void emitLoop(int loopStart) { */
-/*   emitByte(OP_LOOP); */
-
-/*   int offset = currentChunk()->count - loopStart + 2; */
-/*   if (offset > UINT16_MAX) */
-/*     error("Loop body too large."); */
-
-/*   emitByte((offset >> 8) & 0xff); */
-/*   emitByte(offset & 0xff); */
-/* } */
-
-/* static int emitJump(uint8_t instruction) { */
-/*   emitByte(instruction); */
-/*   emitByte(0xff); */
-/*   emitByte(0xff); */
-/*   return currentChunk()->count - 2; */
-/* } */
-
 /* static void emitReturn() { */
 /*   if (current->type == TYPE_INITIALIZER) { */
 /*     emitBytes(OP_GET_LOCAL, 0); */
@@ -55,18 +37,6 @@ Table labels;
 /*     emitByte(OP_NIL); */
 /*   } */
 /*   emitByte(OP_RETURN); */
-/* } */
-
-/* static void patchJump(int offset) { */
-/*   // -2 to adjust for the bytecode for the jump offset itself. */
-/*   int jump = currentChunk()->count - offset - 2; */
-
-/*   if (jump > UINT16_MAX) { */
-/*     error("Too much code to jump over."); */
-/*   } */
-
-/*   currentChunk()->code[offset] = (jump >> 8) & 0xff; */
-/*   currentChunk()->code[offset + 1] = jump & 0xff; */
 /* } */
 
 void errorAt(Compiler *compiler, Token *token, const char *message) {
@@ -144,83 +114,6 @@ void errorAtCurrent(Compiler *compiler, const char *message) {
 /*   } */
 /*   function(type); */
 /*   emitBytes(OP_METHOD, constant); */
-/* } */
-
-/* static void whileStatement() { */
-/*   int oldLoopOffset = current->loopOffset; */
-/*   int oldStackDepth = current->currentStackDepth; */
-/*   current->loopOffset = currentChunk()->count; */
-/*   current->currentStackDepth = current->scopeDepth; */
-
-/*   consume(TOKEN_LEFT_PAREN, "Expect '(' after 'while'."); */
-/*   expression(); */
-/*   consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition."); */
-
-/*   int exitJump = emitJump(OP_JUMP_IF_FALSE); */
-/*   emitByte(OP_POP); */
-/*   statement(); */
-/*   emitLoop(current->loopOffset); */
-
-/*   patchJump(exitJump); */
-/*   emitByte(OP_POP); */
-/*   current->loopOffset = oldLoopOffset; */
-/*   current->currentStackDepth = oldStackDepth; */
-/* } */
-
-/* static void forStatement() { */
-/*   beginScope(); */
-/*   consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'."); */
-
-/*   int oldLoopOffset = current->loopOffset; */
-/*   int oldStackDepth = current->currentStackDepth; */
-
-/*   if (match(TOKEN_SEMICOLON)) { */
-/*     // No initializer. */
-/*   } else if (match(TOKEN_VAR)) { */
-/*     varDeclaration(false); */
-/*   } else { */
-/*     expressionStatement(); */
-/*   } */
-
-/*   current->loopOffset = currentChunk()->count; */
-/*   current->currentStackDepth = current->scopeDepth; */
-
-/*   int exitJump = -1; */
-/*   if (!match(TOKEN_SEMICOLON)) { */
-/*     expression(); */
-/*     consume(TOKEN_SEMICOLON, "Expect ';' after loop condition."); */
-
-/*     // Jump out of the loop if the condition is false. */
-/*     exitJump = emitJump(OP_JUMP_IF_FALSE); */
-/*     emitByte(OP_POP); // Condition. */
-/*   } */
-
-/*   if (!match(TOKEN_RIGHT_PAREN)) { */
-/*     int bodyJump = emitJump(OP_JUMP); */
-/*     int incrementStart = currentChunk()->count; */
-
-/*     expression(); */
-/*     emitByte(OP_POP); */
-/*     consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses."); */
-
-/*     emitLoop(current->loopOffset); */
-/*     current->loopOffset = incrementStart; */
-/*     patchJump(bodyJump); */
-/*   } */
-
-/*   statement(); */
-
-/*   emitLoop(current->loopOffset); */
-
-/*   if (exitJump != -1) { */
-/*     patchJump(exitJump); */
-/*     emitByte(OP_POP); // Condition. */
-/*   } */
-
-/*   current->loopOffset = oldLoopOffset; */
-/*   current->currentStackDepth = oldStackDepth; */
-
-/*   endScope(); */
 /* } */
 
 /* static void switchStatement() { */

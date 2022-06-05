@@ -39,6 +39,7 @@ typedef enum IROp {
   IR_NIL,
   IR_NOT,
   IR_NOT_EQUAL,
+  IR_POP,
   IR_PRINT,
   IR_RETURN,
   IR_CODE_START,

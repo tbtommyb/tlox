@@ -178,6 +178,35 @@ static AstNode *expressionStatement(Parser *parser) {
   return node;
 }
 
+static AstNode *forStatement(Parser *parser) {
+  consume(parser, TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
+
+  AstNode *initNode = NULL;
+  if (match(parser, TOKEN_SEMICOLON)) {
+    // No initializer.
+  } else if (match(parser, TOKEN_VAR)) {
+    initNode = varDeclaration(parser, false);
+  } else {
+    initNode = expressionStatement(parser);
+  }
+
+  AstNode *conditionNode = NULL;
+  if (!match(parser, TOKEN_SEMICOLON)) {
+    conditionNode = expression(parser);
+    consume(parser, TOKEN_SEMICOLON, "Expect ';' after loop condition.");
+  }
+
+  AstNode *postNode = NULL;
+  if (!match(parser, TOKEN_RIGHT_PAREN)) {
+    postNode = expression(parser);
+    consume(parser, TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
+  }
+
+  AstNode *bodyNode = statement(parser);
+
+  return newForStmt(initNode, conditionNode, postNode, bodyNode);
+}
+
 static AstNode *ifStatement(Parser *parser) {
   consume(parser, TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
   AstNode *condition = expression(parser);
@@ -263,9 +292,10 @@ static AstNode *statement(Parser *parser) {
     return printStatement(parser);
   } else if (match(parser, TOKEN_IF)) {
     return ifStatement(parser);
+  } else if (match(parser, TOKEN_FOR)) {
+    return forStatement(parser);
   } else if (match(parser, TOKEN_LEFT_BRACE)) {
-    AstNode *node = block(parser);
-    return node;
+    return block(parser);
   } else if (match(parser, TOKEN_RETURN)) {
     return returnStatement(parser);
   } else if (match(parser, TOKEN_WHILE)) {
@@ -273,8 +303,6 @@ static AstNode *statement(Parser *parser) {
   } else {
     return expressionStatement(parser);
   }
-  /* } else if (match(TOKEN_FOR)) { */
-  /*   forStatement(); */
   /* } else if (match(TOKEN_SWITCH)) { */
   /*   switchStatement(); */
   /* } else if (match(TOKEN_CONTINUE)) { */
@@ -359,9 +387,9 @@ ParseRule rules[] = {
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
     /* [TOKEN_AND] = {NULL, and_, PREC_AND}, */
     /* [TOKEN_CLASS] = {NULL, NULL, PREC_NONE}, */
-    /* [TOKEN_ELSE] = {NULL, NULL, PREC_NONE}, */
+    [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
-    /* [TOKEN_FOR] = {NULL, NULL, PREC_NONE}, */
+    [TOKEN_FOR] = {NULL, NULL, PREC_NONE},
     [TOKEN_FUN] = {NULL, NULL, PREC_NONE},
     [TOKEN_IF] = {NULL, NULL, PREC_NONE},
     [TOKEN_NIL] = {literal, NULL, PREC_NONE},
@@ -372,7 +400,7 @@ ParseRule rules[] = {
     /* [TOKEN_THIS] = {this_, NULL, PREC_NONE}, */
     [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
     [TOKEN_VAR] = {NULL, NULL, PREC_NONE},
-    /* [TOKEN_WHILE] = {NULL, NULL, PREC_NONE}, */
+    [TOKEN_WHILE] = {NULL, NULL, PREC_NONE},
     /* [TOKEN_ERROR] = {NULL, NULL, PREC_NONE}, */
     [TOKEN_EOF] = {NULL, NULL, PREC_NONE},
     /* [TOKEN_QUESTION] = {NULL, ternary, PREC_OR}, */
