@@ -22,6 +22,7 @@ typedef enum IROp {
   IR_CALL,
   IR_CONSTANT,
   IR_COND,
+  IR_COND_NO_POP,
   IR_DIVIDE,
   IR_BEGIN_SCOPE,
   IR_END_SCOPE,

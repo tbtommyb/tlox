@@ -265,6 +265,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   }
   case EXPR_AND: {
     LabelId afterLabelId = getLabelId();
+    LabelId trueLabelId = getLabelId();
     Operation *left =
         walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
 
@@ -272,6 +273,42 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
                       newLabelOperand(afterLabelId));
     bb->curr->next = op;
     bb->curr = op;
+
+    Operation *trueLabel = newLabelOperation(trueLabelId, IR_LABEL);
+    bb->curr->next = trueLabel;
+    bb->curr = trueLabel;
+
+    Operation *right =
+        walkAst(compiler, bb, node->branches.right, activeScope, activeCFG);
+
+    Operation *afterLabel = newLabelOperation(afterLabelId, IR_LABEL);
+    bb->curr->next = afterLabel;
+    bb->curr = afterLabel;
+
+    break;
+  }
+  case EXPR_OR: {
+    LabelId afterLabelId = getLabelId();
+    LabelId elseLabelId = getLabelId();
+    Operation *left =
+        walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
+
+    op = newOperation(IR_COND_NO_POP, newRegisterOperand(bb->curr->destination),
+                      newLabelOperand(elseLabelId));
+    bb->curr->next = op;
+    bb->curr = op;
+
+    Operation *trueOp = newGotoOperation(afterLabelId);
+    bb->curr->next = trueOp;
+    bb->curr = trueOp;
+
+    Operation *elseLabel = newLabelOperation(elseLabelId, IR_LABEL);
+    bb->curr->next = elseLabel;
+    bb->curr = elseLabel;
+
+    Operation *popOp = newOperation(IR_POP, NULL, NULL);
+    bb->curr->next = popOp;
+    bb->curr = popOp;
 
     Operation *right =
         walkAst(compiler, bb, node->branches.right, activeScope, activeCFG);
@@ -767,6 +804,8 @@ char *opcodeString(IROp opcode) {
     return "<start>";
   case IR_COND:
     return "cond";
+  case IR_COND_NO_POP:
+    return "cond_np";
   case IR_DIVIDE:
     return "/";
   case IR_EQUAL:

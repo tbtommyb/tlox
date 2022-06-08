@@ -140,6 +140,14 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     emitByte(&f->chunk, OP_POP);
     break;
   }
+  case IR_COND_NO_POP: {
+    // Write label ID into instruction stream and later rewrite symbolic
+    // addresses
+    emitByte(&f->chunk, OP_JUMP_IF_FALSE);
+    emitByte(&f->chunk, (op->second->val.label >> 8) & 0xff);
+    emitByte(&f->chunk, op->second->val.label & 0xff);
+    break;
+  }
   case IR_GOTO: {
     emitByte(&f->chunk, OP_JUMP);
     emitByte(&f->chunk, (op->first->val.label >> 8) & 0xff);

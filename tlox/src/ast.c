@@ -43,10 +43,9 @@ AstNode *newUnaryExpr(AstNode *right, TokenType op) {
   return node;
 }
 
-AstNode *newAndExpr() {
-  AstNode *node = allocateAstNode(EXPR_AND);
-  return node;
-}
+AstNode *newAndExpr() { return allocateAstNode(EXPR_AND); }
+
+AstNode *newOrExpr() { return allocateAstNode(EXPR_OR); }
 
 AstNode *newVariableExpr(Token token) {
   AstNode *node = allocateAstNode(EXPR_VARIABLE);
@@ -205,6 +204,14 @@ void printAST(AstNode node, int indentation) {
   }
   case EXPR_AND: {
     printf("%*sExpr And\n", indentation, "");
+    printf("%*sLeft:\n", indentation + 2, "");
+    printAST(*node.branches.left, indentation + 4);
+    printf("%*sRight:\n", indentation + 2, "");
+    printAST(*node.branches.right, indentation + 4);
+    break;
+  }
+  case EXPR_OR: {
+    printf("%*sExpr Or\n", indentation, "");
     printf("%*sLeft:\n", indentation + 2, "");
     printAST(*node.branches.left, indentation + 4);
     printf("%*sRight:\n", indentation + 2, "");

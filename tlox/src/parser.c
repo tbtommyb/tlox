@@ -361,10 +361,14 @@ static AstNode *call(Parser *parser, bool canAssign) {
 
 static AstNode *and_(Parser *parser, bool canAssign) {
   AstNode *expr = newAndExpr();
-  /* int endJump = emitJump(OP_JUMP_IF_FALSE); */
-
-  /* emitByte(OP_POP); */
   expr->branches.right = parsePrecedence(parser, PREC_AND);
+
+  return expr;
+}
+
+static AstNode *or_(Parser *parser, bool canAssign) {
+  AstNode *expr = newOrExpr();
+  expr->branches.right = parsePrecedence(parser, PREC_OR);
 
   return expr;
 }
@@ -403,7 +407,7 @@ ParseRule rules[] = {
     [TOKEN_FUN] = {NULL, NULL, PREC_NONE},
     [TOKEN_IF] = {NULL, NULL, PREC_NONE},
     [TOKEN_NIL] = {literal, NULL, PREC_NONE},
-    /* [TOKEN_OR] = {NULL, or_, PREC_OR}, */
+    [TOKEN_OR] = {NULL, or_, PREC_OR},
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
     [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
     /* [TOKEN_SUPER] = {super_, NULL, PREC_NONE}, */

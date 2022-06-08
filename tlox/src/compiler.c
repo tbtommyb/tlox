@@ -248,17 +248,6 @@ void errorAtCurrent(Compiler *compiler, const char *message) {
 /*   currentClass = currentClass->enclosing; */
 /* } */
 
-/* static void or_(bool canAssign) { */
-/*   int elseJump = emitJump(OP_JUMP_IF_FALSE); */
-/*   int endJump = emitJump(OP_JUMP); */
-
-/*   patchJump(elseJump); */
-/*   emitByte(OP_POP); */
-
-/*   parsePrecedence(PREC_OR); */
-/*   patchJump(endJump); */
-/* } */
-
 /* static void this_(bool canAssign) { */
 /*   variable(false); */
 /*   if (currentClass == NULL) { */

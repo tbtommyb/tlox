@@ -10,6 +10,7 @@
 
 typedef enum {
   EXPR_AND,
+  EXPR_OR,
   EXPR_BINARY,
   EXPR_CALL,
   EXPR_FUNCTION,
@@ -58,6 +59,7 @@ static inline bool isNodeType(AstNode node, NodeType type) {
 }
 
 AstNode *newAndExpr();
+AstNode *newOrExpr();
 AstNode *newLiteralExpr(Value value);
 AstNode *newBinaryExpr(AstNode *left, AstNode *right, TokenType operator);
 AstNode *newUnaryExpr(AstNode *right, TokenType operator);
