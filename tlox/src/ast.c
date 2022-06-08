@@ -43,6 +43,11 @@ AstNode *newUnaryExpr(AstNode *right, TokenType op) {
   return node;
 }
 
+AstNode *newAndExpr() {
+  AstNode *node = allocateAstNode(EXPR_AND);
+  return node;
+}
+
 AstNode *newVariableExpr(Token token) {
   AstNode *node = allocateAstNode(EXPR_VARIABLE);
   node->token = token;
@@ -198,6 +203,14 @@ void printAST(AstNode node, int indentation) {
     printAST(*node.branches.right, indentation + 4);
     break;
   }
+  case EXPR_AND: {
+    printf("%*sExpr And\n", indentation, "");
+    printf("%*sLeft:\n", indentation + 2, "");
+    printAST(*node.branches.left, indentation + 4);
+    printf("%*sRight:\n", indentation + 2, "");
+    printAST(*node.branches.right, indentation + 4);
+    break;
+  }
   case EXPR_BINARY: {
     printf("%*sExpr Binary\n", indentation, "");
     printf("%*sOp: %s\n", indentation + 2, "", tokenTypeStr(node.op));
@@ -313,8 +326,7 @@ void printAST(AstNode node, int indentation) {
   }
   case STMT_PRINT: {
     printf("%*sStmt Print\n", indentation, "");
-    printf("%*sExpr:\n", indentation + 2, "");
-    printAST(*node.expr, indentation + 4);
+    printAST(*node.expr, indentation + 2);
     break;
   }
   case STMT_RETURN: {

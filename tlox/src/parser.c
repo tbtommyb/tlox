@@ -359,6 +359,16 @@ static AstNode *call(Parser *parser, bool canAssign) {
   return expr;
 }
 
+static AstNode *and_(Parser *parser, bool canAssign) {
+  AstNode *expr = newAndExpr();
+  /* int endJump = emitJump(OP_JUMP_IF_FALSE); */
+
+  /* emitByte(OP_POP); */
+  expr->branches.right = parsePrecedence(parser, PREC_AND);
+
+  return expr;
+}
+
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
@@ -385,7 +395,7 @@ ParseRule rules[] = {
     [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
-    /* [TOKEN_AND] = {NULL, and_, PREC_AND}, */
+    [TOKEN_AND] = {NULL, and_, PREC_AND},
     /* [TOKEN_CLASS] = {NULL, NULL, PREC_NONE}, */
     [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE},

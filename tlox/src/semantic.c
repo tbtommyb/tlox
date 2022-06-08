@@ -35,6 +35,11 @@ void analyse(AstNode *node, Compiler *compiler, FunctionType currentEnv) {
     analyse(node->branches.right, compiler, currentEnv);
     break;
   }
+  case EXPR_AND: {
+    analyse(node->branches.left, compiler, currentEnv);
+    analyse(node->branches.right, compiler, currentEnv);
+    break;
+  }
   case EXPR_VARIABLE: {
     Symbol symbol = {0};
     if (!scope_search(compiler->currentScope, node->token.start,

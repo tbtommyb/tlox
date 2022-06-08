@@ -263,6 +263,25 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     bb->curr = op;
     break;
   }
+  case EXPR_AND: {
+    LabelId afterLabelId = getLabelId();
+    Operation *left =
+        walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
+
+    op = newOperation(IR_COND, newRegisterOperand(bb->curr->destination),
+                      newLabelOperand(afterLabelId));
+    bb->curr->next = op;
+    bb->curr = op;
+
+    Operation *right =
+        walkAst(compiler, bb, node->branches.right, activeScope, activeCFG);
+
+    Operation *afterLabel = newLabelOperation(afterLabelId, IR_LABEL);
+    bb->curr->next = afterLabel;
+    bb->curr = afterLabel;
+
+    break;
+  }
   case EXPR_VARIABLE: {
     Value nameString =
         OBJ_VAL(copyString(node->token.start, node->token.length));

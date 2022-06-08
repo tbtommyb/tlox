@@ -66,15 +66,6 @@ void errorAtCurrent(Compiler *compiler, const char *message) {
   errorAt(compiler, &compiler->parser->current, message);
 }
 
-/* static void and_(bool canAssign) { */
-/*   int endJump = emitJump(OP_JUMP_IF_FALSE); */
-
-/*   emitByte(OP_POP); */
-/*   parsePrecedence(PREC_AND); */
-
-/*   patchJump(endJump); */
-/* } */
-
 /* static void dot(bool canAssign) { */
 /*   consume(TOKEN_IDENTIFIER, "Expect property name after '.'."); */
 /*   uint8_t name = identifierConstant(&parser.previous); */
