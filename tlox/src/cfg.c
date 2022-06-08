@@ -388,26 +388,27 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
       bb->curr->next = condOp;
       bb->curr = condOp;
     }
-    Operation *jumpToBody = newGotoOperation(bodyLabelId);
-    bb->curr->next = jumpToBody;
-    bb->curr = jumpToBody;
-
-    Operation *postExprLabel = newLabelOperation(postLabelId, IR_LABEL);
-    bb->curr->next = postExprLabel;
-    bb->curr = postExprLabel;
 
     if (node->postExpr != NULL) {
+      Operation *jumpToBody = newGotoOperation(bodyLabelId);
+      bb->curr->next = jumpToBody;
+      bb->curr = jumpToBody;
+
+      Operation *postExprLabel = newLabelOperation(postLabelId, IR_LABEL);
+      bb->curr->next = postExprLabel;
+      bb->curr = postExprLabel;
+
       walkAst(compiler, bb, node->postExpr, node->scope, activeCFG);
       // FIXME: don't like having POP in IR
       Operation *popPostExpr = newOperation(IR_POP, NULL, NULL);
       bb->curr->next = popPostExpr;
       bb->curr = popPostExpr;
-    }
 
-    Operation *loopOp =
-        newOperation(IR_LOOP, newLabelOperand(condLabelId), NULL);
-    bb->curr->next = loopOp;
-    bb->curr = loopOp;
+      Operation *loopOp =
+          newOperation(IR_LOOP, newLabelOperand(condLabelId), NULL);
+      bb->curr->next = loopOp;
+      bb->curr = loopOp;
+    }
 
     Operation *bodyExprLabel = newLabelOperation(bodyLabelId, IR_LABEL);
     bb->curr->next = bodyExprLabel;
@@ -420,8 +421,10 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
       blockNode = blockNode->next;
     }
 
-    Operation *secondLoop =
-        newOperation(IR_LOOP, newLabelOperand(postLabelId), NULL);
+    Operation *secondLoop = newOperation(
+        IR_LOOP,
+        newLabelOperand(node->postExpr != NULL ? postLabelId : condLabelId),
+        NULL);
     bb->curr->next = secondLoop;
     bb->curr = secondLoop;
 
