@@ -14,20 +14,26 @@ typedef enum {
   EXPR_BINARY,
   EXPR_CALL,
   EXPR_FUNCTION,
+  EXPR_GET_PROPERTY,
+  EXPR_INVOKE,
   EXPR_LITERAL,
   EXPR_UNARY,
   EXPR_VARIABLE,
   STMT_ASSIGN,
   STMT_BLOCK,
+  STMT_CLASS,
+  STMT_CLASS_BODY,
   STMT_DEFINE,
   STMT_DEFINE_CONST,
   STMT_EXPR,
   STMT_FUNCTION,
   STMT_FOR,
   STMT_IF,
+  STMT_METHOD,
   STMT_MODULE,
   STMT_PRINT,
   STMT_RETURN,
+  STMT_SET_PROPERTY,
   STMT_WHILE
 } NodeType;
 
@@ -49,9 +55,13 @@ struct AstNode {
   } branches;
   LinkedList *stmts;
   LinkedList *params;
+  LinkedList *methods;
   Token token;
+  Token superclass;
   Scope *scope;
   int arity;
+  FunctionType functionType;
+  bool isPropertyInvocation;
 };
 
 static inline bool isNodeType(AstNode node, NodeType type) {
@@ -64,8 +74,12 @@ AstNode *newLiteralExpr(Value value);
 AstNode *newBinaryExpr(AstNode *left, AstNode *right, TokenType operator);
 AstNode *newUnaryExpr(AstNode *right, TokenType operator);
 AstNode *newVariableExpr(Token token);
-AstNode *newFunctionExpr();
-AstNode *newCallExpr(Token name);
+AstNode *newFunctionExpr(FunctionType functionType);
+AstNode *newCallExpr();
+AstNode *newInvocationExpr(Token name);
+AstNode *newGetPropertyExpr(Token name);
+AstNode *newClassStmt(Token name);
+AstNode *newClassBodyStmt();
 AstNode *newDefineStmt(Token token, AstNode *expr);
 AstNode *newConstDefineStmt(Token token, AstNode *expr);
 AstNode *newAssignStmt(Token token, AstNode *expr);
@@ -76,10 +90,12 @@ AstNode *newWhileStmt(AstNode *condition, AstNode *thenBranch);
 AstNode *newForStmt(AstNode *initNode, AstNode *conditionNode,
                     AstNode *postNode, AstNode *bodyNode);
 AstNode *newModuleStmt();
+AstNode *newMethodStmt(Token name, AstNode *expr);
 AstNode *newBlockStmt();
 AstNode *newFunctionStmt(Token name, AstNode *funcExpr);
 AstNode *newReturnStmt(AstNode *expr);
 AstNode *newExprStmt(AstNode *expr);
+AstNode *newSetPropertyStmt(Token property, AstNode *expr);
 
 void printAST(AstNode root, int indentation);
 

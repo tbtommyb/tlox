@@ -16,8 +16,12 @@ static AstNode *allocateAstNode(NodeType type) {
   node->branches.right = NULL;
   node->stmts = NULL;
   node->params = NULL;
+  node->methods = NULL;
   node->arity = 0;
   node->scope = NULL;
+  node->token = (Token){0};
+  node->superclass = (Token){0};
+  node->functionType = (FunctionType){0};
 
   return node;
 }
@@ -53,16 +57,29 @@ AstNode *newVariableExpr(Token token) {
   return node;
 }
 
-AstNode *newFunctionExpr() {
+AstNode *newFunctionExpr(FunctionType functionType) {
   AstNode *node = allocateAstNode(EXPR_FUNCTION);
+  node->params = linkedList_allocate();
+  node->functionType = functionType;
+  return node;
+}
+
+AstNode *newCallExpr() {
+  AstNode *node = allocateAstNode(EXPR_CALL);
   node->params = linkedList_allocate();
   return node;
 }
 
-AstNode *newCallExpr(Token name) {
-  AstNode *node = allocateAstNode(EXPR_CALL);
-  node->token = name;
+AstNode *newInvocationExpr(Token name) {
+  AstNode *node = allocateAstNode(EXPR_INVOKE);
   node->params = linkedList_allocate();
+  node->token = name;
+  return node;
+}
+
+AstNode *newGetPropertyExpr(Token name) {
+  AstNode *node = allocateAstNode(EXPR_GET_PROPERTY);
+  node->token = name;
   return node;
 }
 
@@ -155,6 +172,32 @@ AstNode *newExprStmt(AstNode *expr) {
   return node;
 }
 
+AstNode *newMethodStmt(Token name, AstNode *expr) {
+  AstNode *node = allocateAstNode(STMT_METHOD);
+  node->token = name;
+  node->expr = expr;
+  return node;
+}
+
+AstNode *newClassStmt(Token name) {
+  AstNode *node = allocateAstNode(STMT_CLASS);
+  node->token = name;
+  return node;
+}
+
+AstNode *newClassBodyStmt() {
+  AstNode *node = allocateAstNode(STMT_CLASS_BODY);
+  node->methods = linkedList_allocate();
+  return node;
+}
+
+AstNode *newSetPropertyStmt(Token name, AstNode *expr) {
+  AstNode *node = allocateAstNode(STMT_SET_PROPERTY);
+  node->token = name;
+  node->expr = expr;
+  return node;
+}
+
 char *tokenTypeStr(TokenType op) {
   switch (op) {
   case TOKEN_BANG:
@@ -186,7 +229,7 @@ char *tokenTypeStr(TokenType op) {
   }
 }
 
-// change to take pointer?
+// FIXME: change to take pointers
 void printAST(AstNode node, int indentation) {
   switch (node.type) {
   case EXPR_LITERAL: {
@@ -250,19 +293,39 @@ void printAST(AstNode node, int indentation) {
     break;
   }
   case EXPR_CALL: {
-    ObjString *nameString = copyString(node.token.start, node.token.length);
     printf("%*sExpr Call\n", indentation, "");
-    printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
+    if (node.branches.left != NULL) {
+      printAST(*(AstNode *)node.branches.left, indentation + 2);
+    }
     Node *param = (Node *)node.params->head;
     if (param == NULL) {
-      break;
+      printf("%*sArgs: ()\n", indentation + 2, "");
+    } else {
+      printf("%*sArgs:\n", indentation + 2, "");
+      while (param != NULL) {
+        printAST(*(AstNode *)param->data, indentation + 4);
+        param = param->next;
+      }
     }
-    printf("%*sArgs:\n", indentation + 2, "");
-    while (param != NULL) {
-      printAST(*(AstNode *)param->data, indentation + 4);
-      param = param->next;
+    break;
+  }
+  case EXPR_INVOKE: {
+    ObjString *nameString = copyString(node.token.start, node.token.length);
+    printf("%*sExpr Invoke\n", indentation, "");
+    if (node.branches.left != NULL) {
+      printAST(*(AstNode *)node.branches.left, indentation + 2);
     }
-    printf("\n");
+    printf("%*sMethod: %s\n", indentation + 2, "", nameString->chars);
+    Node *param = (Node *)node.params->head;
+    if (param == NULL) {
+      printf("%*sArgs: ()\n", indentation + 2, "");
+    } else {
+      printf("%*sArgs:\n", indentation + 2, "");
+      while (param != NULL) {
+        printAST(*(AstNode *)param->data, indentation + 4);
+        param = param->next;
+      }
+    }
     break;
   }
   case STMT_DEFINE: {
@@ -344,8 +407,9 @@ void printAST(AstNode node, int indentation) {
   }
   case STMT_EXPR: {
     printf("%*sStmt Expr\n", indentation, "");
-    printf("%*sExpr:\n", indentation + 2, "");
-    printAST(*node.expr, indentation + 4);
+    if (node.expr != NULL) {
+      printAST(*node.expr, indentation + 2);
+    }
     break;
   }
   case STMT_MODULE: {
@@ -369,6 +433,51 @@ void printAST(AstNode node, int indentation) {
   case STMT_FUNCTION: {
     ObjString *nameString = copyString(node.token.start, node.token.length);
     printf("%*sStmt Function\n", indentation, "");
+    printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
+    printf("%*sExpr:\n", indentation + 2, "");
+    printAST(*node.expr, indentation + 4);
+    break;
+  }
+  case STMT_CLASS: {
+    ObjString *nameString = copyString(node.token.start, node.token.length);
+    printf("%*sStmt Class\n", indentation, "");
+    printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
+    if (node.superclass.length > 0) {
+      ObjString *superclassNameString =
+          copyString(node.superclass.start, node.superclass.length);
+      printf("%*sSuperclass: %s\n", indentation + 2, "",
+             superclassNameString->chars);
+    }
+    printAST(*node.expr, indentation + 2);
+    break;
+  }
+  case STMT_CLASS_BODY: {
+    Node *method = (Node *)node.methods->head;
+    while (method != NULL) {
+      printAST(*(AstNode *)method->data, indentation + 2);
+      method = method->next;
+    }
+    break;
+  }
+  case STMT_METHOD: {
+    printf("%*sStmt Method\n", indentation, "");
+    ObjString *nameString = copyString(node.token.start, node.token.length);
+    printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
+    printf("%*sExpr:\n", indentation + 2, "");
+    printAST(*node.expr, indentation + 4);
+    break;
+  }
+  case STMT_SET_PROPERTY: {
+    printf("%*sStmt set property\n", indentation, "");
+    ObjString *nameString = copyString(node.token.start, node.token.length);
+    printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
+    printf("%*sExpr:\n", indentation + 2, "");
+    printAST(*node.expr, indentation + 4);
+    break;
+  }
+  case EXPR_GET_PROPERTY: {
+    printf("%*sExpr get property\n", indentation, "");
+    ObjString *nameString = copyString(node.token.start, node.token.length);
     printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
     printf("%*sExpr:\n", indentation + 2, "");
     printAST(*node.expr, indentation + 4);

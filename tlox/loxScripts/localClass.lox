@@ -1,0 +1,11 @@
+fun test() {
+  class Test {
+    hello() {
+      print "hello";
+    }
+  }
+
+  return Test().hello();
+}
+
+test();

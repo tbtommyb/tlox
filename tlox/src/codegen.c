@@ -3,6 +3,10 @@
 #include "chunk.h"
 #include "memory.h"
 
+static void generateBasicBlockCode(Compiler *compiler, ObjFunction *f,
+                                   BasicBlock *bb, Table *labels,
+                                   ExecutionContext *context);
+
 static void emitByte(Chunk *chunk, uint8_t byte) {
   writeChunk(chunk, byte, 123); // FIXME: line number would be from token
 }
@@ -131,6 +135,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
   }
   case IR_CODE_START:
     break;
+  // FIXME: better names for these two IR instructions
   case IR_COND: {
     // Write label ID into instruction stream and later rewrite symbolic
     // addresses
@@ -216,6 +221,15 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
   case IR_POP:
     emitByte(&f->chunk, OP_POP);
     break;
+  case IR_INVOKE: {
+    Symbol symbol = op->first->val.symbol;
+    Value name = OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
+    uint8_t position = identifierConstant(compiler, &f->chunk, name);
+
+    emitBytes(&f->chunk, OP_INVOKE, position);
+    emitByte(&f->chunk, AS_NUMBER(op->second->val.literal));
+    break;
+  }
   case IR_DEFINE_GLOBAL: {
     Symbol symbol = op->first->val.symbol;
     Value name = OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
@@ -289,6 +303,50 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
   }
   case IR_BEGIN_SCOPE: {
     context->scopeDepth++;
+    break;
+  }
+  case IR_CLASS: {
+    Value wuPtr = op->first->val.literal;
+    WorkUnit *wu = AS_POINTER(wuPtr);
+
+    /* ObjFunction *childF = compileWorkUnit(compiler, wu, labels); */
+    ObjString *name = copyString(wu->name.start, wu->name.length);
+    /* childF->name = name; */
+    int position = identifierConstant(compiler, &f->chunk, OBJ_VAL(name));
+    emitBytes(&f->chunk, OP_CLASS, position);
+
+    if (context->enclosing == NULL) {
+      int namePosition = identifierConstant(compiler, &f->chunk, OBJ_VAL(name));
+      emitBytes(&f->chunk, OP_DEFINE_GLOBAL, namePosition);
+      emitBytes(&f->chunk, OP_GET_GLOBAL, namePosition);
+    } else {
+      Local *local = &context->locals[context->localCount++];
+      local->name = wu->name;
+      local->depth = context->scopeDepth;
+      local->isCaptured = false;
+    }
+
+    LinkedList *postOrdered = postOrderTraverseBasicBlock(wu->cfg);
+    Node *tail = postOrdered->tail;
+    /* while (tail != NULL) { */
+    generateBasicBlockCode(compiler, f, tail->data, labels, wu->cfg->context);
+    /* tail = tail->prev; */
+    /* } */
+    wu->f = NULL;
+
+    emitByte(&f->chunk, OP_POP);
+    break;
+  }
+  case IR_METHOD: {
+    // FIXME: fold into IR_FUNCTION
+    Value wuPtr = op->first->val.literal;
+    WorkUnit *wu = AS_POINTER(wuPtr);
+    ObjFunction *childF = compileWorkUnit(compiler, wu, labels);
+    int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
+    emitBytes(&f->chunk, OP_CLOSURE, position);
+    int namePosition =
+        identifierConstant(compiler, &f->chunk, OBJ_VAL(childF->name));
+    emitBytes(&f->chunk, OP_METHOD, namePosition);
     break;
   }
   case IR_FUNCTION: {

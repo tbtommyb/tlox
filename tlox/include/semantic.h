@@ -5,6 +5,6 @@
 #include "common.h"
 #include "compiler.h"
 
-void analyse(AstNode *ast, Compiler *compiler, FunctionType currentEnv);
+void analyse(AstNode *ast, Compiler *compiler);
 
 #endif // SEMANTIC_H_

@@ -240,7 +240,7 @@ static AstNode *variable(Parser *parser, bool canAssign) {
 }
 
 static AstNode *function(Parser *parser, FunctionType type) {
-  AstNode *node = newFunctionExpr();
+  AstNode *node = newFunctionExpr(type);
 
   int arity = 0;
   consume(parser, TOKEN_LEFT_PAREN, "Expect '(' after function name.");
@@ -269,6 +269,41 @@ static AstNode *funDeclaration(Parser *parser) {
   return newFunctionStmt(name, body);
 }
 
+static AstNode *method(Parser *parser) {
+  Token name = parseVariable(parser, "Expect method name.");
+
+  FunctionType type = TYPE_METHOD;
+  if (parser->previous.length == 4 &&
+      memcmp(parser->previous.start, "init", 4) == 0) {
+    type = TYPE_INITIALIZER;
+  }
+
+  AstNode *body = function(parser, type);
+  return newMethodStmt(name, body);
+}
+
+static AstNode *classDeclaration(Parser *parser) {
+  Token name = parseVariable(parser, "Expect class name.");
+  AstNode *node = newClassStmt(name);
+
+  if (match(parser, TOKEN_LESS)) {
+    Token superClassName = parseVariable(parser, "Expect superclass name.");
+    node->superclass = superClassName;
+  }
+
+  consume(parser, TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+
+  AstNode *classBodyNode = newClassBodyStmt();
+  node->expr = classBodyNode;
+  while (!check(parser, TOKEN_RIGHT_BRACE) && !check(parser, TOKEN_EOF)) {
+    linkedList_append(classBodyNode->methods, method(parser));
+  }
+
+  consume(parser, TOKEN_RIGHT_BRACE, "Expect '}' before class body.");
+
+  return node;
+}
+
 static AstNode *declaration(Parser *parser) {
   if (match(parser, TOKEN_CONST)) {
     return varDeclaration(parser, true);
@@ -276,12 +311,11 @@ static AstNode *declaration(Parser *parser) {
     return varDeclaration(parser, false);
   } else if (match(parser, TOKEN_FUN)) {
     return funDeclaration(parser);
+  } else if (match(parser, TOKEN_CLASS)) {
+    return classDeclaration(parser);
   } else {
     return statement(parser);
   }
-  /* if (match(TOKEN_CLASS)) {
-  /*   classDeclaration(); */
-  /* } */
   if (parser->compiler->panicMode) {
     synchronize(parser);
   }
@@ -353,7 +387,7 @@ static void argumentList(Parser *parser, AstNode *parent) {
 }
 
 static AstNode *call(Parser *parser, bool canAssign) {
-  AstNode *expr = newCallExpr(parser->previousPrevious);
+  AstNode *expr = newCallExpr(false);
   argumentList(parser, expr);
 
   return expr;
@@ -373,6 +407,27 @@ static AstNode *or_(Parser *parser, bool canAssign) {
   return expr;
 }
 
+static AstNode *dot(Parser *parser, bool canAssign) {
+  // FIXME: left part of . is in expr->branches.left
+  Token name = parseVariable(parser, "Expect property name after '.'.");
+  /* uint8_t name = identifierConstant(&parser->previous); */
+
+  if (canAssign && match(parser, TOKEN_EQUAL)) {
+    return newSetPropertyStmt(name, expression(parser));
+    /* emitBytes(OP_SET_PROPERTY, name); */
+  } else if (match(parser, TOKEN_LEFT_PAREN)) {
+    // FIXME: need left branch here
+    AstNode *node = newInvocationExpr(name);
+    argumentList(parser, node);
+    return node;
+    /*   emitBytes(OP_INVOKE, name); */
+    /*   emitByte(argCount); */
+  } else {
+    return newGetPropertyExpr(name);
+    /* emitBytes(OP_GET_PROPERTY, name); */
+  }
+}
+
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
@@ -381,7 +436,7 @@ ParseRule rules[] = {
     /* [TOKEN_LEFT_BRACKET] = {arrayLiteral, leftBracket, PREC_CALL}, */
     /* [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE}, */
     [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
-    /* [TOKEN_DOT] = {NULL, dot, PREC_CALL}, */
+    [TOKEN_DOT] = {NULL, dot, PREC_CALL},
     [TOKEN_MINUS] = {unary, binary, PREC_TERM},
     [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
@@ -400,7 +455,7 @@ ParseRule rules[] = {
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
     [TOKEN_AND] = {NULL, and_, PREC_AND},
-    /* [TOKEN_CLASS] = {NULL, NULL, PREC_NONE}, */
+    [TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
     [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
     [TOKEN_FOR] = {NULL, NULL, PREC_NONE},
@@ -415,7 +470,7 @@ ParseRule rules[] = {
     [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
     [TOKEN_VAR] = {NULL, NULL, PREC_NONE},
     [TOKEN_WHILE] = {NULL, NULL, PREC_NONE},
-    /* [TOKEN_ERROR] = {NULL, NULL, PREC_NONE}, */
+    [TOKEN_ERROR] = {NULL, NULL, PREC_NONE},
     [TOKEN_EOF] = {NULL, NULL, PREC_NONE},
     /* [TOKEN_QUESTION] = {NULL, ternary, PREC_OR}, */
     /* [TOKEN_PLUS_PLUS] = {NULL, increment, PREC_CALL}, */

@@ -184,6 +184,8 @@ void disassembleWorkUnits(WorkUnit *root) {
     disassembleWorkUnits(wu);
     child = child->next;
   }
-  disassembleChunk(&root->f->chunk,
-                   copyString(root->name.start, root->name.length)->chars);
+  if (root->f != NULL) {
+    disassembleChunk(&root->f->chunk,
+                     copyString(root->name.start, root->name.length)->chars);
+  }
 }

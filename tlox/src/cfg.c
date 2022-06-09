@@ -625,19 +625,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     break;
   }
   case EXPR_CALL: {
-    Symbol symbol = {0};
-    if (!scope_search(activeScope, node->token.start, node->token.length,
-                      &symbol)) {
-      errorAt(compiler, &node->token,
-              "Symbol is not defined in current scope.");
-      break;
-    }
-
-    Operand *constantValue = newSymbolOperand(symbol);
-    IROp opcode = symbol.type == SCOPE_GLOBAL ? IR_GET_GLOBAL : IR_GET_LOCAL;
-    op = newOperation(opcode, constantValue, NULL);
-    bb->curr->next = op;
-    bb->curr = op;
+    walkAst(compiler, bb, node->branches.left, node->scope, activeCFG);
 
     int arity = 0;
     Node *paramNode = (Node *)node->params->head;
@@ -651,6 +639,66 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     op = newOperation(IR_CALL, arityOperand, NULL);
     bb->curr->next = op;
     bb->curr = op;
+    break;
+  }
+  case EXPR_INVOKE: {
+    walkAst(compiler, bb, node->branches.left, node->scope, activeCFG);
+
+    Symbol symbol = {0};
+    if (!scope_search(activeScope, node->token.start, node->token.length,
+                      &symbol)) {
+      errorAt(compiler, &node->token,
+              "Symbol is not defined in current scope.");
+      break;
+    }
+    int arity = 0;
+    Node *paramNode = (Node *)node->params->head;
+    while (paramNode != NULL) {
+      arity++;
+      walkAst(compiler, bb, paramNode->data, node->scope, activeCFG);
+      paramNode = paramNode->next;
+    }
+    Operand *arityOperand = newLiteralOperand(NUMBER_VAL(arity));
+
+    op = newOperation(IR_INVOKE, newSymbolOperand(symbol), arityOperand);
+    bb->curr->next = op;
+    bb->curr = op;
+    break;
+  }
+  case STMT_CLASS: {
+    // FIXME: bit of a hack to get the name working
+    node->expr->token = node->token;
+    WorkUnit *wu = wu_allocate(activeCFG->context, node->expr, node->token);
+    newCFG(compiler, wu);
+
+    Operand *pointer = newLiteralOperand(POINTER_VAL(wu));
+    op = newOperation(IR_CLASS, pointer, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+
+    linkedList_append(activeCFG->childFunctions, wu);
+    break;
+  }
+  case STMT_CLASS_BODY: {
+    Node *methodNode = (Node *)node->methods->head;
+    while (methodNode != NULL) {
+      walkAst(compiler, bb, methodNode->data, node->scope, activeCFG);
+      methodNode = methodNode->next;
+    }
+
+    break;
+  }
+  case STMT_METHOD: {
+    // FIXME: bit of a hack to get the name working
+    node->expr->token = node->token;
+
+    WorkUnit *wu = wu_allocate(activeCFG->context, node->expr, node->token);
+    newCFG(compiler, wu);
+    Operand *pointer = newLiteralOperand(POINTER_VAL(wu));
+    op = newOperation(IR_METHOD, pointer, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+    linkedList_append(activeCFG->childFunctions, wu);
     break;
   }
   }
@@ -798,6 +846,10 @@ char *opcodeString(IROp opcode) {
     return "+";
   case IR_CALL:
     return "call";
+  case IR_CLASS:
+    return "class";
+  case IR_METHOD:
+    return "method";
   case IR_CONSTANT:
     return "constant";
   case IR_CODE_START:
@@ -864,6 +916,8 @@ char *opcodeString(IROp opcode) {
     return "-";
   case IR_STMT_EXPR:
     return "stmt expr";
+  case IR_INVOKE:
+    return "invoke";
   case IR_UNKNOWN:
   default:
     return "?";
@@ -925,7 +979,8 @@ void printBasicBlock(BasicBlock *bb) {
       printf("%4llu: [       | %14s | %6s | %6s ]\n", curr->id,
              opcodeString(curr->opcode), operandString(curr->first),
              operandString(curr->second));
-    } else if (curr->opcode == IR_FUNCTION) {
+    } else if (curr->opcode == IR_FUNCTION || curr->opcode == IR_METHOD ||
+               curr->opcode == IR_CLASS) {
       Value wuPtr = curr->first->val.literal;
       WorkUnit *wu = AS_POINTER(wuPtr);
       printf("%4llu: [       | %14s | %.*s | %6s ]\n", curr->id,

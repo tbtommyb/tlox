@@ -30,15 +30,6 @@ Table labels;
 
 /* ClassCompiler *currentClass = NULL; */
 
-/* static void emitReturn() { */
-/*   if (current->type == TYPE_INITIALIZER) { */
-/*     emitBytes(OP_GET_LOCAL, 0); */
-/*   } else { */
-/*     emitByte(OP_NIL); */
-/*   } */
-/*   emitByte(OP_RETURN); */
-/* } */
-
 void errorAt(Compiler *compiler, Token *token, const char *message) {
   // TODO: does panicMode better belong on parser?
   if (compiler->panicMode)
@@ -65,22 +56,6 @@ void error(Compiler *compiler, const char *message) {
 void errorAtCurrent(Compiler *compiler, const char *message) {
   errorAt(compiler, &compiler->parser->current, message);
 }
-
-/* static void dot(bool canAssign) { */
-/*   consume(TOKEN_IDENTIFIER, "Expect property name after '.'."); */
-/*   uint8_t name = identifierConstant(&parser.previous); */
-
-/*   if (canAssign && match(TOKEN_EQUAL)) { */
-/*     expression(); */
-/*     emitBytes(OP_SET_PROPERTY, name); */
-/*   } else if (match(TOKEN_LEFT_PAREN)) { */
-/*     uint8_t argCount = argumentList(); */
-/*     emitBytes(OP_INVOKE, name); */
-/*     emitByte(argCount); */
-/*   } else { */
-/*     emitBytes(OP_GET_PROPERTY, name); */
-/*   } */
-/* } */
 
 /* static void leftBracket(bool canAssign) { */
 /*   expression(); */
@@ -348,7 +323,7 @@ ObjFunction *compile(Compiler *compiler, const char *source) {
     return NULL;
   }
 
-  analyse(ast, compiler, TYPE_SCRIPT);
+  analyse(ast, compiler);
 
   if (compiler->hadError) {
     return NULL;

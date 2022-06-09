@@ -24,6 +24,7 @@ typedef enum {
   TYPE_SCRIPT,
   TYPE_METHOD,
   TYPE_INITIALIZER,
+  TYPE_CLASS
 } FunctionType;
 
 typedef struct {

@@ -18,31 +18,39 @@ static bool isGlobalScope(Scope *scope) {
   return scope != NULL && scope->enclosing == NULL;
 }
 
+static Scope *getGlobalScope(Scope *scope) {
+  Scope *curr = scope;
+  while (curr->enclosing != NULL) {
+    curr = curr->enclosing;
+  }
+  return curr;
+}
+
 // TODO: do a function-only pass first so that functions don't need to be
 // declared before use
-void analyse(AstNode *node, Compiler *compiler, FunctionType currentEnv) {
+void analyse(AstNode *node, Compiler *compiler) {
   if (node == NULL) {
     return;
   }
   bool variableIsConst = false;
   switch (node->type) {
   case EXPR_BINARY: {
-    analyse(node->branches.left, compiler, currentEnv);
-    analyse(node->branches.right, compiler, currentEnv);
+    analyse(node->branches.left, compiler);
+    analyse(node->branches.right, compiler);
     break;
   }
   case EXPR_UNARY: {
-    analyse(node->branches.right, compiler, currentEnv);
+    analyse(node->branches.right, compiler);
     break;
   }
   case EXPR_AND: {
-    analyse(node->branches.left, compiler, currentEnv);
-    analyse(node->branches.right, compiler, currentEnv);
+    analyse(node->branches.left, compiler);
+    analyse(node->branches.right, compiler);
     break;
   }
   case EXPR_OR: {
-    analyse(node->branches.left, compiler, currentEnv);
-    analyse(node->branches.right, compiler, currentEnv);
+    analyse(node->branches.left, compiler);
+    analyse(node->branches.right, compiler);
     break;
   }
   case EXPR_VARIABLE: {
@@ -96,7 +104,7 @@ void analyse(AstNode *node, Compiler *compiler, FunctionType currentEnv) {
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);
 
-    analyse(node->expr, compiler, currentEnv);
+    analyse(node->expr, compiler);
 
     symbol->isDefined = true;
     scope_set(compiler->currentScope, node->token.start, node->token.length,
@@ -108,7 +116,7 @@ void analyse(AstNode *node, Compiler *compiler, FunctionType currentEnv) {
     Node *stmtNode = (Node *)node->stmts->head;
 
     while (stmtNode != NULL) {
-      analyse(stmtNode->data, compiler, currentEnv);
+      analyse(stmtNode->data, compiler);
       stmtNode = stmtNode->next;
     }
     break;
@@ -119,7 +127,7 @@ void analyse(AstNode *node, Compiler *compiler, FunctionType currentEnv) {
     node->scope = beginScope(compiler, compiler->currentScope->type);
 
     while (blockNode != NULL) {
-      analyse(blockNode->data, compiler, currentEnv);
+      analyse(blockNode->data, compiler);
       blockNode = blockNode->next;
     }
 
@@ -127,11 +135,11 @@ void analyse(AstNode *node, Compiler *compiler, FunctionType currentEnv) {
     break;
   }
   case STMT_PRINT: {
-    analyse(node->expr, compiler, currentEnv);
+    analyse(node->expr, compiler);
     break;
   }
   case STMT_EXPR: {
-    analyse(node->expr, compiler, currentEnv);
+    analyse(node->expr, compiler);
     break;
   }
   case STMT_RETURN: {
@@ -142,27 +150,27 @@ void analyse(AstNode *node, Compiler *compiler, FunctionType currentEnv) {
     /*   error(parser->compiler, "Can't return a value from an initializer.");
      */
     /* } */
-    analyse(node->expr, compiler, currentEnv);
+    analyse(node->expr, compiler);
     break;
   }
   case STMT_IF: {
-    analyse(node->expr, compiler, currentEnv);
-    analyse(node->branches.left, compiler, currentEnv);
-    analyse(node->branches.right, compiler, currentEnv);
+    analyse(node->expr, compiler);
+    analyse(node->branches.left, compiler);
+    analyse(node->branches.right, compiler);
     break;
   }
   case STMT_WHILE: {
-    analyse(node->expr, compiler, currentEnv);
-    analyse(node->branches.left, compiler, currentEnv);
+    analyse(node->expr, compiler);
+    analyse(node->branches.left, compiler);
     break;
   }
   case STMT_FOR: {
     node->scope = beginScope(compiler, compiler->currentScope->type);
 
-    analyse(node->preExpr, compiler, currentEnv);
-    analyse(node->condExpr, compiler, currentEnv);
-    analyse(node->postExpr, compiler, currentEnv);
-    analyse(node->expr, compiler, currentEnv);
+    analyse(node->preExpr, compiler);
+    analyse(node->condExpr, compiler);
+    analyse(node->postExpr, compiler);
+    analyse(node->expr, compiler);
 
     endScope(compiler);
     break;
@@ -189,11 +197,11 @@ void analyse(AstNode *node, Compiler *compiler, FunctionType currentEnv) {
               symbol);
 
     node->expr->token = node->token;
-    analyse(node->expr, compiler, TYPE_FUNCTION);
+    analyse(node->expr, compiler);
     break;
   }
   case EXPR_FUNCTION: {
-    node->scope = beginScope(compiler, TYPE_FUNCTION);
+    node->scope = beginScope(compiler, node->functionType);
 
     Node *paramNode = (Node *)node->params->head;
 
@@ -207,45 +215,148 @@ void analyse(AstNode *node, Compiler *compiler, FunctionType currentEnv) {
       arity++;
     }
 
-    analyse(node->expr, compiler, currentEnv);
+    analyse(node->expr, compiler);
 
     endScope(compiler);
 
-    // Create empty symbol on heap
-    Symbol *functionSymbol =
-        newSymbol(node->token, SCOPE_GLOBAL, false, false, false, 0);
-    bool found = st_get(compiler->currentScope->st, node->token.start,
-                        node->token.length, functionSymbol);
-    if (!found) {
-      errorAt(compiler, &node->token, "Function definition is not in scope.");
-      break;
+    if (node->functionType == TYPE_FUNCTION) {
+      // Create empty symbol on heap
+      Symbol *functionSymbol =
+          newSymbol(node->token, SCOPE_GLOBAL, false, false, false, 0);
+      bool found = st_get(compiler->currentScope->st, node->token.start,
+                          node->token.length, functionSymbol);
+      if (!found) {
+        errorAt(compiler, &node->token, "Function definition is not in scope.");
+        break;
+      }
+      functionSymbol->arity = arity;
+      st_set(compiler->currentScope->st, node->token.start, node->token.length,
+             functionSymbol);
     }
-    functionSymbol->arity = arity;
-    st_set(compiler->currentScope->st, node->token.start, node->token.length,
-           functionSymbol);
-
     break;
   }
   case EXPR_CALL: {
-    Symbol symbol = {0};
-    if (!scope_search(compiler->currentScope, node->token.start,
-                      node->token.length, &symbol)) {
-      errorAt(compiler, &node->token, "Function not found.");
-      break;
-    }
+    analyse(node->branches.left, compiler);
     Node *paramNode = (Node *)node->params->head;
 
+    // FIXME: do something with arity
     int callArity = 0;
     while (paramNode != NULL) {
-      analyse(paramNode->data, compiler, currentEnv);
+      analyse(paramNode->data, compiler);
       paramNode = paramNode->next;
       callArity++;
     }
 
-    if (callArity != symbol.arity) {
-      errorAt(compiler, &node->token, "Wrong function arity.");
-    }
     node->scope = compiler->currentScope;
+    break;
+  }
+  case EXPR_INVOKE: {
+    analyse(node->branches.left, compiler);
+
+    Node *paramNode = (Node *)node->params->head;
+
+    // FIXME: do something with arity
+    int callArity = 0;
+    while (paramNode != NULL) {
+      analyse(paramNode->data, compiler);
+      paramNode = paramNode->next;
+      callArity++;
+    }
+
+    node->scope = compiler->currentScope;
+    break;
+  }
+  case STMT_CLASS: {
+    if (scope_search(compiler->currentScope, node->token.start,
+                     node->token.length, &(Symbol){0})) {
+      errorAt(compiler, &node->token,
+              "Already a variable with this name in this scope.");
+    }
+
+    ScopeType scopeType =
+        isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
+    // FIXME: need better symbol creation.
+    Symbol *symbol = newSymbol(node->token, scopeType, false, true, true, 0);
+    scope_set(compiler->currentScope, node->token.start, node->token.length,
+              symbol);
+
+    node->scope = beginScope(compiler, TYPE_CLASS);
+
+    if (node->superclass.length > 0) {
+      if (identifiersEqual(&node->token, &node->superclass)) {
+        errorAt(compiler, &node->superclass,
+                "A class can't inherit from itself.");
+      }
+      Token super = {.start = "super", .length = (int)strlen("super")};
+      Symbol *symbol = newSymbol(super, SCOPE_LOCAL, false, false, true, 0);
+      scope_set(compiler->currentScope, super.start, super.length, symbol);
+    }
+
+    analyse(node->expr, compiler);
+
+    endScope(compiler);
+
+    break;
+  }
+  case STMT_CLASS_BODY: {
+    Node *methodNode = (Node *)node->methods->head;
+    while (methodNode != NULL) {
+      analyse(methodNode->data, compiler);
+      methodNode = methodNode->next;
+    }
+
+    break;
+  }
+  case STMT_METHOD: {
+    if (scope_search(compiler->currentScope, node->token.start,
+                     node->token.length, &(Symbol){0})) {
+      errorAt(compiler, &node->token,
+              "Already a variable with this name in this scope.");
+      break;
+    }
+
+    Symbol *symbol =
+        newSymbol(node->token, SCOPE_GLOBAL, false, true, true, node->arity);
+    // FIXME: temporary hack until a type system allows us to look up correct
+    // scope
+    Scope *global = getGlobalScope(compiler->currentScope);
+    scope_set(global, node->token.start, node->token.length, symbol);
+
+    node->expr->token = node->token;
+    analyse(node->expr, compiler);
+    break;
+  }
+  case STMT_SET_PROPERTY: {
+    /* ScopeType scopeType = */
+    /*     isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
+     */
+    /* // FIXME: need better symbol creation. */
+    /* Symbol *symbol = newSymbol(node->token, scopeType, false, true, true, 0);
+     */
+    /* scope_set(compiler->currentScope, node->token.start, node->token.length,
+     */
+    /*           symbol); */
+    if (!scope_search(compiler->currentScope, node->token.start,
+                      node->token.length, &(Symbol){0})) {
+      errorAt(compiler, &node->token, "Property not found.");
+    }
+    analyse(node->expr, compiler);
+    break;
+  }
+  case EXPR_GET_PROPERTY: {
+    /* ScopeType scopeType = */
+    /*     isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
+     */
+    /* // FIXME: need better symbol creation. */
+    /* Symbol *symbol = newSymbol(node->token, scopeType, false, true, true, 0);
+     */
+    /* scope_set(compiler->currentScope, node->token.start, node->token.length,
+     */
+    /*           symbol); */
+    if (!scope_search(compiler->currentScope, node->token.start,
+                      node->token.length, &(Symbol){0})) {
+      errorAt(compiler, &node->token, "Property not found.");
+    }
     break;
   }
   }
