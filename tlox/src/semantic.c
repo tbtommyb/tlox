@@ -19,14 +19,6 @@ static bool isGlobalScope(Scope *scope) {
   return scope != NULL && scope->enclosing == NULL;
 }
 
-static Scope *getGlobalScope(Scope *scope) {
-  Scope *curr = scope;
-  while (curr->enclosing != NULL) {
-    curr = curr->enclosing;
-  }
-  return curr;
-}
-
 static bool isInClassScope(Scope *scope) {
   Scope *curr = scope;
   while (curr->enclosing != NULL) {
@@ -305,6 +297,7 @@ void analyse(AstNode *node, Compiler *compiler) {
         errorAt(compiler, &node->superclass,
                 "A class can't inherit from itself.");
       }
+      node->scope = beginScope(compiler, TYPE_CLASS);
       Token super = {.start = "super", .length = (int)strlen("super")};
       Symbol *symbol = newSymbol(super, SCOPE_LOCAL, false, false, true, 0);
       scope_set(compiler->currentScope, super.start, super.length, symbol);
@@ -312,6 +305,9 @@ void analyse(AstNode *node, Compiler *compiler) {
 
     analyse(node->expr, compiler);
 
+    if (node->superclass.length > 0) {
+      endScope(compiler);
+    }
     endScope(compiler);
 
     break;
@@ -335,10 +331,8 @@ void analyse(AstNode *node, Compiler *compiler) {
 
     Symbol *symbol =
         newSymbol(node->token, SCOPE_GLOBAL, false, true, true, node->arity);
-    // FIXME: temporary hack until a type system allows us to look up correct
-    // scope
-    Scope *global = getGlobalScope(compiler->currentScope);
-    scope_set(global, node->token.start, node->token.length, symbol);
+    scope_set(compiler->currentScope, node->token.start, node->token.length,
+              symbol);
 
     node->expr->token = node->token;
     analyse(node->expr, compiler);
@@ -356,6 +350,40 @@ void analyse(AstNode *node, Compiler *compiler) {
   }
   case EXPR_GET_PROPERTY: {
     analyse(node->branches.left, compiler);
+    break;
+  }
+  case EXPR_SUPER: {
+    // TODO: check for superclass
+    if (!isInClassScope(compiler->currentScope)) {
+      errorAt(compiler, &node->token, "Can't use 'super' outside of a class.");
+      break;
+    }
+    analyse(node->branches.left, compiler);
+    break;
+  }
+  case EXPR_SUPER_INVOKE: {
+    if (!isInClassScope(compiler->currentScope)) {
+      errorAt(compiler, &node->token, "Can't use 'super' outside of a class.");
+      break;
+    }
+    if (!scope_search(compiler->currentScope, node->token.start,
+                      node->token.length, &(Symbol){0})) {
+      errorAt(compiler, &node->token, "No method with that name in scope.");
+      break;
+    }
+    analyse(node->branches.left, compiler);
+
+    Node *paramNode = (Node *)node->params->head;
+
+    // FIXME: do something with arity
+    int callArity = 0;
+    while (paramNode != NULL) {
+      analyse(paramNode->data, compiler);
+      paramNode = paramNode->next;
+      callArity++;
+    }
+
+    node->scope = compiler->currentScope;
     break;
   }
   }

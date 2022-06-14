@@ -89,6 +89,19 @@ AstNode *newThisExpr(Token this) {
   return node;
 }
 
+AstNode *newSuperInvocationExpr(Token method) {
+  AstNode *node = allocateAstNode(EXPR_SUPER_INVOKE);
+  node->params = linkedList_allocate();
+  node->token = method;
+  return node;
+}
+
+AstNode *newSuperExpr(Token method) {
+  AstNode *node = allocateAstNode(EXPR_SUPER);
+  node->token = method;
+  return node;
+}
+
 AstNode *newGetPropertyExpr(Token name) {
   AstNode *node = allocateAstNode(EXPR_GET_PROPERTY);
   node->token = name;
@@ -344,6 +357,33 @@ void printAST(AstNode node, int indentation) {
     }
     break;
   }
+  case EXPR_SUPER_INVOKE: {
+    ObjString *nameString = copyString(node.token.start, node.token.length);
+    printf("%*sExpr Super Invoke\n", indentation, "");
+    if (node.branches.left != NULL) {
+      printAST(*(AstNode *)node.branches.left, indentation + 2);
+    }
+    printf("%*sMethod: %s\n", indentation + 2, "", nameString->chars);
+    Node *param = (Node *)node.params->head;
+    if (param == NULL) {
+      printf("%*sArgs: ()\n", indentation + 2, "");
+    } else {
+      printf("%*sArgs:\n", indentation + 2, "");
+      while (param != NULL) {
+        printAST(*(AstNode *)param->data, indentation + 4);
+        param = param->next;
+      }
+    }
+    break;
+  }
+  case EXPR_SUPER: {
+    ObjString *nameString = copyString(node.token.start, node.token.length);
+    printf("%*sExpr Super\n", indentation, "");
+    printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
+    printf("%*sExpr:\n", indentation + 2, "");
+    printAST(*node.branches.left, indentation + 4);
+    break;
+  }
   case STMT_DEFINE: {
     ObjString *nameString = copyString(node.token.start, node.token.length);
     printf("%*sStmt Define\n", indentation, "");
@@ -484,7 +524,7 @@ void printAST(AstNode node, int indentation) {
     break;
   }
   case STMT_SET_PROPERTY: {
-    printf("%*sStmt set property\n", indentation, "");
+    printf("%*sStmt Set Property\n", indentation, "");
     ObjString *nameString = copyString(node.token.start, node.token.length);
     printf("%*sTarget:\n", indentation + 2, "");
     if (node.branches.left != NULL) {
@@ -496,7 +536,7 @@ void printAST(AstNode node, int indentation) {
     break;
   }
   case EXPR_GET_PROPERTY: {
-    printf("%*sExpr get property\n", indentation, "");
+    printf("%*sExpr Get Property\n", indentation, "");
     ObjString *nameString = copyString(node.token.start, node.token.length);
     printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
     printf("%*sExpr:\n", indentation + 2, "");

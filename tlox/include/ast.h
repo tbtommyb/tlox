@@ -18,6 +18,8 @@ typedef enum {
   EXPR_INVOKE,
   EXPR_LITERAL,
   EXPR_NIL,
+  EXPR_SUPER,
+  EXPR_SUPER_INVOKE,
   EXPR_THIS,
   EXPR_UNARY,
   EXPR_VARIABLE,
@@ -82,6 +84,8 @@ AstNode *newCallExpr();
 AstNode *newInvocationExpr(Token name);
 AstNode *newGetPropertyExpr(Token name);
 AstNode *newThisExpr(Token this);
+AstNode *newSuperExpr(Token method);
+AstNode *newSuperInvocationExpr(Token method);
 AstNode *newClassStmt(Token name);
 AstNode *newClassBodyStmt();
 AstNode *newDefineStmt(Token token, AstNode *expr);

@@ -694,13 +694,6 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   case EXPR_INVOKE: {
     walkAst(compiler, bb, node->branches.left, node->scope, activeCFG);
 
-    Symbol symbol = {0};
-    if (!scope_search(activeScope, node->token.start, node->token.length,
-                      &symbol)) {
-      errorAt(compiler, &node->token,
-              "Symbol is not defined in current scope.");
-      break;
-    }
     int arity = 0;
     Node *paramNode = (Node *)node->params->head;
     while (paramNode != NULL) {
@@ -710,7 +703,35 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     }
     Operand *arityOperand = newLiteralOperand(NUMBER_VAL(arity));
 
-    op = newOperation(IR_INVOKE, newSymbolOperand(symbol), arityOperand);
+    Value name = OBJ_VAL(copyString(node->token.start, node->token.length));
+    op = newOperation(IR_INVOKE, newLiteralOperand(name), arityOperand);
+    bb->curr->next = op;
+    bb->curr = op;
+    break;
+  }
+  case EXPR_SUPER_INVOKE: {
+    walkAst(compiler, bb, node->branches.left, node->scope, activeCFG);
+
+    int arity = 0;
+    Node *paramNode = (Node *)node->params->head;
+    while (paramNode != NULL) {
+      arity++;
+      walkAst(compiler, bb, paramNode->data, node->scope, activeCFG);
+      paramNode = paramNode->next;
+    }
+    Operand *arityOperand = newLiteralOperand(NUMBER_VAL(arity));
+
+    Value name = OBJ_VAL(copyString(node->token.start, node->token.length));
+    op = newOperation(IR_SUPER_INVOKE, newLiteralOperand(name), arityOperand);
+    bb->curr->next = op;
+    bb->curr = op;
+    break;
+  }
+  case EXPR_SUPER: {
+    walkAst(compiler, bb, node->branches.left, node->scope, activeCFG);
+
+    Value name = OBJ_VAL(copyString(node->token.start, node->token.length));
+    op = newOperation(IR_SUPER, newLiteralOperand(name), NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
@@ -722,7 +743,13 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     newCFG(compiler, wu);
 
     Operand *pointer = newLiteralOperand(POINTER_VAL(wu));
-    op = newOperation(IR_CLASS, pointer, NULL);
+    if (node->superclass.length > 0) {
+      Value superclassName =
+          OBJ_VAL(copyString(node->superclass.start, node->superclass.length));
+      op = newOperation(IR_CLASS, pointer, newLiteralOperand(superclassName));
+    } else {
+      op = newOperation(IR_CLASS, pointer, NULL);
+    }
     bb->curr->next = op;
     bb->curr = op;
 
@@ -972,6 +999,10 @@ char *opcodeString(IROp opcode) {
     return "stmt expr";
   case IR_INVOKE:
     return "invoke";
+  case IR_SUPER_INVOKE:
+    return "super invoke";
+  case IR_SUPER:
+    return "super";
   case IR_UNKNOWN:
   default:
     return "?";

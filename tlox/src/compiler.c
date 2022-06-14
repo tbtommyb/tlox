@@ -154,29 +154,6 @@ void errorAtCurrent(Compiler *compiler, const char *message) {
 /*   emitLoop(current->loopOffset); */
 /* } */
 
-/* static void super_(bool canAssign) { */
-/*   if (currentClass == NULL) { */
-/*     error("Can't use 'super' outside of a class."); */
-/*   } else if (!currentClass->hasSuperclass) { */
-/*     error("Can't use 'super' in a class with no superclass."); */
-/*   } */
-
-/*   consume(TOKEN_DOT, "Expect '.' after 'super'."); */
-/*   consume(TOKEN_IDENTIFIER, "Expect superclass method name."); */
-/*   uint8_t name = identifierConstant(&parser.previous); */
-
-/*   namedVariable(syntheticToken("this"), false); */
-/*   if (match(TOKEN_LEFT_PAREN)) { */
-/*     uint8_t argCount = argumentList(); */
-/*     namedVariable(syntheticToken("super"), false); */
-/*     emitBytes(OP_SUPER_INVOKE, name); */
-/*     emitByte(argCount); */
-/*   } else { */
-/*     namedVariable(syntheticToken("super"), false); */
-/*     emitBytes(OP_GET_SUPER, name); */
-/*   } */
-/* } */
-
 /* static void classDeclaration() { */
 /*   consume(TOKEN_IDENTIFIER, "Expect class name."); */
 /*   Token className = parser.previous; */
