@@ -339,6 +339,19 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     bb->curr = op;
     break;
   }
+  case EXPR_THIS: {
+    Symbol symbol = {0};
+    if (!scope_search(activeScope, "this", 4, &symbol)) {
+      errorAt(compiler, &node->token,
+              "Symbol is not defined in current scope.");
+      break;
+    }
+
+    op = newOperation(IR_GET_LOCAL, newSymbolOperand(symbol), NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+    break;
+  }
   case STMT_PRINT: {
     walkAst(compiler, bb, node->expr, activeScope, activeCFG);
     Operand *value = newRegisterOperand(bb->curr->destination);
@@ -1025,7 +1038,14 @@ static CFG *newCFG(Compiler *compiler, WorkUnit *wu) {
   // split IR list into CFG
   constructCFG(cfg, irList);
 
-  cfg->context->localCount++; // this or function
+  Local *local = &cfg->context->locals[cfg->context->localCount++];
+  if (wu->node->functionType != TYPE_FUNCTION) {
+    local->name.start = "this";
+    local->name.length = 4;
+  } else {
+    local->name.start = "";
+    local->name.length = 0;
+  }
 
   wu->cfg = cfg; // temp location
 

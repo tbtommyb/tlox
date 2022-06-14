@@ -17,6 +17,7 @@ typedef enum {
   EXPR_GET_PROPERTY,
   EXPR_INVOKE,
   EXPR_LITERAL,
+  EXPR_THIS,
   EXPR_UNARY,
   EXPR_VARIABLE,
   STMT_ASSIGN,
@@ -78,6 +79,7 @@ AstNode *newFunctionExpr(FunctionType functionType);
 AstNode *newCallExpr();
 AstNode *newInvocationExpr(Token name);
 AstNode *newGetPropertyExpr(Token name);
+AstNode *newThisExpr();
 AstNode *newClassStmt(Token name);
 AstNode *newClassBodyStmt();
 AstNode *newDefineStmt(Token token, AstNode *expr);

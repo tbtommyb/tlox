@@ -408,25 +408,20 @@ static AstNode *or_(Parser *parser, bool canAssign) {
 }
 
 static AstNode *dot(Parser *parser, bool canAssign) {
-  // FIXME: left part of . is in expr->branches.left
   Token name = parseVariable(parser, "Expect property name after '.'.");
-  /* uint8_t name = identifierConstant(&parser->previous); */
 
   if (canAssign && match(parser, TOKEN_EQUAL)) {
     return newSetPropertyStmt(name, expression(parser));
-    /* emitBytes(OP_SET_PROPERTY, name); */
   } else if (match(parser, TOKEN_LEFT_PAREN)) {
-    // FIXME: need left branch here
     AstNode *node = newInvocationExpr(name);
     argumentList(parser, node);
     return node;
-    /*   emitBytes(OP_INVOKE, name); */
-    /*   emitByte(argCount); */
   } else {
     return newGetPropertyExpr(name);
-    /* emitBytes(OP_GET_PROPERTY, name); */
   }
 }
+
+static AstNode *this_(Parser *parser, bool canAssign) { return newThisExpr(); }
 
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
@@ -466,7 +461,7 @@ ParseRule rules[] = {
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
     [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
     /* [TOKEN_SUPER] = {super_, NULL, PREC_NONE}, */
-    /* [TOKEN_THIS] = {this_, NULL, PREC_NONE}, */
+    [TOKEN_THIS] = {this_, NULL, PREC_NONE},
     [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
     [TOKEN_VAR] = {NULL, NULL, PREC_NONE},
     [TOKEN_WHILE] = {NULL, NULL, PREC_NONE},

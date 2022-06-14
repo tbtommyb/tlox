@@ -2,6 +2,7 @@
 #include "ast.h"
 #include "compiler.h"
 #include "symbol_table.h"
+#include <stdbool.h>
 
 static Scope *beginScope(Compiler *compiler, FunctionType type) {
   Scope *scope = scope_allocate(type);
@@ -24,6 +25,17 @@ static Scope *getGlobalScope(Scope *scope) {
     curr = curr->enclosing;
   }
   return curr;
+}
+
+static bool isInClassScope(Scope *scope) {
+  Scope *curr = scope;
+  while (curr->enclosing != NULL) {
+    if (curr->type == TYPE_CLASS) {
+      return true;
+    }
+    curr = curr->enclosing;
+  }
+  return false;
 }
 
 // TODO: do a function-only pass first so that functions don't need to be
@@ -264,6 +276,12 @@ void analyse(AstNode *node, Compiler *compiler) {
     }
 
     node->scope = compiler->currentScope;
+    break;
+  }
+  case EXPR_THIS: {
+    if (!isInClassScope(compiler->currentScope)) {
+      errorAt(compiler, &node->token, "Can't use 'this' outside of a class.");
+    }
     break;
   }
   case STMT_CLASS: {

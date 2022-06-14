@@ -223,14 +223,6 @@ void errorAtCurrent(Compiler *compiler, const char *message) {
 /*   currentClass = currentClass->enclosing; */
 /* } */
 
-/* static void this_(bool canAssign) { */
-/*   variable(false); */
-/*   if (currentClass == NULL) { */
-/*     error("Can't use 'this' outside of a class."); */
-/*     return; */
-/*   } */
-/* } */
-
 /* static void ternary(bool canAssign) { */
 /*   int thenJump = emitJump(OP_JUMP_IF_FALSE); */
 /*   emitByte(OP_POP); */

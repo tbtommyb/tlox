@@ -77,6 +77,8 @@ AstNode *newInvocationExpr(Token name) {
   return node;
 }
 
+AstNode *newThisExpr() { return allocateAstNode(EXPR_THIS); }
+
 AstNode *newGetPropertyExpr(Token name) {
   AstNode *node = allocateAstNode(EXPR_GET_PROPERTY);
   node->token = name;
@@ -273,6 +275,10 @@ void printAST(AstNode node, int indentation) {
   case EXPR_VARIABLE: {
     ObjString *nameString = copyString(node.token.start, node.token.length);
     printf("%*sVariable %s\n", indentation, "", nameString->chars);
+    break;
+  }
+  case EXPR_THIS: {
+    printf("%*sThis\n", indentation, "");
     break;
   }
   case EXPR_FUNCTION: {
