@@ -345,36 +345,17 @@ void analyse(AstNode *node, Compiler *compiler) {
     break;
   }
   case STMT_SET_PROPERTY: {
-    /* ScopeType scopeType = */
-    /*     isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
-     */
-    /* // FIXME: need better symbol creation. */
-    /* Symbol *symbol = newSymbol(node->token, scopeType, false, true, true, 0);
-     */
-    /* scope_set(compiler->currentScope, node->token.start, node->token.length,
-     */
-    /*           symbol); */
-    if (!scope_search(compiler->currentScope, node->token.start,
-                      node->token.length, &(Symbol){0})) {
-      errorAt(compiler, &node->token, "Property not found.");
-    }
+    Symbol *symbol =
+        newSymbol(node->token, SCOPE_LOCAL, false, false, true, node->arity);
+    scope_set(compiler->currentScope, node->token.start, node->token.length,
+              symbol);
+
+    analyse(node->branches.left, compiler);
     analyse(node->expr, compiler);
     break;
   }
   case EXPR_GET_PROPERTY: {
-    /* ScopeType scopeType = */
-    /*     isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
-     */
-    /* // FIXME: need better symbol creation. */
-    /* Symbol *symbol = newSymbol(node->token, scopeType, false, true, true, 0);
-     */
-    /* scope_set(compiler->currentScope, node->token.start, node->token.length,
-     */
-    /*           symbol); */
-    if (!scope_search(compiler->currentScope, node->token.start,
-                      node->token.length, &(Symbol){0})) {
-      errorAt(compiler, &node->token, "Property not found.");
-    }
+    analyse(node->branches.left, compiler);
     break;
   }
   }

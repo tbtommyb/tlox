@@ -17,6 +17,7 @@ typedef enum {
   EXPR_GET_PROPERTY,
   EXPR_INVOKE,
   EXPR_LITERAL,
+  EXPR_NIL,
   EXPR_THIS,
   EXPR_UNARY,
   EXPR_VARIABLE,
@@ -72,6 +73,7 @@ static inline bool isNodeType(AstNode node, NodeType type) {
 AstNode *newAndExpr();
 AstNode *newOrExpr();
 AstNode *newLiteralExpr(Value value);
+AstNode *newNilExpr();
 AstNode *newBinaryExpr(AstNode *left, AstNode *right, TokenType operator);
 AstNode *newUnaryExpr(AstNode *right, TokenType operator);
 AstNode *newVariableExpr(Token token);
@@ -79,7 +81,7 @@ AstNode *newFunctionExpr(FunctionType functionType);
 AstNode *newCallExpr();
 AstNode *newInvocationExpr(Token name);
 AstNode *newGetPropertyExpr(Token name);
-AstNode *newThisExpr();
+AstNode *newThisExpr(Token this);
 AstNode *newClassStmt(Token name);
 AstNode *newClassBodyStmt();
 AstNode *newDefineStmt(Token token, AstNode *expr);

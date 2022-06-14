@@ -16,8 +16,12 @@ static void emitBytes(Chunk *chunk, uint8_t byte1, uint8_t byte2) {
   emitByte(chunk, byte2);
 }
 
-static void emitReturn(Chunk *chunk) {
-  emitByte(chunk, OP_NIL);
+static void emitReturn(FunctionType functionType, Chunk *chunk) {
+  if (functionType == TYPE_INITIALIZER) {
+    emitBytes(chunk, OP_GET_LOCAL, 0);
+  } else {
+    emitByte(chunk, OP_NIL);
+  }
   emitByte(chunk, OP_RETURN);
 }
 
@@ -398,6 +402,22 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     emitByte(&f->chunk, OP_POP);
     break;
   }
+  case IR_SET_PROPERTY: {
+    Symbol symbol = op->first->val.symbol;
+    Value nameString =
+        OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
+    int namePosition = identifierConstant(compiler, &f->chunk, nameString);
+    emitBytes(&f->chunk, OP_SET_PROPERTY, namePosition);
+    break;
+  }
+  case IR_GET_PROPERTY: {
+    Symbol symbol = op->first->val.symbol;
+    Value nameString =
+        OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
+    int namePosition = identifierConstant(compiler, &f->chunk, nameString);
+    emitBytes(&f->chunk, OP_GET_PROPERTY, namePosition);
+    break;
+  }
   default:
     printf("Unknown opcode %d\n", op->opcode);
   }
@@ -482,7 +502,7 @@ ObjFunction *compileWorkUnit(Compiler *compiler, WorkUnit *wu, Table *labels) {
   wu->f = f;
 
   generateChunk(compiler, wu->cfg, labels, f);
-  emitReturn(&f->chunk);
+  emitReturn(wu->node->functionType, &f->chunk);
 
   return f;
 }

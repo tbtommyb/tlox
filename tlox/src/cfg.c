@@ -237,6 +237,12 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     bb->curr = op;
     break;
   }
+  case EXPR_NIL: {
+    op = newOperation(IR_NIL, NULL, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+    break;
+  }
   case EXPR_UNARY: {
     Operation *right =
         walkAst(compiler, bb, node->branches.right, activeScope, activeCFG);
@@ -637,6 +643,37 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     bb->curr = op;
     break;
   }
+  case EXPR_GET_PROPERTY: {
+    Symbol symbol = {0};
+    if (!scope_search(activeScope, node->token.start, node->token.length,
+                      &symbol)) {
+      errorAt(compiler, &node->token,
+              "Symbol is not defined in current scope.");
+      break;
+    }
+
+    walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
+    op = newOperation(IR_GET_PROPERTY, newSymbolOperand(symbol), NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+    break;
+  }
+  case STMT_SET_PROPERTY: {
+    Symbol symbol = {0};
+    if (!scope_search(activeScope, node->token.start, node->token.length,
+                      &symbol)) {
+      errorAt(compiler, &node->token,
+              "Symbol is not defined in current scope.");
+      break;
+    }
+
+    walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
+    walkAst(compiler, bb, node->expr, activeScope, activeCFG);
+    op = newOperation(IR_SET_PROPERTY, newSymbolOperand(symbol), NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+    break;
+  }
   case EXPR_CALL: {
     walkAst(compiler, bb, node->branches.left, node->scope, activeCFG);
 
@@ -915,6 +952,10 @@ char *opcodeString(IROp opcode) {
     return "l var";
   case IR_SET_LOCAL:
     return "l assign";
+  case IR_GET_PROPERTY:
+    return "get prop";
+  case IR_SET_PROPERTY:
+    return "set prop";
   case IR_POP:
     return "pop";
   case IR_RETURN:

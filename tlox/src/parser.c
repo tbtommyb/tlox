@@ -132,7 +132,7 @@ static AstNode *literal(Parser *parser, bool canAssign) {
   case TOKEN_FALSE:
     return newLiteralExpr(FALSE_VAL);
   case TOKEN_NIL:
-    return newLiteralExpr(NIL_VAL);
+    return newNilExpr();
   case TOKEN_TRUE:
     return newLiteralExpr(TRUE_VAL);
   default:
@@ -421,7 +421,9 @@ static AstNode *dot(Parser *parser, bool canAssign) {
   }
 }
 
-static AstNode *this_(Parser *parser, bool canAssign) { return newThisExpr(); }
+static AstNode *this_(Parser *parser, bool canAssign) {
+  return newThisExpr(parser->previous);
+}
 
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},

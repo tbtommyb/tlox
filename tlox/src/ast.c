@@ -32,6 +32,12 @@ AstNode *newLiteralExpr(Value value) {
   return node;
 }
 
+AstNode *newNilExpr(Token token) {
+  AstNode *node = allocateAstNode(EXPR_NIL);
+  node->token = token;
+  return node;
+}
+
 AstNode *newBinaryExpr(AstNode *left, AstNode *right, TokenType op) {
   AstNode *node = allocateAstNode(EXPR_BINARY);
   node->branches.left = left;
@@ -77,7 +83,11 @@ AstNode *newInvocationExpr(Token name) {
   return node;
 }
 
-AstNode *newThisExpr() { return allocateAstNode(EXPR_THIS); }
+AstNode *newThisExpr(Token this) {
+  AstNode *node = allocateAstNode(EXPR_THIS);
+  node->token = this;
+  return node;
+}
 
 AstNode *newGetPropertyExpr(Token name) {
   AstNode *node = allocateAstNode(EXPR_GET_PROPERTY);
@@ -476,7 +486,11 @@ void printAST(AstNode node, int indentation) {
   case STMT_SET_PROPERTY: {
     printf("%*sStmt set property\n", indentation, "");
     ObjString *nameString = copyString(node.token.start, node.token.length);
-    printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
+    printf("%*sTarget:\n", indentation + 2, "");
+    if (node.branches.left != NULL) {
+      printAST(*(AstNode *)node.branches.left, indentation + 4);
+    }
+    printf("%*sProperty: %s\n", indentation + 2, "", nameString->chars);
     printf("%*sExpr:\n", indentation + 2, "");
     printAST(*node.expr, indentation + 4);
     break;
@@ -486,7 +500,7 @@ void printAST(AstNode node, int indentation) {
     ObjString *nameString = copyString(node.token.start, node.token.length);
     printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
     printf("%*sExpr:\n", indentation + 2, "");
-    printAST(*node.expr, indentation + 4);
+    printAST(*node.branches.left, indentation + 4);
     break;
   }
   }
