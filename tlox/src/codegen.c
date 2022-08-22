@@ -78,9 +78,8 @@ static int resolveLocal(ExecutionContext *context, Token *name) {
   return -1;
 }
 
-static int addUpvalue(ExecutionContext *context, ObjFunction *f, uint8_t index,
-                      bool isLocal) {
-  int upvalueCount = f->upvalueCount;
+static int addUpvalue(ExecutionContext *context, uint8_t index, bool isLocal) {
+  int upvalueCount = context->upvalueCount;
 
   for (int i = 0; i < upvalueCount; i++) {
     Upvalue *upvalue = &context->upvalues[i];
@@ -96,11 +95,10 @@ static int addUpvalue(ExecutionContext *context, ObjFunction *f, uint8_t index,
 
   context->upvalues[upvalueCount].isLocal = isLocal;
   context->upvalues[upvalueCount].index = index;
-  return f->upvalueCount++;
+  return context->upvalueCount++;
 }
 
-static int resolveUpvalue(ExecutionContext *context, ObjFunction *f,
-                          Token *name) {
+static int resolveUpvalue(ExecutionContext *context, Token *name) {
   if (context->enclosing == NULL) {
     return -1;
   }
@@ -108,12 +106,12 @@ static int resolveUpvalue(ExecutionContext *context, ObjFunction *f,
   int local = resolveLocal(context->enclosing, name);
   if (local != -1) {
     context->enclosing->locals[local].isCaptured = true;
-    return addUpvalue(context, f, (uint8_t)local, true);
+    return addUpvalue(context, (uint8_t)local, true);
   }
 
-  int upvalue = resolveUpvalue(context->enclosing, f, name);
+  int upvalue = resolveUpvalue(context->enclosing, name);
   if (upvalue != -1) {
-    return addUpvalue(context, f, (uint8_t)upvalue, false);
+    return addUpvalue(context, (uint8_t)upvalue, false);
   }
 
   return -1;
@@ -265,11 +263,11 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     int position = resolveLocal(context, &symbol.name);
 
     if (position == -1) {
-      position = resolveUpvalue(context, f, &symbol.name);
+      position = resolveUpvalue(context, &symbol.name);
       op = OP_GET_UPVALUE;
     }
 
-    assert(position != -1);
+    /* assert(position != -1); */
 
     emitBytes(&f->chunk, op, (uint8_t)position);
     break;
@@ -292,7 +290,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     int position = resolveLocal(context, &symbol.name);
 
     if (position == -1) {
-      position = resolveUpvalue(context, f, &symbol.name);
+      position = resolveUpvalue(context, &symbol.name);
       opcode = OP_SET_UPVALUE;
     }
 
@@ -346,6 +344,9 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     Value wuPtr = op->first->val.literal;
     WorkUnit *wu = AS_POINTER(wuPtr);
     ObjFunction *childF = compileWorkUnit(compiler, wu, labels);
+    // Test fix hack
+    // Need to rethink where to store upvalues
+    childF->upvalueCount = wu->cfg->context->upvalueCount;
     int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
     emitBytes(&f->chunk, OP_CLOSURE, position);
     int namePosition =
@@ -358,20 +359,25 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     WorkUnit *wu = AS_POINTER(wuPtr);
     ObjFunction *childF = compileWorkUnit(compiler, wu, labels);
     int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
+    // Test fix hack
+    // Need to rethink where to store upvalues
+    childF->upvalueCount = wu->cfg->context->upvalueCount;
 
     OpCode op = OP_CONSTANT;
-    if (childF->upvalueCount > 0) {
+    if (wu->cfg->context->upvalueCount > 0) {
       // FIXME: handle methods and initialisers
       op = OP_CLOSURE;
     }
     emitBytes(&f->chunk, op, position);
-    for (int i = 0; i < childF->upvalueCount; i++) {
+    for (int i = 0; i < wu->cfg->context->upvalueCount; i++) {
       // Not sure going through wu->cfg->context is best/correct here
       emitByte(&f->chunk, wu->cfg->context->upvalues[i].isLocal ? 1 : 0);
       emitByte(&f->chunk, wu->cfg->context->upvalues[i].index);
     }
 
-    if (context->enclosing == NULL) {
+    // Fixes issue when using scopes at top level. Do we need both checks here?
+    // Test fix hack
+    if (context->enclosing == NULL && context->scopeDepth == 0) {
       int namePosition =
           identifierConstant(compiler, &f->chunk, OBJ_VAL(childF->name));
       emitBytes(&f->chunk, OP_DEFINE_GLOBAL, namePosition);

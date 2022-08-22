@@ -8,6 +8,7 @@ typedef struct ExecutionContext {
   Upvalue upvalues[UINT8_COUNT];
   Local locals[UINT8_COUNT];
   int localCount;
+  int upvalueCount;
   int scopeDepth;
   int loopOffset;
   int currentStackDepth;
