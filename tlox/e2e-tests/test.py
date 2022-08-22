@@ -314,10 +314,10 @@ def run_script(app, path, type):
 
 
 def run_test(path):
-    run_script(TLOX_INTERPRETER, path, "test")
+    run_script(TLOX_INTERPRETER, path, "e2e-tests")
 
 
-walk(join(REPO_DIR, 'test'), run_test)
+walk(join(REPO_DIR, 'e2e-tests'), run_test)
 
 print_line()
 if failed == 0:

@@ -194,7 +194,7 @@ check_cloc: cmake_check_build_system
 
 # fast build rule for target.
 check_cloc/fast:
-	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/check_cloc.dir/build.make tests/CMakeFiles/check_cloc.dir/build
+	$(MAKE) $(MAKESILENT) -f c-tests/CMakeFiles/check_cloc.dir/build.make c-tests/CMakeFiles/check_cloc.dir/build
 .PHONY : check_cloc/fast
 
 #=============================================================================
