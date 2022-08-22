@@ -1,0 +1,550 @@
+commit 05615a1b0afa938edda16a03cc5c2a365c3802c8
+Author: Tom Johnson <tom@tmjohnson.co.uk>
+Date:   Tue Jun 14 18:44:48 2022 +0100
+
+    WIP: getting inheritance to work
+
+diff --git a/tlox/include/ast.h b/tlox/include/ast.h
+index 09d3f89..5612cf7 100644
+--- a/tlox/include/ast.h
++++ b/tlox/include/ast.h
+@@ -18,6 +18,8 @@ typedef enum {
+   EXPR_INVOKE,
+   EXPR_LITERAL,
+   EXPR_NIL,
++  EXPR_SUPER,
++  EXPR_SUPER_INVOKE,
+   EXPR_THIS,
+   EXPR_UNARY,
+   EXPR_VARIABLE,
+@@ -82,6 +84,8 @@ AstNode *newCallExpr();
+ AstNode *newInvocationExpr(Token name);
+ AstNode *newGetPropertyExpr(Token name);
+ AstNode *newThisExpr(Token this);
++AstNode *newSuperExpr(Token method);
++AstNode *newSuperInvocationExpr(Token method);
+ AstNode *newClassStmt(Token name);
+ AstNode *newClassBodyStmt();
+ AstNode *newDefineStmt(Token token, AstNode *expr);
+diff --git a/tlox/include/cfg.h b/tlox/include/cfg.h
+index 993beb7..cf47efb 100644
+--- a/tlox/include/cfg.h
++++ b/tlox/include/cfg.h
+@@ -34,6 +34,8 @@ typedef enum IROp {
+   IR_GREATER,
+   IR_GREATER_EQUAL,
+   IR_INVOKE,
++  IR_SUPER_INVOKE,
++  IR_SUPER,
+   IR_LESS,
+   IR_LESS_EQUAL,
+   IR_LOOP,
+diff --git a/tlox/loxScripts/superclass.lox b/tlox/loxScripts/superclass.lox
+new file mode 100644
+index 0000000..3a5e3e3
+--- /dev/null
++++ b/tlox/loxScripts/superclass.lox
+@@ -0,0 +1,20 @@
++class Doughnut {
++  cook() {
++    print "Dunk in the fryer.";
++    this.finish("sprinkles");
++  }
++
++  finish(ingredient) {
++    print "Finish with " + ingredient;
++  }
++}
++
++class Cruller < Doughnut {
++  finish(ingredient) {
++    // No sprinkles, always icing.
++    super.finish("icing");
++  }
++}
++
++var d = Cruller();
++d.finish("cream");
+diff --git a/tlox/src/ast.c b/tlox/src/ast.c
+index 2a85147..3170a0c 100644
+--- a/tlox/src/ast.c
++++ b/tlox/src/ast.c
+@@ -89,6 +89,19 @@ AstNode *newThisExpr(Token this) {
+   return node;
+ }
+ 
++AstNode *newSuperInvocationExpr(Token method) {
++  AstNode *node = allocateAstNode(EXPR_SUPER_INVOKE);
++  node->params = linkedList_allocate();
++  node->token = method;
++  return node;
++}
++
++AstNode *newSuperExpr(Token method) {
++  AstNode *node = allocateAstNode(EXPR_SUPER);
++  node->token = method;
++  return node;
++}
++
+ AstNode *newGetPropertyExpr(Token name) {
+   AstNode *node = allocateAstNode(EXPR_GET_PROPERTY);
+   node->token = name;
+@@ -344,6 +357,33 @@ void printAST(AstNode node, int indentation) {
+     }
+     break;
+   }
++  case EXPR_SUPER_INVOKE: {
++    ObjString *nameString = copyString(node.token.start, node.token.length);
++    printf("%*sExpr Super Invoke\n", indentation, "");
++    if (node.branches.left != NULL) {
++      printAST(*(AstNode *)node.branches.left, indentation + 2);
++    }
++    printf("%*sMethod: %s\n", indentation + 2, "", nameString->chars);
++    Node *param = (Node *)node.params->head;
++    if (param == NULL) {
++      printf("%*sArgs: ()\n", indentation + 2, "");
++    } else {
++      printf("%*sArgs:\n", indentation + 2, "");
++      while (param != NULL) {
++        printAST(*(AstNode *)param->data, indentation + 4);
++        param = param->next;
++      }
++    }
++    break;
++  }
++  case EXPR_SUPER: {
++    ObjString *nameString = copyString(node.token.start, node.token.length);
++    printf("%*sExpr Super\n", indentation, "");
++    printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
++    printf("%*sExpr:\n", indentation + 2, "");
++    printAST(*node.branches.left, indentation + 4);
++    break;
++  }
+   case STMT_DEFINE: {
+     ObjString *nameString = copyString(node.token.start, node.token.length);
+     printf("%*sStmt Define\n", indentation, "");
+@@ -484,7 +524,7 @@ void printAST(AstNode node, int indentation) {
+     break;
+   }
+   case STMT_SET_PROPERTY: {
+-    printf("%*sStmt set property\n", indentation, "");
++    printf("%*sStmt Set Property\n", indentation, "");
+     ObjString *nameString = copyString(node.token.start, node.token.length);
+     printf("%*sTarget:\n", indentation + 2, "");
+     if (node.branches.left != NULL) {
+@@ -496,7 +536,7 @@ void printAST(AstNode node, int indentation) {
+     break;
+   }
+   case EXPR_GET_PROPERTY: {
+-    printf("%*sExpr get property\n", indentation, "");
++    printf("%*sExpr Get Property\n", indentation, "");
+     ObjString *nameString = copyString(node.token.start, node.token.length);
+     printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
+     printf("%*sExpr:\n", indentation + 2, "");
+diff --git a/tlox/src/cfg.c b/tlox/src/cfg.c
+index e3f26b3..dbb9c29 100644
+--- a/tlox/src/cfg.c
++++ b/tlox/src/cfg.c
+@@ -694,13 +694,24 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
+   case EXPR_INVOKE: {
+     walkAst(compiler, bb, node->branches.left, node->scope, activeCFG);
+ 
+-    Symbol symbol = {0};
+-    if (!scope_search(activeScope, node->token.start, node->token.length,
+-                      &symbol)) {
+-      errorAt(compiler, &node->token,
+-              "Symbol is not defined in current scope.");
+-      break;
++    int arity = 0;
++    Node *paramNode = (Node *)node->params->head;
++    while (paramNode != NULL) {
++      arity++;
++      walkAst(compiler, bb, paramNode->data, node->scope, activeCFG);
++      paramNode = paramNode->next;
+     }
++    Operand *arityOperand = newLiteralOperand(NUMBER_VAL(arity));
++
++    Value name = OBJ_VAL(copyString(node->token.start, node->token.length));
++    op = newOperation(IR_INVOKE, newLiteralOperand(name), arityOperand);
++    bb->curr->next = op;
++    bb->curr = op;
++    break;
++  }
++  case EXPR_SUPER_INVOKE: {
++    walkAst(compiler, bb, node->branches.left, node->scope, activeCFG);
++
+     int arity = 0;
+     Node *paramNode = (Node *)node->params->head;
+     while (paramNode != NULL) {
+@@ -710,7 +721,17 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
+     }
+     Operand *arityOperand = newLiteralOperand(NUMBER_VAL(arity));
+ 
+-    op = newOperation(IR_INVOKE, newSymbolOperand(symbol), arityOperand);
++    Value name = OBJ_VAL(copyString(node->token.start, node->token.length));
++    op = newOperation(IR_SUPER_INVOKE, newLiteralOperand(name), arityOperand);
++    bb->curr->next = op;
++    bb->curr = op;
++    break;
++  }
++  case EXPR_SUPER: {
++    walkAst(compiler, bb, node->branches.left, node->scope, activeCFG);
++
++    Value name = OBJ_VAL(copyString(node->token.start, node->token.length));
++    op = newOperation(IR_SUPER, newLiteralOperand(name), NULL);
+     bb->curr->next = op;
+     bb->curr = op;
+     break;
+@@ -722,7 +743,13 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
+     newCFG(compiler, wu);
+ 
+     Operand *pointer = newLiteralOperand(POINTER_VAL(wu));
+-    op = newOperation(IR_CLASS, pointer, NULL);
++    if (node->superclass.length > 0) {
++      Value superclassName =
++          OBJ_VAL(copyString(node->superclass.start, node->superclass.length));
++      op = newOperation(IR_CLASS, pointer, newLiteralOperand(superclassName));
++    } else {
++      op = newOperation(IR_CLASS, pointer, NULL);
++    }
+     bb->curr->next = op;
+     bb->curr = op;
+ 
+@@ -972,6 +999,10 @@ char *opcodeString(IROp opcode) {
+     return "stmt expr";
+   case IR_INVOKE:
+     return "invoke";
++  case IR_SUPER_INVOKE:
++    return "super invoke";
++  case IR_SUPER:
++    return "super";
+   case IR_UNKNOWN:
+   default:
+     return "?";
+diff --git a/tlox/src/codegen.c b/tlox/src/codegen.c
+index ba52d5e..2af33af 100644
+--- a/tlox/src/codegen.c
++++ b/tlox/src/codegen.c
+@@ -226,8 +226,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
+     emitByte(&f->chunk, OP_POP);
+     break;
+   case IR_INVOKE: {
+-    Symbol symbol = op->first->val.symbol;
+-    Value name = OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
++    Value name = op->first->val.literal;
+     uint8_t position = identifierConstant(compiler, &f->chunk, name);
+ 
+     emitBytes(&f->chunk, OP_INVOKE, position);
+@@ -310,6 +309,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
+     break;
+   }
+   case IR_CLASS: {
++    // TODO: super needs its own scope
+     Value wuPtr = op->first->val.literal;
+     WorkUnit *wu = AS_POINTER(wuPtr);
+ 
+@@ -322,6 +322,34 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
+     if (context->enclosing == NULL) {
+       int namePosition = identifierConstant(compiler, &f->chunk, OBJ_VAL(name));
+       emitBytes(&f->chunk, OP_DEFINE_GLOBAL, namePosition);
++
++      if (op->second != NULL) {
++        context->scopeDepth++;
++        Value superclassName = op->second->val.literal;
++        Token superclassNameToken =
++            syntheticToken(AS_STRING(superclassName)->chars);
++
++        // TODO: move out to common function again
++        OpCode op = OP_GET_LOCAL;
++        int position = resolveLocal(context, &superclassNameToken);
++
++        if (position == -1) {
++          position = resolveUpvalue(context, f, &superclassNameToken);
++          op = OP_GET_UPVALUE;
++        }
++        if (position == -1) {
++          position = identifierConstant(compiler, &f->chunk, superclassName);
++          op = OP_GET_GLOBAL;
++        }
++
++        Local *local = &context->locals[context->localCount++];
++        local->name = syntheticToken("super");
++        local->depth = context->scopeDepth;
++        local->isCaptured = false;
++        emitBytes(&f->chunk, op, position);
++        emitBytes(&f->chunk, OP_GET_GLOBAL, namePosition);
++        emitByte(&f->chunk, OP_INHERIT);
++      }
+       emitBytes(&f->chunk, OP_GET_GLOBAL, namePosition);
+     } else {
+       Local *local = &context->locals[context->localCount++];
+@@ -339,6 +367,20 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
+     wu->f = NULL;
+ 
+     emitByte(&f->chunk, OP_POP);
++    if (op->second != NULL) {
++      context->scopeDepth--;
++
++      while (context->localCount > 0 &&
++             context->locals[context->localCount - 1].depth >
++                 context->scopeDepth) {
++        if (context->locals[context->localCount - 1].isCaptured) {
++          emitByte(&f->chunk, OP_CLOSE_UPVALUE);
++        } else {
++          emitByte(&f->chunk, OP_POP);
++        }
++        context->localCount--;
++      }
++    }
+     break;
+   }
+   case IR_METHOD: {
+@@ -348,9 +390,15 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
+     ObjFunction *childF = compileWorkUnit(compiler, wu, labels);
+     int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
+     emitBytes(&f->chunk, OP_CLOSURE, position);
++    for (int i = 0; i < childF->upvalueCount; i++) {
++      // Not sure going through wu->cfg->context is best/correct here
++      emitByte(&f->chunk, wu->cfg->context->upvalues[i].isLocal ? 1 : 0);
++      emitByte(&f->chunk, wu->cfg->context->upvalues[i].index);
++    }
+     int namePosition =
+         identifierConstant(compiler, &f->chunk, OBJ_VAL(childF->name));
+     emitBytes(&f->chunk, OP_METHOD, namePosition);
++
+     break;
+   }
+   case IR_FUNCTION: {
+@@ -418,6 +466,33 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
+     emitBytes(&f->chunk, OP_GET_PROPERTY, namePosition);
+     break;
+   }
++  case IR_SUPER_INVOKE: {
++    Value name = op->first->val.literal;
++    uint8_t position = identifierConstant(compiler, &f->chunk, name);
++    Token localThis = syntheticToken("this");
++    uint8_t thisPosition = resolveLocal(context, &localThis);
++    Token localSuper = syntheticToken("super");
++    uint8_t superPosition = resolveUpvalue(context, f, &localSuper);
++
++    emitBytes(&f->chunk, OP_GET_LOCAL, thisPosition);
++    emitBytes(&f->chunk, OP_GET_UPVALUE, superPosition);
++    emitBytes(&f->chunk, OP_SUPER_INVOKE, position);
++    emitByte(&f->chunk, AS_NUMBER(op->second->val.literal));
++    break;
++  }
++  case IR_SUPER: {
++    Value name = op->first->val.literal;
++    uint8_t position = identifierConstant(compiler, &f->chunk, name);
++    Token localThis = syntheticToken("this");
++    uint8_t thisPosition = resolveLocal(context, &localThis);
++    Token localSuper = syntheticToken("super");
++    uint8_t superPosition = resolveUpvalue(context, f, &localSuper);
++
++    emitBytes(&f->chunk, OP_GET_LOCAL, thisPosition);
++    emitBytes(&f->chunk, OP_GET_UPVALUE, superPosition);
++    emitBytes(&f->chunk, OP_GET_SUPER, position);
++    break;
++  }
+   default:
+     printf("Unknown opcode %d\n", op->opcode);
+   }
+@@ -472,10 +547,17 @@ static void rewriteLabels(Chunk *chunk, Table *labels) {
+       index++;
+       index++;
+     } else if (chunk->code[index] == OP_GET_LOCAL ||
++               chunk->code[index] == OP_SET_LOCAL ||
+                chunk->code[index] == OP_DEFINE_GLOBAL ||
+                chunk->code[index] == OP_GET_GLOBAL ||
+                chunk->code[index] == OP_SET_GLOBAL ||
+-               chunk->code[index] == OP_SET_LOCAL ||
++               chunk->code[index] == OP_GET_UPVALUE ||
++               chunk->code[index] == OP_SET_UPVALUE ||
++               chunk->code[index] == OP_GET_PROPERTY ||
++               chunk->code[index] == OP_SET_PROPERTY ||
++               chunk->code[index] == OP_METHOD ||
++               chunk->code[index] == OP_GET_SUPER ||
++               chunk->code[index] == OP_SUPER_INVOKE ||
+                chunk->code[index] == OP_CALL) {
+       index++;
+     }
+diff --git a/tlox/src/compiler.c b/tlox/src/compiler.c
+index 259ec79..cc18944 100644
+--- a/tlox/src/compiler.c
++++ b/tlox/src/compiler.c
+@@ -154,29 +154,6 @@ void errorAtCurrent(Compiler *compiler, const char *message) {
+ /*   emitLoop(current->loopOffset); */
+ /* } */
+ 
+-/* static void super_(bool canAssign) { */
+-/*   if (currentClass == NULL) { */
+-/*     error("Can't use 'super' outside of a class."); */
+-/*   } else if (!currentClass->hasSuperclass) { */
+-/*     error("Can't use 'super' in a class with no superclass."); */
+-/*   } */
+-
+-/*   consume(TOKEN_DOT, "Expect '.' after 'super'."); */
+-/*   consume(TOKEN_IDENTIFIER, "Expect superclass method name."); */
+-/*   uint8_t name = identifierConstant(&parser.previous); */
+-
+-/*   namedVariable(syntheticToken("this"), false); */
+-/*   if (match(TOKEN_LEFT_PAREN)) { */
+-/*     uint8_t argCount = argumentList(); */
+-/*     namedVariable(syntheticToken("super"), false); */
+-/*     emitBytes(OP_SUPER_INVOKE, name); */
+-/*     emitByte(argCount); */
+-/*   } else { */
+-/*     namedVariable(syntheticToken("super"), false); */
+-/*     emitBytes(OP_GET_SUPER, name); */
+-/*   } */
+-/* } */
+-
+ /* static void classDeclaration() { */
+ /*   consume(TOKEN_IDENTIFIER, "Expect class name."); */
+ /*   Token className = parser.previous; */
+diff --git a/tlox/src/parser.c b/tlox/src/parser.c
+index 76486cb..53aad25 100644
+--- a/tlox/src/parser.c
++++ b/tlox/src/parser.c
+@@ -425,6 +425,42 @@ static AstNode *this_(Parser *parser, bool canAssign) {
+   return newThisExpr(parser->previous);
+ }
+ 
++static AstNode *super_(Parser *parser, bool canAssign) {
++  consume(parser, TOKEN_DOT, "Expect '.' after 'super'.");
++  Token method = parseVariable(parser, "Expect superclass method name.");
++
++  if (match(parser, TOKEN_LEFT_PAREN)) {
++    AstNode *node = newSuperInvocationExpr(method);
++    argumentList(parser, node);
++    return node;
++  } else {
++    return newSuperExpr(method);
++  }
++}
++
++/* static void super_(bool canAssign) { */
++/*   if (currentClass == NULL) { */
++/*     error("Can't use 'super' outside of a class."); */
++/*   } else if (!currentClass->hasSuperclass) { */
++/*     error("Can't use 'super' in a class with no superclass."); */
++/*   } */
++
++/*   consume(TOKEN_DOT, "Expect '.' after 'super'."); */
++/*   consume(TOKEN_IDENTIFIER, "Expect superclass method name."); */
++/*   uint8_t name = identifierConstant(&parser.previous); */
++
++/*   namedVariable(syntheticToken("this"), false); */
++/*   if (match(TOKEN_LEFT_PAREN)) { */
++/*     uint8_t argCount = argumentList(); */
++/*     namedVariable(syntheticToken("super"), false); */
++/*     emitBytes(OP_SUPER_INVOKE, name); */
++/*     emitByte(argCount); */
++/*   } else { */
++/*     namedVariable(syntheticToken("super"), false); */
++/*     emitBytes(OP_GET_SUPER, name); */
++/*   } */
++/* } */
++
+ ParseRule rules[] = {
+     [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
+     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
+@@ -462,7 +498,7 @@ ParseRule rules[] = {
+     [TOKEN_OR] = {NULL, or_, PREC_OR},
+     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
+     [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
+-    /* [TOKEN_SUPER] = {super_, NULL, PREC_NONE}, */
++    [TOKEN_SUPER] = {super_, NULL, PREC_NONE},
+     [TOKEN_THIS] = {this_, NULL, PREC_NONE},
+     [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
+     [TOKEN_VAR] = {NULL, NULL, PREC_NONE},
+diff --git a/tlox/src/semantic.c b/tlox/src/semantic.c
+index 4586d30..f53a8d8 100644
+--- a/tlox/src/semantic.c
++++ b/tlox/src/semantic.c
+@@ -19,14 +19,6 @@ static bool isGlobalScope(Scope *scope) {
+   return scope != NULL && scope->enclosing == NULL;
+ }
+ 
+-static Scope *getGlobalScope(Scope *scope) {
+-  Scope *curr = scope;
+-  while (curr->enclosing != NULL) {
+-    curr = curr->enclosing;
+-  }
+-  return curr;
+-}
+-
+ static bool isInClassScope(Scope *scope) {
+   Scope *curr = scope;
+   while (curr->enclosing != NULL) {
+@@ -305,6 +297,7 @@ void analyse(AstNode *node, Compiler *compiler) {
+         errorAt(compiler, &node->superclass,
+                 "A class can't inherit from itself.");
+       }
++      node->scope = beginScope(compiler, TYPE_CLASS);
+       Token super = {.start = "super", .length = (int)strlen("super")};
+       Symbol *symbol = newSymbol(super, SCOPE_LOCAL, false, false, true, 0);
+       scope_set(compiler->currentScope, super.start, super.length, symbol);
+@@ -312,6 +305,9 @@ void analyse(AstNode *node, Compiler *compiler) {
+ 
+     analyse(node->expr, compiler);
+ 
++    if (node->superclass.length > 0) {
++      endScope(compiler);
++    }
+     endScope(compiler);
+ 
+     break;
+@@ -335,10 +331,8 @@ void analyse(AstNode *node, Compiler *compiler) {
+ 
+     Symbol *symbol =
+         newSymbol(node->token, SCOPE_GLOBAL, false, true, true, node->arity);
+-    // FIXME: temporary hack until a type system allows us to look up correct
+-    // scope
+-    Scope *global = getGlobalScope(compiler->currentScope);
+-    scope_set(global, node->token.start, node->token.length, symbol);
++    scope_set(compiler->currentScope, node->token.start, node->token.length,
++              symbol);
+ 
+     node->expr->token = node->token;
+     analyse(node->expr, compiler);
+@@ -358,5 +352,39 @@ void analyse(AstNode *node, Compiler *compiler) {
+     analyse(node->branches.left, compiler);
+     break;
+   }
++  case EXPR_SUPER: {
++    // TODO: check for superclass
++    if (!isInClassScope(compiler->currentScope)) {
++      errorAt(compiler, &node->token, "Can't use 'super' outside of a class.");
++      break;
++    }
++    analyse(node->branches.left, compiler);
++    break;
++  }
++  case EXPR_SUPER_INVOKE: {
++    if (!isInClassScope(compiler->currentScope)) {
++      errorAt(compiler, &node->token, "Can't use 'super' outside of a class.");
++      break;
++    }
++    if (!scope_search(compiler->currentScope, node->token.start,
++                      node->token.length, &(Symbol){0})) {
++      errorAt(compiler, &node->token, "No method with that name in scope.");
++      break;
++    }
++    analyse(node->branches.left, compiler);
++
++    Node *paramNode = (Node *)node->params->head;
++
++    // FIXME: do something with arity
++    int callArity = 0;
++    while (paramNode != NULL) {
++      analyse(paramNode->data, compiler);
++      paramNode = paramNode->next;
++      callArity++;
++    }
++
++    node->scope = compiler->currentScope;
++    break;
++  }
+   }
+ }
