@@ -630,7 +630,20 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     break;
   }
   case STMT_RETURN: {
-    Operation *expr = walkAst(compiler, bb, node->expr, activeScope, activeCFG);
+    if (activeScope->type == TYPE_INITIALIZER) {
+      op = newOperation(IR_RETURN_FROM_INIT, NULL, NULL);
+      bb->curr->next = op;
+      bb->curr = op;
+      break;
+    }
+    Operation *expr = NULL;
+    if (node->expr == NULL) {
+      expr = newOperation(IR_NIL, NULL, NULL);
+      bb->curr->next = expr;
+      bb->curr = expr;
+    } else {
+      expr = walkAst(compiler, bb, node->expr, activeScope, activeCFG);
+    }
     op = newOperation(IR_RETURN, newRegisterOperand(expr->destination), NULL);
     bb->curr->next = op;
     bb->curr = op;
@@ -959,6 +972,8 @@ char *opcodeString(IROp opcode) {
   case IR_POP:
     return "pop";
   case IR_RETURN:
+    return "return";
+  case IR_RETURN_FROM_INIT:
     return "return";
   case IR_BEGIN_SCOPE:
     return "begin scope";

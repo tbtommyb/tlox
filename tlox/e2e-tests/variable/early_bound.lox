@@ -1,10 +1,11 @@
+// expect error line 9
 var a = "outer";
 {
   fun foo() {
     print a;
   }
 
-  foo(); // expect: outer
+  foo();
   var a = "inner";
-  foo(); // expect: outer
+  foo();
 }

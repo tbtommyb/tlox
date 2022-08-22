@@ -60,7 +60,7 @@ static AstNode *printStatement(Parser *parser) {
 static AstNode *returnStatement(Parser *parser) {
   AstNode *returnExpr = NULL;
   Token returnToken = parser->previous;
-  if (!match(parser, TOKEN_SEMICOLON)) {
+  if (!check(parser, TOKEN_SEMICOLON)) {
     returnExpr = expression(parser);
   }
   consume(parser, TOKEN_SEMICOLON, "Expect ';' after return value.");

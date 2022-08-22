@@ -303,6 +303,11 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     emitByte(&f->chunk, OP_RETURN);
     break;
   }
+  case IR_RETURN_FROM_INIT: {
+    emitBytes(&f->chunk, OP_GET_LOCAL, 0);
+    emitByte(&f->chunk, OP_RETURN);
+    break;
+  }
   case IR_BEGIN_SCOPE: {
     context->scopeDepth++;
     break;

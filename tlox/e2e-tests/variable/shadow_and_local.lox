@@ -1,8 +1,9 @@
+// expect error line 6
 {
   var a = "outer";
   {
-    print a; // expect: outer
+    print a;
     var a = "inner";
-    print a; // expect: inner
+    print a;
   }
 }

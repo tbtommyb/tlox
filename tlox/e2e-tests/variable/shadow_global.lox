@@ -1,6 +1,7 @@
+// expect error line 4
 var a = "global";
 {
   var a = "shadow";
-  print a; // expect: shadow
+  print a;
 }
-print a; // expect: global
+print a;

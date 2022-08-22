@@ -155,7 +155,9 @@ void analyse(AstNode *node, Compiler *compiler) {
     break;
   }
   case STMT_RETURN: {
-    if (compiler->currentScope->type != TYPE_FUNCTION) {
+    if (compiler->currentScope->type != TYPE_FUNCTION &&
+        compiler->currentScope->type != TYPE_METHOD &&
+        compiler->currentScope->type != TYPE_INITIALIZER) {
       errorAt(compiler, &node->token, "Can't return from top-level code.");
     }
     /* if (parser->compiler->type == TYPE_INITIALIZER) { */

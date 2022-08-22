@@ -417,8 +417,10 @@ void printAST(AstNode node, int indentation) {
   }
   case STMT_RETURN: {
     printf("%*sStmt Return\n", indentation, "");
-    printf("%*sExpr:\n", indentation + 2, "");
-    printAST(*node.expr, indentation + 4);
+    if (node.expr != NULL) {
+      printf("%*sExpr:\n", indentation + 2, "");
+      printAST(*node.expr, indentation + 4);
+    }
     break;
   }
   case STMT_EXPR: {
