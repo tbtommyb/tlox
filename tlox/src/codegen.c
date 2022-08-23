@@ -368,12 +368,8 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     // Need to rethink where to store upvalues
     childF->upvalueCount = wu->cfg->context->upvalueCount;
 
-    OpCode op = OP_CONSTANT;
-    if (wu->cfg->context->upvalueCount > 0) {
-      // FIXME: handle methods and initialisers
-      op = OP_CLOSURE;
-    }
-    emitBytes(&f->chunk, op, position);
+    // FIXME: handle methods and initialisers
+    emitBytes(&f->chunk, OP_CLOSURE, position);
     for (int i = 0; i < wu->cfg->context->upvalueCount; i++) {
       // Not sure going through wu->cfg->context is best/correct here
       emitByte(&f->chunk, wu->cfg->context->upvalues[i].isLocal ? 1 : 0);
