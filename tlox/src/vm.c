@@ -36,8 +36,8 @@ void runtimeError(const char *format, ...) {
     CallFrame *frame = &vm.frames[i];
     ObjFunction *function = frame->closure->function;
     size_t instruction = frame->ip - function->chunk.code - 1;
-    fprintf(vm.errstream, "[line %d] in ",
-            function->chunk.lines[instruction].line);
+    int line = getLine(&function->chunk, instruction);
+    fprintf(vm.errstream, "[line %d] in ", line);
     if (function->name == NULL) {
       fprintf(vm.errstream, "script\n");
     } else {
@@ -184,12 +184,6 @@ static bool isFalsey(Value value) {
 }
 
 static bool call(ObjClosure *closure, int argCount) {
-  if (argCount != closure->function->arity) {
-    runtimeError("Expected %d arguments but got %d.", closure->function->arity,
-                 argCount);
-    return false;
-  }
-
   if (vm.frameCount == FRAMES_MAX) {
     runtimeError("Stack overflow.");
     return false;
@@ -248,6 +242,13 @@ static bool callValue(Value callee, int argCount) {
       vm.stack[vm.stackCount - argCount - 1] = OBJ_VAL(newInstance(klass));
       Value initializer;
       if (tableGet(&klass->methods, OBJ_VAL(vm.initString), &initializer)) {
+
+        if (argCount != AS_CLOSURE(initializer)->function->arity) {
+          runtimeError("Expected %d arguments but got %d.",
+                       AS_CLOSURE(initializer)->function->arity, argCount);
+          return false;
+        }
+
         return call(AS_CLOSURE(initializer), argCount);
       } else if (argCount != 0) {
         runtimeError("Expected 0 arguments but got %d.", argCount);

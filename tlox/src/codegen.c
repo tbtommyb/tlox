@@ -349,10 +349,13 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     Value wuPtr = op->first->val.literal;
     WorkUnit *wu = AS_POINTER(wuPtr);
     ObjFunction *childF = compileWorkUnit(compiler, wu, labels);
+
     // Test fix hack
     // Need to rethink where to store upvalues
     childF->upvalueCount = wu->cfg->context->upvalueCount;
+    childF->arity = wu->cfg->arity;
     int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
+
     emitBytes(&f->chunk, OP_CLOSURE, position);
     int namePosition =
         identifierConstant(compiler, &f->chunk, OBJ_VAL(childF->name));
@@ -363,10 +366,12 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     Value wuPtr = op->first->val.literal;
     WorkUnit *wu = AS_POINTER(wuPtr);
     ObjFunction *childF = compileWorkUnit(compiler, wu, labels);
-    int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
+
     // Test fix hack
     // Need to rethink where to store upvalues
     childF->upvalueCount = wu->cfg->context->upvalueCount;
+    childF->arity = wu->cfg->arity;
+    int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
 
     // FIXME: handle methods and initialisers
     emitBytes(&f->chunk, OP_CLOSURE, position);
