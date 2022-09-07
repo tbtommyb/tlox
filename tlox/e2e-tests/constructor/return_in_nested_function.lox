@@ -1,10 +1,11 @@
+// expect error line 4
 class Foo {
   init() {
     fun init() {
       return "bar";
     }
-    print init(); // expect: bar
+    print init();
   }
 }
 
-print Foo(); // expect: Foo instance
+print Foo();

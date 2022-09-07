@@ -6,9 +6,10 @@
 #include "value.h"
 
 // TODO: integrate with garbage collector
-static AstNode *allocateAstNode(NodeType type) {
+static AstNode *allocateAstNode(Token token, NodeType type) {
   AstNode *node = (AstNode *)reallocate(NULL, 0, sizeof(AstNode));
   node->type = type;
+  node->token = token;
   node->literal = EMPTY_VAL;
   node->op = TOKEN_UNKNOWN;
   node->expr = NULL;
@@ -19,129 +20,125 @@ static AstNode *allocateAstNode(NodeType type) {
   node->methods = NULL;
   node->arity = 0;
   node->scope = NULL;
-  node->token = (Token){0};
+
+  // TODO: these empty values are code smell
   node->superclass = (Token){0};
   node->functionType = (FunctionType){0};
 
   return node;
 }
 
-AstNode *newLiteralExpr(Value value) {
-  AstNode *node = allocateAstNode(EXPR_LITERAL);
+AstNode *newLiteralExpr(Token token, Value value) {
+  AstNode *node = allocateAstNode(token, EXPR_LITERAL);
   node->literal = value;
   return node;
 }
 
 AstNode *newNilExpr(Token token) {
-  AstNode *node = allocateAstNode(EXPR_NIL);
+  AstNode *node = allocateAstNode(token, EXPR_NIL);
   node->token = token;
   return node;
 }
 
-AstNode *newBinaryExpr(AstNode *left, AstNode *right, TokenType op) {
-  AstNode *node = allocateAstNode(EXPR_BINARY);
+AstNode *newBinaryExpr(Token token, AstNode *left, AstNode *right,
+                       TokenType op) {
+  AstNode *node = allocateAstNode(token, EXPR_BINARY);
   node->branches.left = left;
   node->branches.right = right;
   node->op = op;
   return node;
 }
 
-AstNode *newUnaryExpr(AstNode *right, TokenType op) {
-  AstNode *node = allocateAstNode(EXPR_UNARY);
+AstNode *newUnaryExpr(Token token, AstNode *right, TokenType op) {
+  AstNode *node = allocateAstNode(token, EXPR_UNARY);
   node->branches.right = right;
   node->op = op;
   return node;
 }
 
-AstNode *newAndExpr() { return allocateAstNode(EXPR_AND); }
+AstNode *newAndExpr(Token token) { return allocateAstNode(token, EXPR_AND); }
 
-AstNode *newOrExpr() { return allocateAstNode(EXPR_OR); }
+AstNode *newOrExpr(Token token) { return allocateAstNode(token, EXPR_OR); }
 
 AstNode *newVariableExpr(Token token) {
-  AstNode *node = allocateAstNode(EXPR_VARIABLE);
+  AstNode *node = allocateAstNode(token, EXPR_VARIABLE);
   node->token = token;
   return node;
 }
 
-AstNode *newFunctionExpr(FunctionType functionType) {
-  AstNode *node = allocateAstNode(EXPR_FUNCTION);
+AstNode *newFunctionExpr(Token token, FunctionType functionType) {
+  AstNode *node = allocateAstNode(token, EXPR_FUNCTION);
   node->params = linkedList_allocate();
   node->functionType = functionType;
   return node;
 }
 
-AstNode *newCallExpr() {
-  AstNode *node = allocateAstNode(EXPR_CALL);
+AstNode *newCallExpr(Token token) {
+  AstNode *node = allocateAstNode(token, EXPR_CALL);
   node->params = linkedList_allocate();
   return node;
 }
 
-AstNode *newInvocationExpr(Token name) {
-  AstNode *node = allocateAstNode(EXPR_INVOKE);
+AstNode *newInvocationExpr(Token token) {
+  AstNode *node = allocateAstNode(token, EXPR_INVOKE);
   node->params = linkedList_allocate();
-  node->token = name;
   return node;
 }
 
-AstNode *newThisExpr(Token this) {
-  AstNode *node = allocateAstNode(EXPR_THIS);
-  node->token = this;
+AstNode *newThisExpr(Token token) {
+  AstNode *node = allocateAstNode(token, EXPR_THIS);
   return node;
 }
 
-AstNode *newGetPropertyExpr(Token name) {
-  AstNode *node = allocateAstNode(EXPR_GET_PROPERTY);
-  node->token = name;
+AstNode *newGetPropertyExpr(Token token) {
+  AstNode *node = allocateAstNode(token, EXPR_GET_PROPERTY);
   return node;
 }
 
 AstNode *newDefineStmt(Token token, AstNode *expr) {
-  AstNode *node = allocateAstNode(STMT_DEFINE);
-  node->token = token;
+  AstNode *node = allocateAstNode(token, STMT_DEFINE);
   node->expr = expr;
   return node;
 }
 
 AstNode *newAssignStmt(Token token, AstNode *expr) {
-  AstNode *node = allocateAstNode(STMT_ASSIGN);
-  node->token = token;
+  AstNode *node = allocateAstNode(token, STMT_ASSIGN);
   node->expr = expr;
   return node;
 }
 
 AstNode *newConstDefineStmt(Token token, AstNode *expr) {
-  AstNode *node = allocateAstNode(STMT_DEFINE_CONST);
-  node->token = token;
+  AstNode *node = allocateAstNode(token, STMT_DEFINE_CONST);
   node->expr = expr;
   return node;
 }
 
-AstNode *newPrintStmt(AstNode *expr) {
-  AstNode *node = allocateAstNode(STMT_PRINT);
+AstNode *newPrintStmt(Token token, AstNode *expr) {
+  AstNode *node = allocateAstNode(token, STMT_PRINT);
   node->expr = expr;
   return node;
 }
 
-AstNode *newIfStmt(AstNode *condition, AstNode *thenBranch,
+AstNode *newIfStmt(Token token, AstNode *condition, AstNode *thenBranch,
                    AstNode *elseBranch) {
-  AstNode *node = allocateAstNode(STMT_IF);
+  AstNode *node = allocateAstNode(token, STMT_IF);
   node->expr = condition;
   node->branches.left = thenBranch;
   node->branches.right = elseBranch;
   return node;
 }
 
-AstNode *newWhileStmt(AstNode *condition, AstNode *thenBranch) {
-  AstNode *node = allocateAstNode(STMT_WHILE);
+AstNode *newWhileStmt(Token token, AstNode *condition, AstNode *thenBranch) {
+  AstNode *node = allocateAstNode(token, STMT_WHILE);
   node->expr = condition;
   node->branches.left = thenBranch;
   return node;
 }
 
-AstNode *newForStmt(AstNode *initNode, AstNode *conditionNode,
+AstNode *newForStmt(Token token, AstNode *initNode, AstNode *conditionNode,
                     AstNode *postNode, AstNode *bodyNode) {
 
-  AstNode *node = allocateAstNode(STMT_FOR);
+  AstNode *node = allocateAstNode(token, STMT_FOR);
   node->preExpr = initNode;
   node->condExpr = conditionNode;
   node->postExpr = postNode;
@@ -149,63 +146,56 @@ AstNode *newForStmt(AstNode *initNode, AstNode *conditionNode,
   return node;
 }
 
-AstNode *newModuleStmt() {
-  AstNode *node = allocateAstNode(STMT_MODULE);
-  node->stmts = linkedList_allocate();
-  Token name;
-  name.start = "main";
-  name.length = 4;
-  node->token = name;
-  return node;
-}
-
-AstNode *newBlockStmt() {
-  AstNode *node = allocateAstNode(STMT_BLOCK);
+AstNode *newModuleStmt(Token token) {
+  // FIXME: do we need to manually main something "main"?
+  AstNode *node = allocateAstNode(token, STMT_MODULE);
   node->stmts = linkedList_allocate();
   return node;
 }
 
-AstNode *newFunctionStmt(Token name, AstNode *body) {
-  AstNode *node = allocateAstNode(STMT_FUNCTION);
-  node->token = name;
+AstNode *newBlockStmt(Token token) {
+  AstNode *node = allocateAstNode(token, STMT_BLOCK);
+  node->stmts = linkedList_allocate();
+  return node;
+}
+
+AstNode *newFunctionStmt(Token token, AstNode *body) {
+  AstNode *node = allocateAstNode(token, STMT_FUNCTION);
   node->expr = body;
   return node;
 }
 
-AstNode *newReturnStmt(AstNode *expr) {
-  AstNode *node = allocateAstNode(STMT_RETURN);
+AstNode *newReturnStmt(Token token, AstNode *expr) {
+  AstNode *node = allocateAstNode(token, STMT_RETURN);
   node->expr = expr;
   return node;
 }
 
-AstNode *newExprStmt(AstNode *expr) {
-  AstNode *node = allocateAstNode(STMT_EXPR);
+AstNode *newExprStmt(Token token, AstNode *expr) {
+  AstNode *node = allocateAstNode(token, STMT_EXPR);
   node->expr = expr;
   return node;
 }
 
-AstNode *newMethodStmt(Token name, AstNode *expr) {
-  AstNode *node = allocateAstNode(STMT_METHOD);
-  node->token = name;
+AstNode *newMethodStmt(Token token, AstNode *expr) {
+  AstNode *node = allocateAstNode(token, STMT_METHOD);
   node->expr = expr;
   return node;
 }
 
-AstNode *newClassStmt(Token name) {
-  AstNode *node = allocateAstNode(STMT_CLASS);
-  node->token = name;
+AstNode *newClassStmt(Token token) {
+  AstNode *node = allocateAstNode(token, STMT_CLASS);
   return node;
 }
 
-AstNode *newClassBodyStmt() {
-  AstNode *node = allocateAstNode(STMT_CLASS_BODY);
+AstNode *newClassBodyStmt(Token token) {
+  AstNode *node = allocateAstNode(token, STMT_CLASS_BODY);
   node->methods = linkedList_allocate();
   return node;
 }
 
-AstNode *newSetPropertyStmt(Token name, AstNode *expr) {
-  AstNode *node = allocateAstNode(STMT_SET_PROPERTY);
-  node->token = name;
+AstNode *newSetPropertyStmt(Token token, AstNode *expr) {
+  AstNode *node = allocateAstNode(token, STMT_SET_PROPERTY);
   node->expr = expr;
   return node;
 }
@@ -248,6 +238,10 @@ void printAST(AstNode node, int indentation) {
     printf("%*sExpr Lit: ", indentation, "");
     printValue(stdout, node.literal);
     printf("%*s\n", indentation, "");
+    break;
+  }
+  case EXPR_NIL: {
+    printf("%*sExpr Nil\n", indentation, "");
     break;
   }
   case EXPR_UNARY: {

@@ -70,36 +70,37 @@ static inline bool isNodeType(AstNode node, NodeType type) {
   return node.type == type;
 }
 
-AstNode *newAndExpr();
-AstNode *newOrExpr();
-AstNode *newLiteralExpr(Value value);
-AstNode *newNilExpr();
-AstNode *newBinaryExpr(AstNode *left, AstNode *right, TokenType operator);
-AstNode *newUnaryExpr(AstNode *right, TokenType operator);
+AstNode *newAndExpr(Token token);
+AstNode *newOrExpr(Token token);
+AstNode *newLiteralExpr(Token token, Value value);
+AstNode *newNilExpr(Token token);
+AstNode *newBinaryExpr(Token token, AstNode *left, AstNode *right,
+                       TokenType operator);
+AstNode *newUnaryExpr(Token token, AstNode *right, TokenType operator);
 AstNode *newVariableExpr(Token token);
-AstNode *newFunctionExpr(FunctionType functionType);
-AstNode *newCallExpr();
-AstNode *newInvocationExpr(Token name);
-AstNode *newGetPropertyExpr(Token name);
-AstNode *newThisExpr(Token this);
-AstNode *newClassStmt(Token name);
-AstNode *newClassBodyStmt();
+AstNode *newFunctionExpr(Token token, FunctionType functionType);
+AstNode *newCallExpr(Token token);
+AstNode *newInvocationExpr(Token token);
+AstNode *newGetPropertyExpr(Token token);
+AstNode *newThisExpr(Token token);
+AstNode *newClassStmt(Token token);
+AstNode *newClassBodyStmt(Token token);
 AstNode *newDefineStmt(Token token, AstNode *expr);
 AstNode *newConstDefineStmt(Token token, AstNode *expr);
 AstNode *newAssignStmt(Token token, AstNode *expr);
-AstNode *newPrintStmt(AstNode *expr);
-AstNode *newIfStmt(AstNode *condition, AstNode *thenBranch,
+AstNode *newPrintStmt(Token token, AstNode *expr);
+AstNode *newIfStmt(Token token, AstNode *condition, AstNode *thenBranch,
                    AstNode *elseBranch);
-AstNode *newWhileStmt(AstNode *condition, AstNode *thenBranch);
-AstNode *newForStmt(AstNode *initNode, AstNode *conditionNode,
+AstNode *newWhileStmt(Token token, AstNode *condition, AstNode *thenBranch);
+AstNode *newForStmt(Token token, AstNode *initNode, AstNode *conditionNode,
                     AstNode *postNode, AstNode *bodyNode);
-AstNode *newModuleStmt();
-AstNode *newMethodStmt(Token name, AstNode *expr);
-AstNode *newBlockStmt();
-AstNode *newFunctionStmt(Token name, AstNode *funcExpr);
-AstNode *newReturnStmt(AstNode *expr);
-AstNode *newExprStmt(AstNode *expr);
-AstNode *newSetPropertyStmt(Token property, AstNode *expr);
+AstNode *newModuleStmt(Token token);
+AstNode *newMethodStmt(Token token, AstNode *expr);
+AstNode *newBlockStmt(Token token);
+AstNode *newFunctionStmt(Token token, AstNode *funcExpr);
+AstNode *newReturnStmt(Token token, AstNode *expr);
+AstNode *newExprStmt(Token token, AstNode *expr);
+AstNode *newSetPropertyStmt(Token token, AstNode *expr);
 
 void printAST(AstNode root, int indentation);
 

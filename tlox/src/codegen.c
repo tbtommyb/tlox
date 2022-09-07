@@ -7,26 +7,26 @@ static void generateBasicBlockCode(Compiler *compiler, ObjFunction *f,
                                    BasicBlock *bb, Table *labels,
                                    ExecutionContext *context);
 
-static void emitByte(Chunk *chunk, uint8_t byte) {
-  writeChunk(chunk, byte, 123); // FIXME: line number would be from token
+static void emitByte(Chunk *chunk, uint8_t byte, int lineno) {
+  writeChunk(chunk, byte, lineno);
 }
 
-static void emitBytes(Chunk *chunk, uint8_t byte1, uint8_t byte2) {
-  emitByte(chunk, byte1);
-  emitByte(chunk, byte2);
+static void emitBytes(Chunk *chunk, uint8_t byte1, uint8_t byte2, int lineno) {
+  emitByte(chunk, byte1, lineno);
+  emitByte(chunk, byte2, lineno);
 }
 
-static void emitReturn(FunctionType functionType, Chunk *chunk) {
+static void emitReturn(FunctionType functionType, Chunk *chunk, int lineno) {
   if (functionType == TYPE_INITIALIZER) {
-    emitBytes(chunk, OP_GET_LOCAL, 0);
+    emitBytes(chunk, OP_GET_LOCAL, 0, lineno);
   } else {
-    emitByte(chunk, OP_NIL);
+    emitByte(chunk, OP_NIL, lineno);
   }
-  emitByte(chunk, OP_RETURN);
+  emitByte(chunk, OP_RETURN, lineno);
 }
 
-static void emitConstant(Chunk *chunk, uint8_t position) {
-  emitBytes(chunk, OP_CONSTANT, position);
+static void emitConstant(Chunk *chunk, uint8_t position, int lineno) {
+  emitBytes(chunk, OP_CONSTANT, position, lineno);
 }
 
 Chunk *allocateChunk() {
@@ -121,18 +121,18 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
                            Table *labels, ExecutionContext *context) {
   switch (op->opcode) {
   case IR_ADD:
-    emitByte(&f->chunk, OP_ADD);
+    emitByte(&f->chunk, OP_ADD, op->token->line);
     break;
   case IR_CONSTANT: {
     Value literal = op->first->val.literal;
     uint8_t position = identifierConstant(compiler, &f->chunk, literal);
-    emitConstant(&f->chunk, position);
+    emitConstant(&f->chunk, position, op->token->line);
     break;
   }
   case IR_CALL: {
     Value arity = op->first->val.literal;
 
-    emitBytes(&f->chunk, OP_CALL, AS_NUMBER(arity));
+    emitBytes(&f->chunk, OP_CALL, AS_NUMBER(arity), op->token->line);
     break;
   }
   case IR_CODE_START:
@@ -141,30 +141,30 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
   case IR_COND: {
     // Write label ID into instruction stream and later rewrite symbolic
     // addresses
-    emitByte(&f->chunk, OP_JUMP_IF_FALSE);
-    emitByte(&f->chunk, (op->second->val.label >> 8) & 0xff);
-    emitByte(&f->chunk, op->second->val.label & 0xff);
-    emitByte(&f->chunk, OP_POP);
+    emitByte(&f->chunk, OP_JUMP_IF_FALSE, op->token->line);
+    emitByte(&f->chunk, (op->second->val.label >> 8) & 0xff, op->token->line);
+    emitByte(&f->chunk, op->second->val.label & 0xff, op->token->line);
+    emitByte(&f->chunk, OP_POP, op->token->line);
     break;
   }
   case IR_COND_NO_POP: {
     // Write label ID into instruction stream and later rewrite symbolic
     // addresses
-    emitByte(&f->chunk, OP_JUMP_IF_FALSE);
-    emitByte(&f->chunk, (op->second->val.label >> 8) & 0xff);
-    emitByte(&f->chunk, op->second->val.label & 0xff);
+    emitByte(&f->chunk, OP_JUMP_IF_FALSE, op->token->line);
+    emitByte(&f->chunk, (op->second->val.label >> 8) & 0xff, op->token->line);
+    emitByte(&f->chunk, op->second->val.label & 0xff, op->token->line);
     break;
   }
   case IR_GOTO: {
-    emitByte(&f->chunk, OP_JUMP);
-    emitByte(&f->chunk, (op->first->val.label >> 8) & 0xff);
-    emitByte(&f->chunk, op->first->val.label & 0xff);
+    emitByte(&f->chunk, OP_JUMP, op->token->line);
+    emitByte(&f->chunk, (op->first->val.label >> 8) & 0xff, op->token->line);
+    emitByte(&f->chunk, op->first->val.label & 0xff, op->token->line);
     break;
   }
   case IR_LOOP: {
-    emitByte(&f->chunk, OP_LOOP);
-    emitByte(&f->chunk, (op->first->val.label >> 8) & 0xff);
-    emitByte(&f->chunk, op->first->val.label & 0xff);
+    emitByte(&f->chunk, OP_LOOP, op->token->line);
+    emitByte(&f->chunk, (op->first->val.label >> 8) & 0xff, op->token->line);
+    emitByte(&f->chunk, op->first->val.label & 0xff, op->token->line);
     break;
   }
   case IR_LABEL: {
@@ -175,61 +175,61 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
   case IR_ELSE_LABEL: {
     tableSet(labels, NUMBER_VAL(op->first->val.label),
              NUMBER_VAL(f->chunk.count - 1));
-    emitByte(&f->chunk, OP_POP);
+    emitByte(&f->chunk, OP_POP, op->token->line);
     break;
   }
   case IR_DIVIDE:
-    emitByte(&f->chunk, OP_DIVIDE);
+    emitByte(&f->chunk, OP_DIVIDE, op->token->line);
     break;
   case IR_SUBTRACT:
-    emitByte(&f->chunk, OP_SUBTRACT);
+    emitByte(&f->chunk, OP_SUBTRACT, op->token->line);
     break;
   case IR_MODULO:
-    emitByte(&f->chunk, OP_MODULO);
+    emitByte(&f->chunk, OP_MODULO, op->token->line);
     break;
   case IR_MULTIPLY:
-    emitByte(&f->chunk, OP_MULTIPLY);
+    emitByte(&f->chunk, OP_MULTIPLY, op->token->line);
     break;
   case IR_NEGATE:
-    emitByte(&f->chunk, OP_NEGATE);
+    emitByte(&f->chunk, OP_NEGATE, op->token->line);
     break;
   case IR_NIL:
-    emitByte(&f->chunk, OP_NIL);
+    emitByte(&f->chunk, OP_NIL, op->token->line);
     break;
   case IR_NOT:
-    emitByte(&f->chunk, OP_NOT);
+    emitByte(&f->chunk, OP_NOT, op->token->line);
     break;
   case IR_NOT_EQUAL:
-    emitBytes(&f->chunk, OP_EQUAL, OP_NOT);
+    emitBytes(&f->chunk, OP_EQUAL, OP_NOT, op->token->line);
     break;
   case IR_EQUAL:
-    emitByte(&f->chunk, OP_EQUAL);
+    emitByte(&f->chunk, OP_EQUAL, op->token->line);
     break;
   case IR_GREATER:
-    emitByte(&f->chunk, OP_GREATER);
+    emitByte(&f->chunk, OP_GREATER, op->token->line);
     break;
   case IR_GREATER_EQUAL:
-    emitBytes(&f->chunk, OP_LESS, OP_NOT);
+    emitBytes(&f->chunk, OP_LESS, OP_NOT, op->token->line);
     break;
   case IR_LESS:
-    emitByte(&f->chunk, OP_LESS);
+    emitByte(&f->chunk, OP_LESS, op->token->line);
     break;
   case IR_LESS_EQUAL:
-    emitBytes(&f->chunk, OP_GREATER, OP_NOT);
+    emitBytes(&f->chunk, OP_GREATER, OP_NOT, op->token->line);
     break;
   case IR_PRINT:
-    emitByte(&f->chunk, OP_PRINT);
+    emitByte(&f->chunk, OP_PRINT, op->token->line);
     break;
   case IR_POP:
-    emitByte(&f->chunk, OP_POP);
+    emitByte(&f->chunk, OP_POP, op->token->line);
     break;
   case IR_INVOKE: {
     Symbol symbol = op->first->val.symbol;
     Value name = OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
     uint8_t position = identifierConstant(compiler, &f->chunk, name);
 
-    emitBytes(&f->chunk, OP_INVOKE, position);
-    emitByte(&f->chunk, AS_NUMBER(op->second->val.literal));
+    emitBytes(&f->chunk, OP_INVOKE, position, op->token->line);
+    emitByte(&f->chunk, AS_NUMBER(op->second->val.literal), op->token->line);
     break;
   }
   case IR_DEFINE_GLOBAL: {
@@ -237,7 +237,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     Value name = OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
     uint8_t position = identifierConstant(compiler, &f->chunk, name);
 
-    emitBytes(&f->chunk, OP_DEFINE_GLOBAL, position);
+    emitBytes(&f->chunk, OP_DEFINE_GLOBAL, position, op->token->line);
     break;
   }
   case IR_DEFINE_LOCAL: {
@@ -253,23 +253,23 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     Value name = OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
     uint8_t position = identifierConstant(compiler, &f->chunk, name);
 
-    emitBytes(&f->chunk, OP_GET_GLOBAL, position);
+    emitBytes(&f->chunk, OP_GET_GLOBAL, position, op->token->line);
     break;
   }
   case IR_GET_LOCAL: {
     Symbol symbol = op->first->val.symbol;
 
-    OpCode op = OP_GET_LOCAL;
+    OpCode opcode = OP_GET_LOCAL;
     int position = resolveLocal(context, &symbol.name);
 
     if (position == -1) {
       position = resolveUpvalue(context, &symbol.name);
-      op = OP_GET_UPVALUE;
+      opcode = OP_GET_UPVALUE;
     }
 
     /* assert(position != -1); */
 
-    emitBytes(&f->chunk, op, (uint8_t)position);
+    emitBytes(&f->chunk, opcode, (uint8_t)position, op->token->line);
     break;
   }
   case IR_SET_GLOBAL: {
@@ -280,7 +280,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     Register source = op->second->val.source;
     uint8_t position = identifierConstant(compiler, &f->chunk, nameString);
 
-    emitBytes(&f->chunk, OP_SET_GLOBAL, position);
+    emitBytes(&f->chunk, OP_SET_GLOBAL, position, op->token->line);
     break;
   }
   case IR_SET_LOCAL: {
@@ -296,16 +296,16 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
 
     assert(position != -1);
 
-    emitBytes(&f->chunk, opcode, (uint8_t)position);
+    emitBytes(&f->chunk, opcode, (uint8_t)position, op->token->line);
     break;
   }
   case IR_RETURN: {
-    emitByte(&f->chunk, OP_RETURN);
+    emitByte(&f->chunk, OP_RETURN, op->token->line);
     break;
   }
   case IR_RETURN_FROM_INIT: {
-    emitBytes(&f->chunk, OP_GET_LOCAL, 0);
-    emitByte(&f->chunk, OP_RETURN);
+    emitBytes(&f->chunk, OP_GET_LOCAL, 0, op->token->line);
+    emitByte(&f->chunk, OP_RETURN, op->token->line);
     break;
   }
   case IR_BEGIN_SCOPE: {
@@ -320,12 +320,12 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     ObjString *name = copyString(wu->name.start, wu->name.length);
     /* childF->name = name; */
     int position = identifierConstant(compiler, &f->chunk, OBJ_VAL(name));
-    emitBytes(&f->chunk, OP_CLASS, position);
+    emitBytes(&f->chunk, OP_CLASS, position, op->token->line);
 
     if (context->enclosing == NULL) {
       int namePosition = identifierConstant(compiler, &f->chunk, OBJ_VAL(name));
-      emitBytes(&f->chunk, OP_DEFINE_GLOBAL, namePosition);
-      emitBytes(&f->chunk, OP_GET_GLOBAL, namePosition);
+      emitBytes(&f->chunk, OP_DEFINE_GLOBAL, namePosition, op->token->line);
+      emitBytes(&f->chunk, OP_GET_GLOBAL, namePosition, op->token->line);
     } else {
       Local *local = &context->locals[context->localCount++];
       local->name = wu->name;
@@ -341,7 +341,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     /* } */
     wu->f = NULL;
 
-    emitByte(&f->chunk, OP_POP);
+    emitByte(&f->chunk, OP_POP, op->token->line);
     break;
   }
   case IR_METHOD: {
@@ -356,10 +356,10 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     childF->arity = wu->cfg->arity;
     int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
 
-    emitBytes(&f->chunk, OP_CLOSURE, position);
+    emitBytes(&f->chunk, OP_CLOSURE, position, op->token->line);
     int namePosition =
         identifierConstant(compiler, &f->chunk, OBJ_VAL(childF->name));
-    emitBytes(&f->chunk, OP_METHOD, namePosition);
+    emitBytes(&f->chunk, OP_METHOD, namePosition, op->token->line);
     break;
   }
   case IR_FUNCTION: {
@@ -374,11 +374,12 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
 
     // FIXME: handle methods and initialisers
-    emitBytes(&f->chunk, OP_CLOSURE, position);
+    emitBytes(&f->chunk, OP_CLOSURE, position, op->token->line);
     for (int i = 0; i < wu->cfg->context->upvalueCount; i++) {
       // Not sure going through wu->cfg->context is best/correct here
-      emitByte(&f->chunk, wu->cfg->context->upvalues[i].isLocal ? 1 : 0);
-      emitByte(&f->chunk, wu->cfg->context->upvalues[i].index);
+      emitByte(&f->chunk, wu->cfg->context->upvalues[i].isLocal ? 1 : 0,
+               op->token->line);
+      emitByte(&f->chunk, wu->cfg->context->upvalues[i].index, op->token->line);
     }
 
     // Fixes issue when using scopes at top level. Do we need both checks here?
@@ -386,7 +387,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     if (context->enclosing == NULL && context->scopeDepth == 0) {
       int namePosition =
           identifierConstant(compiler, &f->chunk, OBJ_VAL(childF->name));
-      emitBytes(&f->chunk, OP_DEFINE_GLOBAL, namePosition);
+      emitBytes(&f->chunk, OP_DEFINE_GLOBAL, namePosition, op->token->line);
     } else {
       Local *local = &context->locals[context->localCount++];
       local->name = wu->name;
@@ -402,16 +403,16 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
            context->locals[context->localCount - 1].depth >
                context->scopeDepth) {
       if (context->locals[context->localCount - 1].isCaptured) {
-        emitByte(&f->chunk, OP_CLOSE_UPVALUE);
+        emitByte(&f->chunk, OP_CLOSE_UPVALUE, op->token->line);
       } else {
-        emitByte(&f->chunk, OP_POP);
+        emitByte(&f->chunk, OP_POP, op->token->line);
       }
       context->localCount--;
     }
     break;
   }
   case IR_STMT_EXPR: {
-    emitByte(&f->chunk, OP_POP);
+    emitByte(&f->chunk, OP_POP, op->token->line);
     break;
   }
   case IR_SET_PROPERTY: {
@@ -419,7 +420,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     Value nameString =
         OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
     int namePosition = identifierConstant(compiler, &f->chunk, nameString);
-    emitBytes(&f->chunk, OP_SET_PROPERTY, namePosition);
+    emitBytes(&f->chunk, OP_SET_PROPERTY, namePosition, op->token->line);
     break;
   }
   case IR_GET_PROPERTY: {
@@ -427,7 +428,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     Value nameString =
         OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
     int namePosition = identifierConstant(compiler, &f->chunk, nameString);
-    emitBytes(&f->chunk, OP_GET_PROPERTY, namePosition);
+    emitBytes(&f->chunk, OP_GET_PROPERTY, namePosition, op->token->line);
     break;
   }
   default:
@@ -514,7 +515,8 @@ ObjFunction *compileWorkUnit(Compiler *compiler, WorkUnit *wu, Table *labels) {
   wu->f = f;
 
   generateChunk(compiler, wu->cfg, labels, f);
-  emitReturn(wu->node->functionType, &f->chunk);
+  // FIXME: lineno is wrong
+  emitReturn(wu->node->functionType, &f->chunk, wu->name.line);
 
   return f;
 }

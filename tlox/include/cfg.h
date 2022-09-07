@@ -87,6 +87,7 @@ struct Operation {
   Operand *first;
   Operand *second;
   Operation *next;
+  Token *token;
 };
 
 typedef struct BasicBlock {
@@ -116,7 +117,8 @@ typedef struct WorkUnit {
 } WorkUnit;
 
 BasicBlock *newBasicBlock(AstNode *node);
-Operation *newOperation(IROp opcode, Operand *first, Operand *second);
+Operation *newOperation(Token *token, IROp opcode, Operand *first,
+                        Operand *second);
 WorkUnit *createWorkUnit(Compiler *compiler, AstNode *root);
 
 LinkedList *postOrderTraverseBasicBlock(CFG *cfg);
