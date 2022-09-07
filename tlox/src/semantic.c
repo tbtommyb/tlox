@@ -337,10 +337,8 @@ void analyse(AstNode *node, Compiler *compiler) {
 
     Symbol *symbol =
         newSymbol(node->token, SCOPE_GLOBAL, false, true, true, node->arity);
-    // FIXME: temporary hack until a type system allows us to look up correct
-    // scope
-    Scope *global = getGlobalScope(compiler->currentScope);
-    scope_set(global, node->token.start, node->token.length, symbol);
+    scope_set(compiler->currentScope, node->token.start, node->token.length,
+              symbol);
 
     node->expr->token = node->token;
     analyse(node->expr, compiler);

@@ -685,13 +685,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     break;
   }
   case EXPR_GET_PROPERTY: {
-    Symbol symbol = {0};
-    if (!scope_search(activeScope, node->token.start, node->token.length,
-                      &symbol)) {
-      errorAt(compiler, &node->token,
-              "Symbol is not defined in current scope.");
-      break;
-    }
+    Symbol symbol = {.name = node->token};
 
     walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
     op = newOperation(&node->token, IR_GET_PROPERTY, newSymbolOperand(symbol),
@@ -701,13 +695,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     break;
   }
   case STMT_SET_PROPERTY: {
-    Symbol symbol = {0};
-    if (!scope_search(activeScope, node->token.start, node->token.length,
-                      &symbol)) {
-      errorAt(compiler, &node->token,
-              "Symbol is not defined in current scope.");
-      break;
-    }
+    Symbol symbol = {.name = node->token};
 
     walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
     walkAst(compiler, bb, node->expr, activeScope, activeCFG);
@@ -737,13 +725,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   case EXPR_INVOKE: {
     walkAst(compiler, bb, node->branches.left, node->scope, activeCFG);
 
-    Symbol symbol = {0};
-    if (!scope_search(activeScope, node->token.start, node->token.length,
-                      &symbol)) {
-      errorAt(compiler, &node->token,
-              "Symbol is not defined in current scope.");
-      break;
-    }
+    Symbol symbol = {.name = node->token};
     int arity = 0;
     Node *paramNode = (Node *)node->params->head;
     while (paramNode != NULL) {
