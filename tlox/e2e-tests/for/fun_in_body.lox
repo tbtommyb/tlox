@@ -1,2 +1,2 @@
-// [line 2] Error at 'fun': Expect expression.
-for (;;) fun foo() {}
+// expect error line 2
+for (;;) fun foo() {} // [line 2] Error at 'fun': Expect expression.

@@ -1,3 +1,4 @@
+// expect error line 258
 // 256 parameters.
 fun f(
     a1,

@@ -1,3 +1,4 @@
+// expect error line 261
 fun foo() {}
 {
   var a = 1;

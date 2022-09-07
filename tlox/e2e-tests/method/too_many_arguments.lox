@@ -1,3 +1,4 @@
+// expect error line 260
 {
   var a = 1;
   true.method(

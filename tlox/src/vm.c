@@ -188,6 +188,11 @@ static bool call(ObjClosure *closure, int argCount) {
     runtimeError("Stack overflow.");
     return false;
   }
+  if (argCount < closure->function->arity) {
+    runtimeError("Expected %d arguments but got %d.", closure->function->arity,
+                 argCount);
+    return false;
+  }
 
   CallFrame *frame = &vm.frames[vm.frameCount++];
   frame->closure = closure;

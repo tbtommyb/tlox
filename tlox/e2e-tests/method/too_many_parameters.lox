@@ -1,3 +1,4 @@
+// expect error line 259
 class Foo {
   // 256 parameters.
   method(
