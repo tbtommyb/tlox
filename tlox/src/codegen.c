@@ -453,8 +453,13 @@ static void rewriteLabels(Chunk *chunk, Table *labels) {
   // Iterate through and rewrite all JUMP addresses using stored addresses
   int index = 0;
   while (index < chunk->count) {
-    if (chunk->code[index] == OP_JUMP ||
-        chunk->code[index] == OP_JUMP_IF_FALSE) {
+    switch (chunk->code[index]) {
+    case OP_CONSTANT_LONG: {
+      index += 4;
+      break;
+    }
+    case OP_JUMP:
+    case OP_JUMP_IF_FALSE: {
       uint8_t hi = chunk->code[index + 1];
       uint8_t lo = chunk->code[index + 2];
       LabelId labelId = (hi << 8) | lo;
@@ -467,9 +472,10 @@ static void rewriteLabels(Chunk *chunk, Table *labels) {
       int offset = (int)AS_NUMBER(location) - index - 2;
       chunk->code[index + 1] = (offset >> 8) & 0xff;
       chunk->code[index + 2] = offset & 0xff;
-      index++;
-      index++;
-    } else if (chunk->code[index] == OP_LOOP) {
+      index += 3;
+      break;
+    }
+    case OP_LOOP: {
       uint8_t hi = chunk->code[index + 1];
       uint8_t lo = chunk->code[index + 2];
       LabelId labelId = (hi << 8) | lo;
@@ -482,17 +488,40 @@ static void rewriteLabels(Chunk *chunk, Table *labels) {
       int offset = index - (int)AS_NUMBER(location) + 2;
       chunk->code[index + 1] = (offset >> 8) & 0xff;
       chunk->code[index + 2] = offset & 0xff;
-      index++;
-      index++;
-    } else if (chunk->code[index] == OP_GET_LOCAL ||
-               chunk->code[index] == OP_DEFINE_GLOBAL ||
-               chunk->code[index] == OP_GET_GLOBAL ||
-               chunk->code[index] == OP_SET_GLOBAL ||
-               chunk->code[index] == OP_SET_LOCAL ||
-               chunk->code[index] == OP_CALL) {
-      index++;
+      index += 3;
+      break;
     }
-    index++;
+    case OP_INVOKE: {
+      index += 3;
+      break;
+    }
+    case OP_CLOSURE: {
+      /* FIXME: OP_CLOSURE label iteration not implemented yet */
+      index += 1;
+    }
+    case OP_ARRAY:
+    case OP_DEFINE_GLOBAL:
+    case OP_METHOD:
+    case OP_GET_LOCAL:
+    case OP_SET_LOCAL:
+    case OP_GET_UPVALUE:
+    case OP_SET_UPVALUE:
+    case OP_GET_GLOBAL:
+    case OP_SET_GLOBAL:
+    case OP_GET_PROPERTY:
+    case OP_SET_PROPERTY:
+    case OP_GET_SUPER:
+    case OP_SUPER_INVOKE:
+    case OP_CONSTANT:
+    case OP_CLASS:
+    case OP_CALL: {
+      index += 2;
+      break;
+    }
+    default: {
+      index += 1;
+    }
+    }
   }
 }
 
