@@ -512,11 +512,13 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     bb->curr->next = bodyExprLabel;
     bb->curr = bodyExprLabel;
 
-    Node *blockNode = (Node *)node->expr->stmts->head;
+    if ((Node *)node->expr->stmts) {
+      Node *blockNode = (Node *)node->expr->stmts->head;
 
-    while (blockNode != NULL) {
-      walkAst(compiler, bb, blockNode->data, node->expr->scope, activeCFG);
-      blockNode = blockNode->next;
+      while (blockNode != NULL) {
+        walkAst(compiler, bb, blockNode->data, node->expr->scope, activeCFG);
+        blockNode = blockNode->next;
+      }
     }
 
     Operation *secondLoop = newOperation(
