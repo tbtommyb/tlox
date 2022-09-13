@@ -420,6 +420,10 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     LabelId ifLabelId = getLabelId();
     LabelId afterLabelId = getLabelId();
 
+    op = newOperation(&node->token, IR_BEGIN_SCOPE, NULL, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+
     Operation *exprLabel =
         newLabelOperation(&node->token, exprLabelId, IR_LABEL);
     bb->curr->next = exprLabel;
@@ -435,7 +439,16 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     Operation *ifLabel = newLabelOperation(&node->token, ifLabelId, IR_LABEL);
     bb->curr->next = ifLabel;
     bb->curr = ifLabel;
+
+    op = newOperation(&node->token, IR_BEGIN_SCOPE, NULL, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+
     walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
+
+    op = newOperation(&node->token, IR_END_SCOPE, NULL, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
 
     op =
         newOperation(&node->token, IR_LOOP, newLabelOperand(exprLabelId), NULL);
@@ -447,24 +460,27 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     bb->curr->next = afterLabel;
     bb->curr = afterLabel;
 
+    op = newOperation(&node->token, IR_END_SCOPE, NULL, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+
     break;
   }
   case STMT_FOR: {
-    // FIXME: create scope
     LabelId preLabelId = getLabelId();
     LabelId condLabelId = getLabelId();
     LabelId bodyLabelId = getLabelId();
     LabelId postLabelId = getLabelId();
     LabelId afterLabelId = getLabelId();
 
+    op = newOperation(&node->token, IR_BEGIN_SCOPE, NULL, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+
     Operation *preExprLabel =
         newLabelOperation(&node->token, preLabelId, IR_LABEL);
     bb->curr->next = preExprLabel;
     bb->curr = preExprLabel;
-
-    op = newOperation(&node->token, IR_BEGIN_SCOPE, NULL, NULL);
-    bb->curr->next = op;
-    bb->curr = op;
 
     if (node->preExpr != NULL) {
       walkAst(compiler, bb, node->preExpr, node->scope, activeCFG);
@@ -507,6 +523,10 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
       bb->curr = loopOp;
     }
 
+    op = newOperation(&node->token, IR_BEGIN_SCOPE, NULL, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+
     Operation *bodyExprLabel =
         newLabelOperation(&node->token, bodyLabelId, IR_LABEL);
     bb->curr->next = bodyExprLabel;
@@ -520,6 +540,10 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
         blockNode = blockNode->next;
       }
     }
+
+    op = newOperation(&node->token, IR_END_SCOPE, NULL, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
 
     Operation *secondLoop = newOperation(
         &node->token, IR_LOOP,
@@ -608,10 +632,10 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
       blockNode = blockNode->next;
     }
 
-    // FIXME: wrong node
-    op = newOperation(&node->token, IR_END_SCOPE, NULL, NULL);
-    bb->curr->next = op;
-    bb->curr = op;
+    /* // FIXME: wrong node */
+    /* op = newOperation(&node->token, IR_END_SCOPE, NULL, NULL); */
+    /* bb->curr->next = op; */
+    /* bb->curr = op; */
     break;
   }
   case STMT_FUNCTION: {
