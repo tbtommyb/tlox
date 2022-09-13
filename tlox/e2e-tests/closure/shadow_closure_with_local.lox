@@ -1,13 +1,12 @@
-// expect error line 7
 {
   var foo = "closure";
   fun f() {
     {
-      print foo;
+      print foo; // expect: closure
       var foo = "shadow";
-      print foo;
+      print foo; // expect: shadow
     }
-    print foo;
+    print foo; // expect: closure
   }
   f();
 }
