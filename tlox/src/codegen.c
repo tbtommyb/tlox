@@ -267,7 +267,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
       opcode = OP_GET_UPVALUE;
     }
 
-    /* assert(position != -1); */
+    assert(position != -1);
 
     emitBytes(&f->chunk, opcode, (uint8_t)position, op->token->line);
     break;
@@ -322,24 +322,26 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     int position = identifierConstant(compiler, &f->chunk, OBJ_VAL(name));
     emitBytes(&f->chunk, OP_CLASS, position, op->token->line);
 
-    if (context->enclosing == NULL) {
+    if (context->scopeDepth == 0) {
       int namePosition = identifierConstant(compiler, &f->chunk, OBJ_VAL(name));
       emitBytes(&f->chunk, OP_DEFINE_GLOBAL, namePosition, op->token->line);
       emitBytes(&f->chunk, OP_GET_GLOBAL, namePosition, op->token->line);
     } else {
+      int position = context->localCount;
       Local *local = &context->locals[context->localCount++];
       local->name = wu->name;
       local->depth = context->scopeDepth;
       local->isCaptured = false;
+      emitBytes(&f->chunk, OP_GET_LOCAL, (uint8_t)position, op->token->line);
     }
 
     LinkedList *postOrdered = postOrderTraverseBasicBlock(wu->cfg);
     Node *tail = postOrdered->tail;
-    /* while (tail != NULL) { */
-    generateBasicBlockCode(compiler, f, tail->data, labels, wu->cfg->context);
-    /* tail = tail->prev; */
-    /* } */
-    wu->f = NULL;
+    while (tail != NULL) {
+      generateBasicBlockCode(compiler, f, tail->data, labels, wu->cfg->context);
+      tail = tail->prev;
+    }
+    wu->f = NULL; // TODO: document/clarify
 
     emitByte(&f->chunk, OP_POP, op->token->line);
     break;
@@ -357,6 +359,13 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
 
     emitBytes(&f->chunk, OP_CLOSURE, position, op->token->line);
+    // FIXME: I don't think this works for the general case
+    // Need to look in parent contexts too?
+    for (int i = 0; i < wu->cfg->context->upvalueCount; i++) {
+      emitByte(&f->chunk, context->upvalues[i].isLocal ? 1 : 0,
+               op->token->line);
+      emitByte(&f->chunk, context->upvalues[i].index, op->token->line);
+    }
     int namePosition =
         identifierConstant(compiler, &f->chunk, OBJ_VAL(childF->name));
     emitBytes(&f->chunk, OP_METHOD, namePosition, op->token->line);
@@ -376,7 +385,6 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     // FIXME: handle methods and initialisers
     emitBytes(&f->chunk, OP_CLOSURE, position, op->token->line);
     for (int i = 0; i < wu->cfg->context->upvalueCount; i++) {
-      // Not sure going through wu->cfg->context is best/correct here
       emitByte(&f->chunk, wu->cfg->context->upvalues[i].isLocal ? 1 : 0,
                op->token->line);
       emitByte(&f->chunk, wu->cfg->context->upvalues[i].index, op->token->line);
@@ -496,8 +504,13 @@ static void rewriteLabels(Chunk *chunk, Table *labels) {
       break;
     }
     case OP_CLOSURE: {
-      /* FIXME: OP_CLOSURE label iteration not implemented yet */
-      index += 1;
+      index++;
+      uint8_t constant = chunk->code[index++];
+      ObjFunction *function = AS_FUNCTION(chunk->constants.values[constant]);
+      for (int j = 0; j < function->upvalueCount; j++) {
+        index += 2;
+      }
+      break;
     }
     case OP_ARRAY:
     case OP_DEFINE_GLOBAL:
