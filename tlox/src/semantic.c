@@ -328,10 +328,10 @@ void analyse(AstNode *node, Compiler *compiler) {
     break;
   }
   case STMT_METHOD: {
-    if (scope_search(compiler->currentScope, node->token.start,
-                     node->token.length, &(Symbol){0})) {
+    if (scope_current_search(compiler->currentScope, node->token.start,
+                             node->token.length, &(Symbol){0})) {
       errorAt(compiler, &node->token,
-              "Already a variable with this name in this scope.");
+              "Already a method with this name in this scope.");
       break;
     }
 
