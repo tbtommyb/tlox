@@ -261,10 +261,16 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   case EXPR_BINARY: {
     Operation *left =
         walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
+    if (left == NULL) {
+      break;
+    }
     Operation *leftTail = tailOf(left);
 
     Operation *right =
         walkAst(compiler, bb, node->branches.right, activeScope, activeCFG);
+    if (right == NULL) {
+      break;
+    }
     Operation *rightTail = tailOf(right);
 
     op = newOperation(&node->token, tokenToBinaryOp(node->op),
@@ -346,7 +352,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     if (!scope_search(activeScope, node->token.start, node->token.length,
                       &symbol)) {
       errorAt(compiler, &node->token,
-              "Symbol is not defined in current scope.");
+              "Symbol is not defined in current scope.3");
       break;
     }
 
@@ -361,7 +367,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     Symbol symbol = {0};
     if (!scope_search(activeScope, "this", 4, &symbol)) {
       errorAt(compiler, &node->token,
-              "Symbol is not defined in current scope.");
+              "Symbol is not defined in current scope.4");
       break;
     }
 
@@ -382,9 +388,9 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   case STMT_IF: {
     // TODO: tidy up implementation here
     Operation *expr = walkAst(compiler, bb, node->expr, activeScope, activeCFG);
-    LabelId ifLabelId = getLabelId();
     LabelId elseLabelId = getLabelId();
     LabelId afterLabelId = getLabelId();
+    LabelId skipLabelId = getLabelId();
 
     bool elseBranchPresent = node->branches.right != NULL;
     op = newOperation(
@@ -393,25 +399,41 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     bb->curr->next = op;
     bb->curr = op;
 
-    Operation *ifLabel = newLabelOperation(&node->token, ifLabelId, IR_LABEL);
-    bb->curr->next = ifLabel;
-    bb->curr = ifLabel;
     walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
 
+    Operation *afterOp = newGotoOperation(&node->token, skipLabelId);
+    bb->curr->next = afterOp;
+    bb->curr = afterOp;
+
     if (elseBranchPresent) {
-      Operation *afterOp = newGotoOperation(&node->token, afterLabelId);
-      bb->curr->next = afterOp;
-      bb->curr = afterOp;
       Operation *elseLabel =
-          newLabelOperation(&node->token, elseLabelId, IR_ELSE_LABEL);
+          newLabelOperation(&node->token, elseLabelId, IR_LABEL);
       bb->curr->next = elseLabel;
       bb->curr = elseLabel;
+
+      Operation *popPostExpr = newOperation(&node->token, IR_POP, NULL, NULL);
+      bb->curr->next = popPostExpr;
+      bb->curr = popPostExpr;
+
       walkAst(compiler, bb, node->branches.right, activeScope, activeCFG);
     }
+
     Operation *afterLabel =
         newLabelOperation(&node->token, afterLabelId, IR_LABEL);
     bb->curr->next = afterLabel;
     bb->curr = afterLabel;
+
+    if (!elseBranchPresent) {
+      Operation *pop2PostExpr = newOperation(&node->token, IR_POP, NULL, NULL);
+      bb->curr->next = pop2PostExpr;
+      bb->curr = pop2PostExpr;
+    }
+
+    Operation *skipLabel =
+        newLabelOperation(&node->token, skipLabelId, IR_LABEL);
+    bb->curr->next = skipLabel;
+    bb->curr = skipLabel;
+
     break;
   }
   case STMT_WHILE: {
@@ -532,13 +554,15 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     bb->curr->next = bodyExprLabel;
     bb->curr = bodyExprLabel;
 
-    if ((Node *)node->expr->stmts) {
+    if (node->expr != NULL && node->expr->stmts) {
       Node *blockNode = (Node *)node->expr->stmts->head;
 
       while (blockNode != NULL) {
         walkAst(compiler, bb, blockNode->data, node->expr->scope, activeCFG);
         blockNode = blockNode->next;
       }
+    } else if (node->expr) {
+      walkAst(compiler, bb, node->expr, node->scope, activeCFG);
     }
 
     op = newOperation(&node->token, IR_END_SCOPE, NULL, NULL);
@@ -553,7 +577,8 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     bb->curr = secondLoop;
 
     Operation *afterLabel =
-        newLabelOperation(&node->token, afterLabelId, IR_ELSE_LABEL);
+        newLabelOperation(&node->token, afterLabelId,
+                          node->condExpr != NULL ? IR_ELSE_LABEL : IR_LABEL);
     bb->curr->next = afterLabel;
     bb->curr = afterLabel;
 
@@ -599,7 +624,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     if (!scope_search(activeScope, node->token.start, node->token.length,
                       &symbol)) {
       errorAt(compiler, &node->token,
-              "Symbol is not defined in current scope.");
+              "Symbol is not defined in current scope.1");
       break;
     }
 
@@ -657,7 +682,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
       Symbol symbol = {0};
       Token *name = paramNode->data;
       if (!scope_search(node->scope, name->start, name->length, &symbol)) {
-        errorAt(compiler, name, "Symbol is not defined in current scope.");
+        errorAt(compiler, name, "Symbol is not defined in current scope.2");
         break;
       }
       Operand *pointer = newLiteralOperand(POINTER_VAL(node->scope));
@@ -836,7 +861,12 @@ void constructCFG(CFG *cfg, BasicBlock *irList) {
 
     if (currentOp->opcode == IR_COND) {
       Value ifBranchPtr;
-      LabelId ifBranchHead = currentOp->next->first->val.label;
+      // TODO seeking next here is a code smell
+      Operation *ifBranchLabelInstr = currentOp->next;
+      while (ifBranchLabelInstr->first == NULL) {
+        ifBranchLabelInstr = ifBranchLabelInstr->next;
+      }
+      LabelId ifBranchHead = ifBranchLabelInstr->first->val.label;
       BasicBlock *ifBranchBB = NULL;
       if (tableGet(&labelBasicBlockMapping, NUMBER_VAL(ifBranchHead),
                    &ifBranchPtr)) {

@@ -90,6 +90,7 @@ void analyse(AstNode *node, Compiler *compiler) {
       errorAt(compiler, &node->token, "Cannot reassign a const variable.");
       break;
     }
+    analyse(node->expr, compiler);
     break;
   }
   case STMT_DEFINE_CONST: {
@@ -98,6 +99,7 @@ void analyse(AstNode *node, Compiler *compiler) {
   }
   case STMT_DEFINE: {
     Symbol existing = {0};
+    // FIXME: change to scope_current_search
     if (scope_search(compiler->currentScope, node->token.start,
                      node->token.length, &existing)) {
       if (existing.isConst) {

@@ -147,7 +147,7 @@ AstNode *newForStmt(Token token, AstNode *initNode, AstNode *conditionNode,
 }
 
 AstNode *newModuleStmt(Token token) {
-  // FIXME: do we need to manually main something "main"?
+  // FIXME: do we need to manually make something "main"?
   AstNode *node = allocateAstNode(token, STMT_MODULE);
   node->stmts = linkedList_allocate();
   return node;
