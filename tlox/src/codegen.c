@@ -125,8 +125,14 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     break;
   case IR_CONSTANT: {
     Value literal = op->first->val.literal;
-    uint8_t position = identifierConstant(compiler, &f->chunk, literal);
-    emitConstant(&f->chunk, position, op->token->line);
+    if (valuesEqual(literal, FALSE_VAL)) {
+      emitByte(&f->chunk, OP_FALSE, op->token->line);
+    } else if (valuesEqual(literal, TRUE_VAL)) {
+      emitByte(&f->chunk, OP_TRUE, op->token->line);
+    } else {
+      uint8_t position = identifierConstant(compiler, &f->chunk, literal);
+      emitConstant(&f->chunk, position, op->token->line);
+    }
     break;
   }
   case IR_CALL: {
