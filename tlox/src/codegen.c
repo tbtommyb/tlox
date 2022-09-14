@@ -354,6 +354,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
       int namePosition = identifierConstant(compiler, &f->chunk, OBJ_VAL(name));
       emitBytes(&f->chunk, OP_DEFINE_GLOBAL, namePosition, op->token->line);
       if (op->second != NULL) {
+        // TODO extract out to a namedVariable function
         int superclassNamePosition =
             resolveLocal(context, &op->second->val.symbol.name);
         OpCode opcode = OP_GET_LOCAL;
@@ -431,8 +432,6 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
 
     emitBytes(&f->chunk, OP_CLOSURE, position, op->token->line);
-    // FIXME: I don't think this works for the general case
-    // Need to look in parent contexts too?
     for (int i = 0; i < wu->cfg->context->upvalueCount; i++) {
       emitByte(&f->chunk, wu->cfg->context->upvalues[i].isLocal ? 1 : 0,
                op->token->line);
@@ -462,7 +461,6 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     childF->arity = wu->cfg->arity;
     int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
 
-    // FIXME: handle methods and initialisers
     emitBytes(&f->chunk, OP_CLOSURE, position, op->token->line);
     for (int i = 0; i < wu->cfg->context->upvalueCount; i++) {
       emitByte(&f->chunk, wu->cfg->context->upvalues[i].isLocal ? 1 : 0,
@@ -520,13 +518,9 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
         OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
     uint8_t position = identifierConstant(compiler, &f->chunk, nameString);
 
-    Token localThis = syntheticToken("this");
-    int thisPosition = resolveLocal(context, &localThis);
-
     Token localSuper = syntheticToken("super");
     int superPosition = resolveUpvalue(context, &localSuper);
 
-    emitBytes(&f->chunk, OP_GET_LOCAL, (uint8_t)thisPosition, op->token->line);
     emitBytes(&f->chunk, OP_GET_UPVALUE, (uint8_t)superPosition,
               op->token->line);
     emitBytes(&f->chunk, OP_SUPER_INVOKE, position, op->token->line);
@@ -539,13 +533,9 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
         OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
     uint8_t position = identifierConstant(compiler, &f->chunk, nameString);
 
-    Token localThis = syntheticToken("this");
-    int thisPosition = resolveLocal(context, &localThis);
-
     Token localSuper = syntheticToken("super");
     int superPosition = resolveUpvalue(context, &localSuper);
 
-    emitBytes(&f->chunk, OP_GET_LOCAL, (uint8_t)thisPosition, op->token->line);
     emitBytes(&f->chunk, OP_GET_UPVALUE, (uint8_t)superPosition,
               op->token->line);
     emitBytes(&f->chunk, OP_GET_SUPER, position, op->token->line);

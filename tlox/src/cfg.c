@@ -793,11 +793,10 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     break;
   }
   case EXPR_SUPER_INVOKE: {
-    /* Symbol this = {.name = syntheticToken("this")}; */
-    /* op = newOperation(&node->token, IR_GET_LOCAL, newSymbolOperand(this),
-     * NULL); */
-    /* bb->curr->next = op; */
-    /* bb->curr = op; */
+    Symbol this = {.name = syntheticToken("this")};
+    op = newOperation(&node->token, IR_GET_LOCAL, newSymbolOperand(this), NULL);
+    bb->curr->next = op;
+    bb->curr = op;
 
     walkAst(compiler, bb, node->branches.left, node->scope, activeCFG);
 
@@ -820,11 +819,10 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     break;
   }
   case EXPR_SUPER: {
-    /* Symbol this = {.name = syntheticToken("this")}; */
-    /* op = newOperation(&node->token, IR_GET_LOCAL, newSymbolOperand(this),
-     * NULL); */
-    /* bb->curr->next = op; */
-    /* bb->curr = op; */
+    Symbol this = {.name = syntheticToken("this")};
+    op = newOperation(&node->token, IR_GET_LOCAL, newSymbolOperand(this), NULL);
+    bb->curr->next = op;
+    bb->curr = op;
 
     walkAst(compiler, bb, node->branches.left, node->scope, activeCFG);
 
@@ -836,11 +834,6 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     break;
   }
   case STMT_CLASS: {
-    /* if (node->superclass.length > 0) { */
-    /*   op = newOperation(&node->token, IR_BEGIN_SCOPE, NULL, NULL); */
-    /*   bb->curr->next = op; */
-    /*   bb->curr = op; */
-    /* } */
     // FIXME: bit of a hack to get the name working
     node->expr->token = node->token;
     WorkUnit *wu = wu_allocate(activeCFG->context, node->expr, node->token);
@@ -859,11 +852,6 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     bb->curr = op;
 
     linkedList_append(activeCFG->childFunctions, wu);
-    /* if (node->superclass.length > 0) { */
-    /*   op = newOperation(&node->token, IR_END_SCOPE, NULL, NULL); */
-    /*   bb->curr->next = op; */
-    /*   bb->curr = op; */
-    /* } */
 
     break;
   }

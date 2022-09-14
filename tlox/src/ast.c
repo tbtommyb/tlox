@@ -373,7 +373,9 @@ void printAST(AstNode node, int indentation) {
     printf("%*sExpr Super\n", indentation, "");
     printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
     printf("%*sExpr:\n", indentation + 2, "");
-    printAST(*node.branches.left, indentation + 4);
+    if (node.branches.left != NULL) {
+      printAST(*node.branches.left, indentation + 4);
+    }
     break;
   }
   case STMT_DEFINE: {

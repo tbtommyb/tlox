@@ -373,11 +373,8 @@ void analyse(AstNode *node, Compiler *compiler) {
       errorAt(compiler, &node->token, "Can't use 'super' outside of a class.");
       break;
     }
-    if (!scope_search(compiler->currentScope, node->token.start,
-                      node->token.length, &(Symbol){0})) {
-      errorAt(compiler, &node->token, "No method with that name in scope.");
-      break;
-    }
+    // TODO: need a way to know what class is being used in order to do semantic
+    // checks
     analyse(node->branches.left, compiler);
 
     Node *paramNode = (Node *)node->params->head;
