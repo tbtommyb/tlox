@@ -8,7 +8,7 @@ The language implementation has a few minor changes to the Lox language in Craft
 
 ## Planned work
 
-- [ ] implement AST in C and construct control-flow graph (*in progress*)
+- [x] implement AST in C and construct control-flow graph
 - [ ] implement basic type system
 - [ ] implement local analysis and optimisations
 
