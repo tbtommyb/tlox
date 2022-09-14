@@ -793,6 +793,10 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     break;
   }
   case EXPR_SUPER_INVOKE: {
+    Symbol this = {.name = syntheticToken("this")};
+    op = newOperation(&node->token, IR_GET_LOCAL, newSymbolOperand(this), NULL);
+    bb->curr->next = op;
+    bb->curr = op;
     walkAst(compiler, bb, node->branches.left, node->scope, activeCFG);
 
     Symbol symbol = {.name = node->token};
@@ -814,6 +818,10 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     break;
   }
   case EXPR_SUPER: {
+    Symbol this = {.name = syntheticToken("this")};
+    op = newOperation(&node->token, IR_GET_LOCAL, newSymbolOperand(this), NULL);
+    bb->curr->next = op;
+    bb->curr = op;
     walkAst(compiler, bb, node->branches.left, node->scope, activeCFG);
 
     Symbol symbol = {.name = node->token};

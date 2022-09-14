@@ -342,16 +342,35 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     Value wuPtr = op->first->val.literal;
     WorkUnit *wu = AS_POINTER(wuPtr);
 
+    if (op->second != NULL) {
+      Token super = syntheticToken("super");
+      Local *local = &context->locals[context->localCount++];
+      local->name = super;
+      local->depth = context->scopeDepth;
+      local->isCaptured = false;
+    }
+
     /* ObjFunction *childF = compileWorkUnit(compiler, wu, labels); */
     ObjString *name = copyString(wu->name.start, wu->name.length);
     /* childF->name = name; */
     int position = identifierConstant(compiler, &f->chunk, OBJ_VAL(name));
     emitBytes(&f->chunk, OP_CLASS, position, op->token->line);
 
-    if (context->scopeDepth == 0) {
+    if (context->enclosing == NULL && context->scopeDepth == 0) {
       int namePosition = identifierConstant(compiler, &f->chunk, OBJ_VAL(name));
       emitBytes(&f->chunk, OP_DEFINE_GLOBAL, namePosition, op->token->line);
+      if (op->second != NULL) {
+        // FIXME: support locally defined superclasses
+        int superclassNamePosition =
+            identifierConstant(compiler, &f->chunk, op->second->val.literal);
+        emitBytes(&f->chunk, OP_GET_GLOBAL, superclassNamePosition,
+                  op->token->line);
+      }
       emitBytes(&f->chunk, OP_GET_GLOBAL, namePosition, op->token->line);
+      if (op->second != NULL) {
+        emitByte(&f->chunk, OP_INHERIT, op->token->line);
+        emitBytes(&f->chunk, OP_GET_GLOBAL, namePosition, op->token->line);
+      }
     } else {
       int position = context->localCount;
       Local *local = &context->locals[context->localCount++];
@@ -370,6 +389,9 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     wu->f = NULL; // TODO: document/clarify
 
     emitByte(&f->chunk, OP_POP, op->token->line);
+    if (op->second != NULL) {
+      emitByte(&f->chunk, OP_CLOSE_UPVALUE, op->token->line);
+    }
     break;
   }
   case IR_METHOD: {
@@ -478,7 +500,6 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     Token localSuper = syntheticToken("super");
     uint8_t superPosition = resolveUpvalue(context, &localSuper);
 
-    emitBytes(&f->chunk, OP_GET_LOCAL, thisPosition, op->token->line);
     emitBytes(&f->chunk, OP_GET_UPVALUE, superPosition, op->token->line);
     emitBytes(&f->chunk, OP_SUPER_INVOKE, position, op->token->line);
     emitByte(&f->chunk, AS_NUMBER(op->second->val.literal), op->token->line);
@@ -494,7 +515,6 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     Token localSuper = syntheticToken("super");
     uint8_t superPosition = resolveUpvalue(context, &localSuper);
 
-    emitBytes(&f->chunk, OP_GET_LOCAL, thisPosition, op->token->line);
     emitBytes(&f->chunk, OP_GET_UPVALUE, superPosition, op->token->line);
     emitBytes(&f->chunk, OP_GET_SUPER, position, op->token->line);
     break;
