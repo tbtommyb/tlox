@@ -7,6 +7,9 @@ static void generateBasicBlockCode(Compiler *compiler, ObjFunction *f,
                                    BasicBlock *bb, Table *labels,
                                    ExecutionContext *context);
 
+static void generateClass(Compiler *compiler, CFG *cfg, Table *labels,
+                          ObjFunction *f, Operation *op);
+
 static void emitByte(Chunk *chunk, uint8_t byte, int lineno) {
   writeChunk(chunk, byte, lineno);
 }
@@ -338,7 +341,6 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     break;
   }
   case IR_CLASS: {
-    // TODO: super needs its own scope
     Value wuPtr = op->first->val.literal;
     WorkUnit *wu = AS_POINTER(wuPtr);
 
@@ -352,13 +354,6 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
       int namePosition = identifierConstant(compiler, &f->chunk, OBJ_VAL(name));
       emitBytes(&f->chunk, OP_DEFINE_GLOBAL, namePosition, op->token->line);
       if (op->second != NULL) {
-        context->scopeDepth++;
-        Token super = syntheticToken("super");
-        Local *local = &context->locals[context->localCount++];
-        local->name = super;
-        local->depth = context->scopeDepth;
-        local->isCaptured = false;
-
         int superclassNamePosition =
             resolveLocal(context, &op->second->val.symbol.name);
         OpCode opcode = OP_GET_LOCAL;
@@ -409,12 +404,6 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
         }
 
         emitBytes(&f->chunk, opcode, superclassNamePosition, op->token->line);
-        context->scopeDepth++;
-        Token super = syntheticToken("super");
-        Local *local = &context->locals[context->localCount++];
-        local->name = super;
-        local->depth = context->scopeDepth;
-        local->isCaptured = false;
       }
       emitBytes(&f->chunk, OP_GET_LOCAL, (uint8_t)position, op->token->line);
       if (op->second != NULL) {
@@ -423,27 +412,10 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
       }
     }
 
-    LinkedList *postOrdered = postOrderTraverseBasicBlock(wu->cfg);
-    Node *tail = postOrdered->tail;
-    while (tail != NULL) {
-      generateBasicBlockCode(compiler, f, tail->data, labels, wu->cfg->context);
-      tail = tail->prev;
-    }
+    generateClass(compiler, wu->cfg, labels, f, op);
+
     wu->f = NULL; // TODO: document/clarify
 
-    emitByte(&f->chunk, OP_POP, op->token->line);
-    if (op->second != NULL) {
-      context->scopeDepth--;
-      Local *superLocal = &context->locals[context->localCount - 1];
-      /* Token superToken = syntheticToken("super"); */
-      /* int superclassNamePosition = resolveUpvalue(context, &superToken); */
-      /* if (superclassNamePosition != -1) { */
-      if (superLocal->isCaptured) {
-        emitByte(&f->chunk, OP_CLOSE_UPVALUE, op->token->line);
-      } else {
-        emitByte(&f->chunk, OP_POP, op->token->line);
-      }
-    }
     break;
   }
   case IR_METHOD: {
@@ -462,9 +434,9 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     // FIXME: I don't think this works for the general case
     // Need to look in parent contexts too?
     for (int i = 0; i < wu->cfg->context->upvalueCount; i++) {
-      emitByte(&f->chunk, context->upvalues[i].isLocal ? 1 : 0,
+      emitByte(&f->chunk, wu->cfg->context->upvalues[i].isLocal ? 1 : 0,
                op->token->line);
-      emitByte(&f->chunk, context->upvalues[i].index, op->token->line);
+      emitByte(&f->chunk, wu->cfg->context->upvalues[i].index, op->token->line);
     }
     int namePosition =
         identifierConstant(compiler, &f->chunk, OBJ_VAL(childF->name));
@@ -674,6 +646,41 @@ static void rewriteLabels(Chunk *chunk, Table *labels) {
     default: {
       index += 1;
     }
+    }
+  }
+}
+
+void generateClass(Compiler *compiler, CFG *cfg, Table *labels, ObjFunction *f,
+                   Operation *op) {
+  ExecutionContext *context = cfg->context;
+
+  Local *local = &context->locals[context->localCount++];
+  local->name.start = "this";
+  local->name.length = 4;
+
+  if (op->second != NULL) {
+    context->scopeDepth++;
+    Token super = syntheticToken("super");
+    Local *local = &context->locals[context->localCount++];
+    local->name = super;
+    local->depth = context->scopeDepth;
+    local->isCaptured = false;
+  }
+
+  LinkedList *postOrdered = postOrderTraverseBasicBlock(cfg);
+  Node *tail = postOrdered->tail;
+  while (tail != NULL) {
+    generateBasicBlockCode(compiler, f, tail->data, labels, cfg->context);
+    tail = tail->prev;
+  }
+  emitByte(&f->chunk, OP_POP, op->token->line);
+  if (op->second != NULL) {
+    context->scopeDepth--;
+    Local *superLocal = &context->locals[context->localCount - 1];
+    if (superLocal->isCaptured) {
+      emitByte(&f->chunk, OP_CLOSE_UPVALUE, op->token->line);
+    } else {
+      emitByte(&f->chunk, OP_POP, op->token->line);
     }
   }
 }
