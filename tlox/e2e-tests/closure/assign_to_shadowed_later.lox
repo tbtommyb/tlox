@@ -1,4 +1,3 @@
-// expect error line 9
 var a = "global";
 
 {
@@ -8,7 +7,7 @@ var a = "global";
 
   var a = "inner";
   assign();
-  print a;
+  print a; // expect: inner
 }
 
-print a;
+print a; // expect: assigned
