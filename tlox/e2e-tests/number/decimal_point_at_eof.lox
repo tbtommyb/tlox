@@ -1,2 +1,2 @@
-// expect error line 2
-123. // [line 2] Error at end: Expect property name after '.'.
+// expect error line 3
+123. // [line 3] Error at end: Expect property name after '.'.

@@ -346,8 +346,10 @@ void analyse(AstNode *node, Compiler *compiler) {
     break;
   }
   case STMT_SET_PROPERTY: {
+    ScopeType scopeType =
+        isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
     Symbol *symbol =
-        newSymbol(node->token, SCOPE_LOCAL, false, false, true, node->arity);
+        newSymbol(node->token, scopeType, false, false, true, node->arity);
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);
 
