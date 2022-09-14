@@ -273,6 +273,15 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
       opcode = OP_GET_UPVALUE;
     }
 
+    // This is a bit of a hack to handle cases where there is a shadowed
+    // variable in local scope that is not yet defined, hiding the intended
+    // global variabl
+    // TODO: think of a cleaner solution to this
+    if (position == -1) {
+      Value name = OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
+      position = identifierConstant(compiler, &f->chunk, name);
+      opcode = OP_GET_GLOBAL;
+    }
     assert(position != -1);
 
     emitBytes(&f->chunk, opcode, (uint8_t)position, op->token->line);
@@ -298,6 +307,16 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     if (position == -1) {
       position = resolveUpvalue(context, &symbol.name);
       opcode = OP_SET_UPVALUE;
+    }
+
+    // This is a bit of a hack to handle cases where there is a shadowed
+    // variable in local scope that is not yet defined, hiding the intended
+    // global variabl
+    // TODO: think of a cleaner solution to this
+    if (position == -1) {
+      Value name = OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
+      position = identifierConstant(compiler, &f->chunk, name);
+      opcode = OP_SET_GLOBAL;
     }
 
     assert(position != -1);
