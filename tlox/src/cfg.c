@@ -657,10 +657,9 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
       blockNode = blockNode->next;
     }
 
-    /* // FIXME: wrong node */
-    /* op = newOperation(&node->token, IR_END_SCOPE, NULL, NULL); */
-    /* bb->curr->next = op; */
-    /* bb->curr = op; */
+    op = newOperation(&node->token, IR_END_SCOPE, NULL, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
     break;
   }
   case STMT_FUNCTION: {
@@ -1162,15 +1161,6 @@ static CFG *newCFG(Compiler *compiler, WorkUnit *wu) {
   walkAst(compiler, irList, wu->node, wu->node->scope, cfg);
   // split IR list into CFG
   constructCFG(cfg, irList);
-
-  Local *local = &cfg->context->locals[cfg->context->localCount++];
-  if (wu->node->functionType != TYPE_FUNCTION) {
-    local->name.start = "this";
-    local->name.length = 4;
-  } else {
-    local->name.start = "";
-    local->name.length = 0;
-  }
 
   wu->cfg = cfg; // temp location
 

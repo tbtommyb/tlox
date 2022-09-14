@@ -380,6 +380,14 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
   case IR_FUNCTION: {
     Value wuPtr = op->first->val.literal;
     WorkUnit *wu = AS_POINTER(wuPtr);
+
+    if (!(context->enclosing == NULL && context->scopeDepth == 0)) {
+      Local *local = &context->locals[context->localCount++];
+      local->name = wu->name;
+      local->depth = context->scopeDepth;
+      local->isCaptured = false;
+    }
+
     ObjFunction *childF = compileWorkUnit(compiler, wu, labels);
 
     // Test fix hack
@@ -397,16 +405,11 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     }
 
     // Fixes issue when using scopes at top level. Do we need both checks here?
-    // Test fix hack
+    // Test fix hack. Should be in CFG STMT_DEFINE?
     if (context->enclosing == NULL && context->scopeDepth == 0) {
       int namePosition =
           identifierConstant(compiler, &f->chunk, OBJ_VAL(childF->name));
       emitBytes(&f->chunk, OP_DEFINE_GLOBAL, namePosition, op->token->line);
-    } else {
-      Local *local = &context->locals[context->localCount++];
-      local->name = wu->name;
-      local->depth = context->scopeDepth;
-      local->isCaptured = false;
     }
     break;
   }
@@ -561,6 +564,15 @@ ObjFunction *compileWorkUnit(Compiler *compiler, WorkUnit *wu, Table *labels) {
   ObjFunction *f = newFunction();
   f->name = copyString(wu->name.start, wu->name.length);
   wu->f = f;
+
+  Local *local = &wu->cfg->context->locals[wu->cfg->context->localCount++];
+  if (wu->node->functionType != TYPE_FUNCTION) {
+    local->name.start = "this";
+    local->name.length = 4;
+  } else {
+    local->name.start = "";
+    local->name.length = 0;
+  }
 
   generateChunk(compiler, wu->cfg, labels, f);
   // FIXME: lineno is wrong
