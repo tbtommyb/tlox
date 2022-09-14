@@ -82,6 +82,7 @@ void analyse(AstNode *node, Compiler *compiler) {
       errorAt(compiler, &node->token, "Cannot reassign a const variable.");
       break;
     }
+    analyse(node->expr, compiler);
     break;
   }
   case STMT_DEFINE_CONST: {
@@ -90,8 +91,8 @@ void analyse(AstNode *node, Compiler *compiler) {
   }
   case STMT_DEFINE: {
     Symbol existing = {0};
-    if (scope_search(compiler->currentScope, node->token.start,
-                     node->token.length, &existing)) {
+    if (scope_current_search(compiler->currentScope, node->token.start,
+                             node->token.length, &existing)) {
       if (existing.isConst) {
         errorAt(compiler, &node->token, "Cannot redefine a const variable.");
         break;
@@ -147,7 +148,9 @@ void analyse(AstNode *node, Compiler *compiler) {
     break;
   }
   case STMT_RETURN: {
-    if (compiler->currentScope->type != TYPE_FUNCTION) {
+    if (compiler->currentScope->type != TYPE_FUNCTION &&
+        compiler->currentScope->type != TYPE_METHOD &&
+        compiler->currentScope->type != TYPE_INITIALIZER) {
       errorAt(compiler, &node->token, "Can't return from top-level code.");
     }
     /* if (parser->compiler->type == TYPE_INITIALIZER) { */
@@ -322,10 +325,10 @@ void analyse(AstNode *node, Compiler *compiler) {
     break;
   }
   case STMT_METHOD: {
-    if (scope_search(compiler->currentScope, node->token.start,
-                     node->token.length, &(Symbol){0})) {
+    if (scope_current_search(compiler->currentScope, node->token.start,
+                             node->token.length, &(Symbol){0})) {
       errorAt(compiler, &node->token,
-              "Already a variable with this name in this scope.");
+              "Already a method with this name in this scope.");
       break;
     }
 
@@ -339,8 +342,10 @@ void analyse(AstNode *node, Compiler *compiler) {
     break;
   }
   case STMT_SET_PROPERTY: {
+    ScopeType scopeType =
+        isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
     Symbol *symbol =
-        newSymbol(node->token, SCOPE_LOCAL, false, false, true, node->arity);
+        newSymbol(node->token, scopeType, false, false, true, node->arity);
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);
 

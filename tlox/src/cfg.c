@@ -61,6 +61,7 @@ static WorkUnit *wu_allocate(ExecutionContext *ec, AstNode *node, Token name) {
 static Operation *allocateOperation() {
   Operation *op = (Operation *)reallocate(NULL, 0, sizeof(Operation));
   op->id = 0;
+  op->token = NULL;
   op->first = NULL;
   op->second = NULL;
   op->next = NULL;
@@ -171,10 +172,12 @@ static Operand *newSymbolOperand(Symbol symbol) {
 }
 
 // Make a separate function for statements that doesn't output to register?
-Operation *newOperation(IROp opcode, Operand *first, Operand *second) {
+Operation *newOperation(Token *token, IROp opcode, Operand *first,
+                        Operand *second) {
   Operation *op = allocateOperation();
 
   op->destination = getRegister();
+  op->token = token;
   op->id = getOperationId();
   op->opcode = opcode;
   op->first = first;
@@ -192,22 +195,25 @@ static Operation *newStartOperation() {
   return op;
 }
 
-static Operation *newGotoOperation(LabelId labelId) {
+static Operation *newGotoOperation(Token *token, LabelId labelId) {
   Operation *op = allocateOperation();
 
   op->id = getOperationId();
   op->opcode = IR_GOTO;
   op->first = newLabelOperand(labelId);
+  op->token = token;
 
   return op;
 }
 
-static Operation *newLabelOperation(LabelId labelId, IROp opcode) {
+static Operation *newLabelOperation(Token *token, LabelId labelId,
+                                    IROp opcode) {
   Operation *op = allocateOperation();
 
   op->id = getOperationId();
   op->opcode = opcode;
   op->first = newLabelOperand(labelId);
+  op->token = token;
 
   return op;
 }
@@ -232,13 +238,13 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   switch (node->type) {
   case EXPR_LITERAL: {
     Operand *constantValue = newLiteralOperand(node->literal);
-    op = newOperation(IR_CONSTANT, constantValue, NULL);
+    op = newOperation(&node->token, IR_CONSTANT, constantValue, NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
   }
   case EXPR_NIL: {
-    op = newOperation(IR_NIL, NULL, NULL);
+    op = newOperation(&node->token, IR_NIL, NULL, NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
@@ -247,7 +253,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     Operation *right =
         walkAst(compiler, bb, node->branches.right, activeScope, activeCFG);
     Operand *value = newRegisterOperand(bb->curr->destination);
-    op = newOperation(tokenToUnaryOp(node->op), value, NULL);
+    op = newOperation(&node->token, tokenToUnaryOp(node->op), value, NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
@@ -255,13 +261,19 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   case EXPR_BINARY: {
     Operation *left =
         walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
+    if (left == NULL) {
+      break;
+    }
     Operation *leftTail = tailOf(left);
 
     Operation *right =
         walkAst(compiler, bb, node->branches.right, activeScope, activeCFG);
+    if (right == NULL) {
+      break;
+    }
     Operation *rightTail = tailOf(right);
 
-    op = newOperation(tokenToBinaryOp(node->op),
+    op = newOperation(&node->token, tokenToBinaryOp(node->op),
                       newRegisterOperand(leftTail->destination),
                       newRegisterOperand(rightTail->destination));
 
@@ -275,19 +287,22 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     Operation *left =
         walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
 
-    op = newOperation(IR_COND, newRegisterOperand(bb->curr->destination),
+    op = newOperation(&node->token, IR_COND,
+                      newRegisterOperand(bb->curr->destination),
                       newLabelOperand(afterLabelId));
     bb->curr->next = op;
     bb->curr = op;
 
-    Operation *trueLabel = newLabelOperation(trueLabelId, IR_LABEL);
+    Operation *trueLabel =
+        newLabelOperation(&node->token, trueLabelId, IR_LABEL);
     bb->curr->next = trueLabel;
     bb->curr = trueLabel;
 
     Operation *right =
         walkAst(compiler, bb, node->branches.right, activeScope, activeCFG);
 
-    Operation *afterLabel = newLabelOperation(afterLabelId, IR_LABEL);
+    Operation *afterLabel =
+        newLabelOperation(&node->token, afterLabelId, IR_LABEL);
     bb->curr->next = afterLabel;
     bb->curr = afterLabel;
 
@@ -299,27 +314,30 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     Operation *left =
         walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
 
-    op = newOperation(IR_COND_NO_POP, newRegisterOperand(bb->curr->destination),
+    op = newOperation(&node->token, IR_COND_NO_POP,
+                      newRegisterOperand(bb->curr->destination),
                       newLabelOperand(elseLabelId));
     bb->curr->next = op;
     bb->curr = op;
 
-    Operation *trueOp = newGotoOperation(afterLabelId);
+    Operation *trueOp = newGotoOperation(&node->token, afterLabelId);
     bb->curr->next = trueOp;
     bb->curr = trueOp;
 
-    Operation *elseLabel = newLabelOperation(elseLabelId, IR_LABEL);
+    Operation *elseLabel =
+        newLabelOperation(&node->token, elseLabelId, IR_LABEL);
     bb->curr->next = elseLabel;
     bb->curr = elseLabel;
 
-    Operation *popOp = newOperation(IR_POP, NULL, NULL);
+    Operation *popOp = newOperation(&node->token, IR_POP, NULL, NULL);
     bb->curr->next = popOp;
     bb->curr = popOp;
 
     Operation *right =
         walkAst(compiler, bb, node->branches.right, activeScope, activeCFG);
 
-    Operation *afterLabel = newLabelOperation(afterLabelId, IR_LABEL);
+    Operation *afterLabel =
+        newLabelOperation(&node->token, afterLabelId, IR_LABEL);
     bb->curr->next = afterLabel;
     bb->curr = afterLabel;
 
@@ -334,13 +352,13 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     if (!scope_search(activeScope, node->token.start, node->token.length,
                       &symbol)) {
       errorAt(compiler, &node->token,
-              "Symbol is not defined in current scope.");
+              "Symbol is not defined in current scope.3");
       break;
     }
 
     IROp opcode = symbol.type == SCOPE_GLOBAL ? IR_GET_GLOBAL : IR_GET_LOCAL;
 
-    op = newOperation(opcode, newSymbolOperand(symbol), NULL);
+    op = newOperation(&node->token, opcode, newSymbolOperand(symbol), NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
@@ -349,11 +367,12 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     Symbol symbol = {0};
     if (!scope_search(activeScope, "this", 4, &symbol)) {
       errorAt(compiler, &node->token,
-              "Symbol is not defined in current scope.");
+              "Symbol is not defined in current scope.4");
       break;
     }
 
-    op = newOperation(IR_GET_LOCAL, newSymbolOperand(symbol), NULL);
+    op = newOperation(&node->token, IR_GET_LOCAL, newSymbolOperand(symbol),
+                      NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
@@ -361,7 +380,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   case STMT_PRINT: {
     walkAst(compiler, bb, node->expr, activeScope, activeCFG);
     Operand *value = newRegisterOperand(bb->curr->destination);
-    op = newOperation(IR_PRINT, value, NULL);
+    op = newOperation(&node->token, IR_PRINT, value, NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
@@ -369,34 +388,52 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   case STMT_IF: {
     // TODO: tidy up implementation here
     Operation *expr = walkAst(compiler, bb, node->expr, activeScope, activeCFG);
-    LabelId ifLabelId = getLabelId();
     LabelId elseLabelId = getLabelId();
     LabelId afterLabelId = getLabelId();
+    LabelId skipLabelId = getLabelId();
 
     bool elseBranchPresent = node->branches.right != NULL;
     op = newOperation(
-        IR_COND, newRegisterOperand(bb->curr->destination),
+        &node->token, IR_COND, newRegisterOperand(bb->curr->destination),
         newLabelOperand(elseBranchPresent ? elseLabelId : afterLabelId));
     bb->curr->next = op;
     bb->curr = op;
 
-    Operation *ifLabel = newLabelOperation(ifLabelId, IR_LABEL);
-    bb->curr->next = ifLabel;
-    bb->curr = ifLabel;
     walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
 
+    Operation *afterOp = newGotoOperation(&node->token, skipLabelId);
+    bb->curr->next = afterOp;
+    bb->curr = afterOp;
+
     if (elseBranchPresent) {
-      Operation *afterOp = newGotoOperation(afterLabelId);
-      bb->curr->next = afterOp;
-      bb->curr = afterOp;
-      Operation *elseLabel = newLabelOperation(elseLabelId, IR_ELSE_LABEL);
+      Operation *elseLabel =
+          newLabelOperation(&node->token, elseLabelId, IR_LABEL);
       bb->curr->next = elseLabel;
       bb->curr = elseLabel;
+
+      Operation *popPostExpr = newOperation(&node->token, IR_POP, NULL, NULL);
+      bb->curr->next = popPostExpr;
+      bb->curr = popPostExpr;
+
       walkAst(compiler, bb, node->branches.right, activeScope, activeCFG);
     }
-    Operation *afterLabel = newLabelOperation(afterLabelId, IR_LABEL);
+
+    Operation *afterLabel =
+        newLabelOperation(&node->token, afterLabelId, IR_LABEL);
     bb->curr->next = afterLabel;
     bb->curr = afterLabel;
+
+    if (!elseBranchPresent) {
+      Operation *pop2PostExpr = newOperation(&node->token, IR_POP, NULL, NULL);
+      bb->curr->next = pop2PostExpr;
+      bb->curr = pop2PostExpr;
+    }
+
+    Operation *skipLabel =
+        newLabelOperation(&node->token, skipLabelId, IR_LABEL);
+    bb->curr->next = skipLabel;
+    bb->curr = skipLabel;
+
     break;
   }
   case STMT_WHILE: {
@@ -405,109 +442,147 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     LabelId ifLabelId = getLabelId();
     LabelId afterLabelId = getLabelId();
 
-    Operation *exprLabel = newLabelOperation(exprLabelId, IR_LABEL);
+    op = newOperation(&node->token, IR_BEGIN_SCOPE, NULL, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+
+    Operation *exprLabel =
+        newLabelOperation(&node->token, exprLabelId, IR_LABEL);
     bb->curr->next = exprLabel;
     bb->curr = exprLabel;
 
     Operation *expr = walkAst(compiler, bb, node->expr, activeScope, activeCFG);
-    op = newOperation(IR_COND, newRegisterOperand(bb->curr->destination),
+    op = newOperation(&node->token, IR_COND,
+                      newRegisterOperand(bb->curr->destination),
                       newLabelOperand(afterLabelId));
     bb->curr->next = op;
     bb->curr = op;
 
-    Operation *ifLabel = newLabelOperation(ifLabelId, IR_LABEL);
+    Operation *ifLabel = newLabelOperation(&node->token, ifLabelId, IR_LABEL);
     bb->curr->next = ifLabel;
     bb->curr = ifLabel;
-    walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
 
-    op = newOperation(IR_LOOP, newLabelOperand(exprLabelId), NULL);
+    op = newOperation(&node->token, IR_BEGIN_SCOPE, NULL, NULL);
     bb->curr->next = op;
     bb->curr = op;
 
-    Operation *afterLabel = newLabelOperation(afterLabelId, IR_ELSE_LABEL);
+    walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
+
+    op = newOperation(&node->token, IR_END_SCOPE, NULL, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+
+    op =
+        newOperation(&node->token, IR_LOOP, newLabelOperand(exprLabelId), NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+
+    Operation *afterLabel =
+        newLabelOperation(&node->token, afterLabelId, IR_ELSE_LABEL);
     bb->curr->next = afterLabel;
     bb->curr = afterLabel;
+
+    op = newOperation(&node->token, IR_END_SCOPE, NULL, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
 
     break;
   }
   case STMT_FOR: {
-    // FIXME: create scope
     LabelId preLabelId = getLabelId();
     LabelId condLabelId = getLabelId();
     LabelId bodyLabelId = getLabelId();
     LabelId postLabelId = getLabelId();
     LabelId afterLabelId = getLabelId();
 
-    Operation *preExprLabel = newLabelOperation(preLabelId, IR_LABEL);
-    bb->curr->next = preExprLabel;
-    bb->curr = preExprLabel;
-
-    op = newOperation(IR_BEGIN_SCOPE, NULL, NULL);
+    op = newOperation(&node->token, IR_BEGIN_SCOPE, NULL, NULL);
     bb->curr->next = op;
     bb->curr = op;
+
+    Operation *preExprLabel =
+        newLabelOperation(&node->token, preLabelId, IR_LABEL);
+    bb->curr->next = preExprLabel;
+    bb->curr = preExprLabel;
 
     if (node->preExpr != NULL) {
       walkAst(compiler, bb, node->preExpr, node->scope, activeCFG);
     }
 
-    Operation *condExprLabel = newLabelOperation(condLabelId, IR_LABEL);
+    Operation *condExprLabel =
+        newLabelOperation(&node->token, condLabelId, IR_LABEL);
     bb->curr->next = condExprLabel;
     bb->curr = condExprLabel;
 
     if (node->condExpr != NULL) {
       Operation *condExpr =
           walkAst(compiler, bb, node->condExpr, node->scope, activeCFG);
-      Operation *condOp =
-          newOperation(IR_COND, newRegisterOperand(condExpr->destination),
-                       newLabelOperand(afterLabelId));
+      Operation *condOp = newOperation(
+          &node->token, IR_COND, newRegisterOperand(condExpr->destination),
+          newLabelOperand(afterLabelId));
       bb->curr->next = condOp;
       bb->curr = condOp;
     }
 
     if (node->postExpr != NULL) {
-      Operation *jumpToBody = newGotoOperation(bodyLabelId);
+      Operation *jumpToBody = newGotoOperation(&node->token, bodyLabelId);
       bb->curr->next = jumpToBody;
       bb->curr = jumpToBody;
 
-      Operation *postExprLabel = newLabelOperation(postLabelId, IR_LABEL);
+      Operation *postExprLabel =
+          newLabelOperation(&node->token, postLabelId, IR_LABEL);
       bb->curr->next = postExprLabel;
       bb->curr = postExprLabel;
 
       walkAst(compiler, bb, node->postExpr, node->scope, activeCFG);
       // FIXME: don't like having POP in IR
-      Operation *popPostExpr = newOperation(IR_POP, NULL, NULL);
+      Operation *popPostExpr = newOperation(&node->token, IR_POP, NULL, NULL);
       bb->curr->next = popPostExpr;
       bb->curr = popPostExpr;
 
-      Operation *loopOp =
-          newOperation(IR_LOOP, newLabelOperand(condLabelId), NULL);
+      Operation *loopOp = newOperation(&node->token, IR_LOOP,
+                                       newLabelOperand(condLabelId), NULL);
       bb->curr->next = loopOp;
       bb->curr = loopOp;
     }
 
-    Operation *bodyExprLabel = newLabelOperation(bodyLabelId, IR_LABEL);
+    op = newOperation(&node->token, IR_BEGIN_SCOPE, NULL, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+
+    Operation *bodyExprLabel =
+        newLabelOperation(&node->token, bodyLabelId, IR_LABEL);
     bb->curr->next = bodyExprLabel;
     bb->curr = bodyExprLabel;
 
-    Node *blockNode = (Node *)node->expr->stmts->head;
+    if (node->expr != NULL && node->expr->stmts) {
+      Node *blockNode = (Node *)node->expr->stmts->head;
 
-    while (blockNode != NULL) {
-      walkAst(compiler, bb, blockNode->data, node->expr->scope, activeCFG);
-      blockNode = blockNode->next;
+      while (blockNode != NULL) {
+        walkAst(compiler, bb, blockNode->data, node->expr->scope, activeCFG);
+        blockNode = blockNode->next;
+      }
+    } else if (node->expr) {
+      walkAst(compiler, bb, node->expr, node->scope, activeCFG);
     }
 
+    op = newOperation(&node->token, IR_END_SCOPE, NULL, NULL);
+    bb->curr->next = op;
+    bb->curr = op;
+
     Operation *secondLoop = newOperation(
-        IR_LOOP,
+        &node->token, IR_LOOP,
         newLabelOperand(node->postExpr != NULL ? postLabelId : condLabelId),
         NULL);
     bb->curr->next = secondLoop;
     bb->curr = secondLoop;
 
-    Operation *afterLabel = newLabelOperation(afterLabelId, IR_ELSE_LABEL);
+    Operation *afterLabel =
+        newLabelOperation(&node->token, afterLabelId,
+                          node->condExpr != NULL ? IR_ELSE_LABEL : IR_LABEL);
     bb->curr->next = afterLabel;
     bb->curr = afterLabel;
 
-    op = newOperation(IR_END_SCOPE, NULL, NULL);
+    op = newOperation(&node->token, IR_END_SCOPE, NULL, NULL);
     bb->curr->next = op;
     bb->curr = op;
 
@@ -516,7 +591,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   case STMT_DEFINE_CONST:
   case STMT_DEFINE: {
     if (node->expr == NULL) {
-      op = newOperation(IR_NIL, NULL, NULL);
+      op = newOperation(&node->token, IR_NIL, NULL, NULL);
       bb->curr->next = op;
       bb->curr = op;
     } else {
@@ -536,7 +611,8 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
 
     // FIXME: Skipping register here. Need to fix this
     Operand *scopeOperand = newLiteralOperand(POINTER_VAL(activeScope));
-    op = newOperation(opcode, newSymbolOperand(symbol), scopeOperand);
+    op = newOperation(&node->token, opcode, newSymbolOperand(symbol),
+                      scopeOperand);
     bb->curr->next = op;
     bb->curr = op;
     break;
@@ -548,13 +624,13 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     if (!scope_search(activeScope, node->token.start, node->token.length,
                       &symbol)) {
       errorAt(compiler, &node->token,
-              "Symbol is not defined in current scope.");
+              "Symbol is not defined in current scope.1");
       break;
     }
 
     IROp opcode = symbol.type == SCOPE_GLOBAL ? IR_SET_GLOBAL : IR_SET_LOCAL;
 
-    op = newOperation(opcode, newSymbolOperand(symbol),
+    op = newOperation(&node->token, opcode, newSymbolOperand(symbol),
                       newRegisterOperand(op->destination));
     bb->curr->next = op;
     bb->curr = op;
@@ -570,7 +646,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     break;
   }
   case STMT_BLOCK: {
-    op = newOperation(IR_BEGIN_SCOPE, NULL, NULL);
+    op = newOperation(&node->token, IR_BEGIN_SCOPE, NULL, NULL);
     bb->curr->next = op;
     bb->curr = op;
 
@@ -581,7 +657,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
       blockNode = blockNode->next;
     }
 
-    op = newOperation(IR_END_SCOPE, NULL, NULL);
+    op = newOperation(&node->token, IR_END_SCOPE, NULL, NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
@@ -593,7 +669,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     WorkUnit *wu = wu_allocate(activeCFG->context, node->expr, node->token);
     newCFG(compiler, wu);
     Operand *pointer = newLiteralOperand(POINTER_VAL(wu));
-    op = newOperation(IR_FUNCTION, pointer, NULL);
+    op = newOperation(&node->token, IR_FUNCTION, pointer, NULL);
     bb->curr->next = op;
     bb->curr = op;
     linkedList_append(activeCFG->childFunctions, wu);
@@ -605,18 +681,19 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
       Symbol symbol = {0};
       Token *name = paramNode->data;
       if (!scope_search(node->scope, name->start, name->length, &symbol)) {
-        errorAt(compiler, name, "Symbol is not defined in current scope.");
+        errorAt(compiler, name, "Symbol is not defined in current scope.2");
         break;
       }
       Operand *pointer = newLiteralOperand(POINTER_VAL(node->scope));
-      op = newOperation(IR_DEFINE_LOCAL, newSymbolOperand(symbol), pointer);
+      op = newOperation(&node->token, IR_DEFINE_LOCAL, newSymbolOperand(symbol),
+                        pointer);
       bb->curr->next = op;
       bb->curr = op;
       paramNode = paramNode->next;
     }
     activeCFG->arity = node->arity; // FIXME: unused?
 
-    op = newOperation(IR_BEGIN_SCOPE, NULL, NULL);
+    op = newOperation(&node->token, IR_BEGIN_SCOPE, NULL, NULL);
     bb->curr->next = op;
     bb->curr = op;
 
@@ -630,46 +707,50 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     break;
   }
   case STMT_RETURN: {
-    Operation *expr = walkAst(compiler, bb, node->expr, activeScope, activeCFG);
-    op = newOperation(IR_RETURN, newRegisterOperand(expr->destination), NULL);
+    if (activeScope->type == TYPE_INITIALIZER) {
+      op = newOperation(&node->token, IR_RETURN_FROM_INIT, NULL, NULL);
+      bb->curr->next = op;
+      bb->curr = op;
+      break;
+    }
+    Operation *expr = NULL;
+    if (node->expr == NULL) {
+      expr = newOperation(&node->token, IR_NIL, NULL, NULL);
+      bb->curr->next = expr;
+      bb->curr = expr;
+    } else {
+      expr = walkAst(compiler, bb, node->expr, activeScope, activeCFG);
+    }
+    op = newOperation(&node->token, IR_RETURN,
+                      newRegisterOperand(expr->destination), NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
   }
   case STMT_EXPR: {
     walkAst(compiler, bb, node->expr, activeScope, activeCFG);
-    op = newOperation(IR_STMT_EXPR, NULL, NULL);
+    op = newOperation(&node->token, IR_STMT_EXPR, NULL, NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
   }
   case EXPR_GET_PROPERTY: {
-    Symbol symbol = {0};
-    if (!scope_search(activeScope, node->token.start, node->token.length,
-                      &symbol)) {
-      errorAt(compiler, &node->token,
-              "Symbol is not defined in current scope.");
-      break;
-    }
+    Symbol symbol = {.name = node->token};
 
     walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
-    op = newOperation(IR_GET_PROPERTY, newSymbolOperand(symbol), NULL);
+    op = newOperation(&node->token, IR_GET_PROPERTY, newSymbolOperand(symbol),
+                      NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
   }
   case STMT_SET_PROPERTY: {
-    Symbol symbol = {0};
-    if (!scope_search(activeScope, node->token.start, node->token.length,
-                      &symbol)) {
-      errorAt(compiler, &node->token,
-              "Symbol is not defined in current scope.");
-      break;
-    }
+    Symbol symbol = {.name = node->token};
 
     walkAst(compiler, bb, node->branches.left, activeScope, activeCFG);
     walkAst(compiler, bb, node->expr, activeScope, activeCFG);
-    op = newOperation(IR_SET_PROPERTY, newSymbolOperand(symbol), NULL);
+    op = newOperation(&node->token, IR_SET_PROPERTY, newSymbolOperand(symbol),
+                      NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
@@ -686,7 +767,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     }
     Operand *arityOperand = newLiteralOperand(NUMBER_VAL(arity));
 
-    op = newOperation(IR_CALL, arityOperand, NULL);
+    op = newOperation(&node->token, IR_CALL, arityOperand, NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
@@ -694,6 +775,8 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   case EXPR_INVOKE: {
     walkAst(compiler, bb, node->branches.left, node->scope, activeCFG);
 
+    Symbol symbol = {.name = node->token};
+
     int arity = 0;
     Node *paramNode = (Node *)node->params->head;
     while (paramNode != NULL) {
@@ -703,8 +786,8 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     }
     Operand *arityOperand = newLiteralOperand(NUMBER_VAL(arity));
 
-    Value name = OBJ_VAL(copyString(node->token.start, node->token.length));
-    op = newOperation(IR_INVOKE, newLiteralOperand(name), arityOperand);
+    op = newOperation(&node->token, IR_INVOKE, newSymbolOperand(symbol),
+                      arityOperand);
     bb->curr->next = op;
     bb->curr = op;
     break;
@@ -712,6 +795,8 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   case EXPR_SUPER_INVOKE: {
     walkAst(compiler, bb, node->branches.left, node->scope, activeCFG);
 
+    Symbol symbol = {.name = node->token};
+
     int arity = 0;
     Node *paramNode = (Node *)node->params->head;
     while (paramNode != NULL) {
@@ -722,7 +807,8 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     Operand *arityOperand = newLiteralOperand(NUMBER_VAL(arity));
 
     Value name = OBJ_VAL(copyString(node->token.start, node->token.length));
-    op = newOperation(IR_SUPER_INVOKE, newLiteralOperand(name), arityOperand);
+    op = newOperation(&node->token, IR_SUPER_INVOKE, newSymbolOperand(symbol),
+                      arityOperand);
     bb->curr->next = op;
     bb->curr = op;
     break;
@@ -730,8 +816,9 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   case EXPR_SUPER: {
     walkAst(compiler, bb, node->branches.left, node->scope, activeCFG);
 
-    Value name = OBJ_VAL(copyString(node->token.start, node->token.length));
-    op = newOperation(IR_SUPER, newLiteralOperand(name), NULL);
+    Symbol symbol = {.name = node->token};
+
+    op = newOperation(&node->token, IR_SUPER, newSymbolOperand(symbol), NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
@@ -746,10 +833,12 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     if (node->superclass.length > 0) {
       Value superclassName =
           OBJ_VAL(copyString(node->superclass.start, node->superclass.length));
-      op = newOperation(IR_CLASS, pointer, newLiteralOperand(superclassName));
+      op = newOperation(&node->token, IR_CLASS, pointer,
+                        newLiteralOperand(superclassName));
     } else {
-      op = newOperation(IR_CLASS, pointer, NULL);
+      op = newOperation(&node->token, IR_CLASS, pointer, NULL);
     }
+
     bb->curr->next = op;
     bb->curr = op;
 
@@ -772,7 +861,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     WorkUnit *wu = wu_allocate(activeCFG->context, node->expr, node->token);
     newCFG(compiler, wu);
     Operand *pointer = newLiteralOperand(POINTER_VAL(wu));
-    op = newOperation(IR_METHOD, pointer, NULL);
+    op = newOperation(&node->token, IR_METHOD, pointer, NULL);
     bb->curr->next = op;
     bb->curr = op;
     linkedList_append(activeCFG->childFunctions, wu);
@@ -811,7 +900,12 @@ void constructCFG(CFG *cfg, BasicBlock *irList) {
 
     if (currentOp->opcode == IR_COND) {
       Value ifBranchPtr;
-      LabelId ifBranchHead = currentOp->next->first->val.label;
+      // TODO seeking next here is a code smell
+      Operation *ifBranchLabelInstr = currentOp->next;
+      while (ifBranchLabelInstr->first == NULL) {
+        ifBranchLabelInstr = ifBranchLabelInstr->next;
+      }
+      LabelId ifBranchHead = ifBranchLabelInstr->first->val.label;
       BasicBlock *ifBranchBB = NULL;
       if (tableGet(&labelBasicBlockMapping, NUMBER_VAL(ifBranchHead),
                    &ifBranchPtr)) {
@@ -987,6 +1081,8 @@ char *opcodeString(IROp opcode) {
     return "pop";
   case IR_RETURN:
     return "return";
+  case IR_RETURN_FROM_INIT:
+    return "return";
   case IR_BEGIN_SCOPE:
     return "begin scope";
   case IR_END_SCOPE:
@@ -1109,15 +1205,6 @@ static CFG *newCFG(Compiler *compiler, WorkUnit *wu) {
   walkAst(compiler, irList, wu->node, wu->node->scope, cfg);
   // split IR list into CFG
   constructCFG(cfg, irList);
-
-  Local *local = &cfg->context->locals[cfg->context->localCount++];
-  if (wu->node->functionType != TYPE_FUNCTION) {
-    local->name.start = "this";
-    local->name.length = 4;
-  } else {
-    local->name.start = "";
-    local->name.length = 0;
-  }
 
   wu->cfg = cfg; // temp location
 

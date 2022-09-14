@@ -43,6 +43,11 @@ bool scope_search(Scope *scope, const char *chars, int length, Symbol *symbol) {
   return false;
 }
 
+bool scope_current_search(Scope *scope, const char *chars, int length,
+                          Symbol *symbol) {
+  return st_get(scope->st, chars, length, symbol);
+}
+
 bool scope_set(Scope *scope, const char *chars, int length, Symbol *symbol) {
   return st_set(scope->st, chars, length, symbol);
 }

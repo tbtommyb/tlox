@@ -53,19 +53,19 @@ static AstNode *declaration(Parser *parser);
 
 static AstNode *printStatement(Parser *parser) {
   AstNode *expr = expression(parser);
+  Token token = parser->previous;
   consume(parser, TOKEN_SEMICOLON, "Expect ';' after value.");
-  return newPrintStmt(expr);
+  return newPrintStmt(token, expr);
 }
 
 static AstNode *returnStatement(Parser *parser) {
   AstNode *returnExpr = NULL;
   Token returnToken = parser->previous;
-  if (!match(parser, TOKEN_SEMICOLON)) {
+  if (!check(parser, TOKEN_SEMICOLON)) {
     returnExpr = expression(parser);
   }
   consume(parser, TOKEN_SEMICOLON, "Expect ';' after return value.");
-  AstNode *node = newReturnStmt(returnExpr);
-  node->token = returnToken;
+  AstNode *node = newReturnStmt(returnToken, returnExpr);
   return node;
 }
 
@@ -109,7 +109,8 @@ static Token parseVariable(Parser *parser, const char *errorMessage) {
 
 static AstNode *binary(Parser *parser, bool canAssign) {
   // Remember the operator.
-  TokenType operatorType = parser->previous.type;
+  Token token = parser->previous;
+  TokenType operatorType = token.type;
 
   // Compile the right operand.
   ParseRule *rule = getRule(operatorType);
@@ -122,7 +123,7 @@ static AstNode *binary(Parser *parser, bool canAssign) {
       operatorType == TOKEN_GREATER || operatorType == TOKEN_GREATER_EQUAL ||
       operatorType == TOKEN_LESS || operatorType == TOKEN_LESS_EQUAL ||
       operatorType == TOKEN_PERCENT) {
-    return newBinaryExpr(NULL, right, operatorType);
+    return newBinaryExpr(token, NULL, right, operatorType);
   }
   return NULL;
 }
@@ -130,11 +131,11 @@ static AstNode *binary(Parser *parser, bool canAssign) {
 static AstNode *literal(Parser *parser, bool canAssign) {
   switch (parser->previous.type) {
   case TOKEN_FALSE:
-    return newLiteralExpr(FALSE_VAL);
+    return newLiteralExpr(parser->previous, FALSE_VAL);
   case TOKEN_NIL:
-    return newNilExpr();
+    return newNilExpr(parser->previous);
   case TOKEN_TRUE:
-    return newLiteralExpr(TRUE_VAL);
+    return newLiteralExpr(parser->previous, TRUE_VAL);
   default:
     return NULL; // Unreachable.
   }
@@ -145,7 +146,7 @@ static AstNode *expression(Parser *parser) {
 }
 
 static AstNode *block(Parser *parser) {
-  AstNode *node = newBlockStmt();
+  AstNode *node = newBlockStmt(parser->current);
   while (!check(parser, TOKEN_RIGHT_BRACE) && !check(parser, TOKEN_EOF)) {
     linkedList_append(node->stmts, declaration(parser));
   }
@@ -173,12 +174,14 @@ static AstNode *varDeclaration(Parser *parser, bool isConst) {
 }
 
 static AstNode *expressionStatement(Parser *parser) {
-  AstNode *node = newExprStmt(expression(parser));
+  AstNode *node = newExprStmt(parser->current, expression(parser));
   consume(parser, TOKEN_SEMICOLON, "Expect ';' after expression.");
   return node;
 }
 
 static AstNode *forStatement(Parser *parser) {
+  Token token = parser->previous;
+
   consume(parser, TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
 
   AstNode *initNode = NULL;
@@ -204,10 +207,12 @@ static AstNode *forStatement(Parser *parser) {
 
   AstNode *bodyNode = statement(parser);
 
-  return newForStmt(initNode, conditionNode, postNode, bodyNode);
+  return newForStmt(token, initNode, conditionNode, postNode, bodyNode);
 }
 
 static AstNode *ifStatement(Parser *parser) {
+  Token token = parser->previous;
+
   consume(parser, TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
   AstNode *condition = expression(parser);
   consume(parser, TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
@@ -218,21 +223,24 @@ static AstNode *ifStatement(Parser *parser) {
     elseBranch = statement(parser);
   }
 
-  return newIfStmt(condition, thenBranch, elseBranch);
+  return newIfStmt(token, condition, thenBranch, elseBranch);
 }
 
 static AstNode *whileStatement(Parser *parser) {
+  Token token = parser->previous;
+
   consume(parser, TOKEN_LEFT_PAREN, "Expect '(' after 'while'.");
   AstNode *condition = expression(parser);
   consume(parser, TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
 
   AstNode *thenBranch = statement(parser);
 
-  return newWhileStmt(condition, thenBranch);
+  return newWhileStmt(token, condition, thenBranch);
 }
 
 static AstNode *variable(Parser *parser, bool canAssign) {
   Token token = parser->previous;
+
   if (canAssign && match(parser, TOKEN_EQUAL)) {
     return newAssignStmt(token, expression(parser));
   }
@@ -240,7 +248,7 @@ static AstNode *variable(Parser *parser, bool canAssign) {
 }
 
 static AstNode *function(Parser *parser, FunctionType type) {
-  AstNode *node = newFunctionExpr(type);
+  AstNode *node = newFunctionExpr(parser->current, type);
 
   int arity = 0;
   consume(parser, TOKEN_LEFT_PAREN, "Expect '(' after function name.");
@@ -293,7 +301,7 @@ static AstNode *classDeclaration(Parser *parser) {
 
   consume(parser, TOKEN_LEFT_BRACE, "Expect '{' before class body.");
 
-  AstNode *classBodyNode = newClassBodyStmt();
+  AstNode *classBodyNode = newClassBodyStmt(name);
   node->expr = classBodyNode;
   while (!check(parser, TOKEN_RIGHT_BRACE) && !check(parser, TOKEN_EOF)) {
     linkedList_append(classBodyNode->methods, method(parser));
@@ -344,25 +352,27 @@ static AstNode *statement(Parser *parser) {
 }
 
 static AstNode *unary(Parser *parser, bool canAssign) {
-  TokenType operatorType = parser->previous.type;
+  Token token = parser->previous;
+  TokenType operatorType = token.type;
 
   // Compile the operand.
   AstNode *operand = parsePrecedence(parser, PREC_UNARY);
 
   if (operatorType == TOKEN_BANG || operatorType == TOKEN_MINUS) {
-    return newUnaryExpr(operand, operatorType);
+    return newUnaryExpr(token, operand, operatorType);
   }
   return NULL;
 }
 
 static AstNode *number(Parser *parser, bool canAssign) {
   double value = strtod(parser->previous.start, NULL);
-  return newLiteralExpr(NUMBER_VAL(value));
+  return newLiteralExpr(parser->previous, NUMBER_VAL(value));
 }
 
 static AstNode *string(Parser *parser, bool canAssign) {
-  return newLiteralExpr(OBJ_VAL(
-      copyString(parser->previous.start + 1, parser->previous.length - 2)));
+  Token token = parser->previous;
+  return newLiteralExpr(token,
+                        OBJ_VAL(copyString(token.start + 1, token.length - 2)));
 }
 
 static AstNode *grouping(Parser *parser, bool canAssign) {
@@ -387,21 +397,21 @@ static void argumentList(Parser *parser, AstNode *parent) {
 }
 
 static AstNode *call(Parser *parser, bool canAssign) {
-  AstNode *expr = newCallExpr(false);
+  AstNode *expr = newCallExpr(parser->current);
   argumentList(parser, expr);
 
   return expr;
 }
 
 static AstNode *and_(Parser *parser, bool canAssign) {
-  AstNode *expr = newAndExpr();
+  AstNode *expr = newAndExpr(parser->current);
   expr->branches.right = parsePrecedence(parser, PREC_AND);
 
   return expr;
 }
 
 static AstNode *or_(Parser *parser, bool canAssign) {
-  AstNode *expr = newOrExpr();
+  AstNode *expr = newOrExpr(parser->current);
   expr->branches.right = parsePrecedence(parser, PREC_OR);
 
   return expr;
@@ -548,7 +558,7 @@ static ParseRule *getRule(TokenType type) { return &rules[type]; }
 AstNode *parse(Parser *parser) {
   advance(parser);
 
-  AstNode *ast = newModuleStmt();
+  AstNode *ast = newModuleStmt(parser->previous);
   while (!match(parser, TOKEN_EOF)) {
     linkedList_append(ast->stmts, declaration(parser));
   }
