@@ -289,7 +289,7 @@ void analyse(AstNode *node, Compiler *compiler) {
     ScopeType scopeType =
         isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
     // FIXME: need better symbol creation.
-    Symbol *symbol = newSymbol(node->token, scopeType, false, true, true, 0);
+    Symbol *symbol = newSymbol(node->token, scopeType, false, false, true, 0);
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);
 
@@ -306,6 +306,7 @@ void analyse(AstNode *node, Compiler *compiler) {
       scope_set(compiler->currentScope, super.start, super.length, symbol);
     }
 
+    node->expr->superclass = node->superclass;
     analyse(node->expr, compiler);
 
     if (node->superclass.length > 0) {
@@ -316,6 +317,7 @@ void analyse(AstNode *node, Compiler *compiler) {
     break;
   }
   case STMT_CLASS_BODY: {
+    node->functionType = TYPE_CLASS;
     Node *methodNode = (Node *)node->methods->head;
     while (methodNode != NULL) {
       analyse(methodNode->data, compiler);
