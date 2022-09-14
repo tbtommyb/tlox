@@ -1,5 +1,5 @@
 if (false) {
-  print notDefined;
+  print notDefined; // expect error: [line 2] Error at 'notDefined': Undefined variable.
 }
 
-print "ok"; // expect: ok
+print "ok";
