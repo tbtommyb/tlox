@@ -1,0 +1,15 @@
+var function;
+fun test(n) {
+  var squared = n * n;
+
+  fun inner() {
+    print squared;
+  }
+
+  function = inner;
+
+  return function;
+}
+
+var output = test(100);
+print output();

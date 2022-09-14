@@ -1,0 +1,2 @@
+var outcome = 2 != 2 or (3 != 3) or (4 != 5);
+print outcome;

@@ -1,6 +1,12 @@
-fun areWeHavingItYet() {
-  print "Yes we are!";
+fun tomsTest(val) {
+  var earlNum = 69;
+  {
+    var blockScopedNum = 20;
+    var secondBlockScoped = 500;
+  }
+  var localNum = 7 * earlNum;
+  return localNum * val;
 }
 
-print areWeHavingItYet;
-print areWeHavingItYet();
+var output = tomsTest(8);
+print output;

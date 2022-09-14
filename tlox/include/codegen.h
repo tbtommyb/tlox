@@ -3,8 +3,13 @@
 
 #include "cfg.h"
 #include "chunk.h"
+#include "compiler.h"
+#include "table.h"
 
 Chunk *allocateChunk();
-Chunk *generateChunk(BasicBlock *bb);
+void generateChunk(Compiler *compiler, CFG *cfg, Table *labels, ObjFunction *f);
+ObjFunction *compileFunction(Compiler *compiler, CFG *cfg, Table *labels);
+ObjFunction *compileMain(Compiler *compiler, CFG *cfg, Node *fs, Table *labels);
+ObjFunction *compileWorkUnit(Compiler *compiler, WorkUnit *wu, Table *labels);
 
 #endif

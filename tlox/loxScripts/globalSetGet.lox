@@ -1,0 +1,19 @@
+var globalSet;
+var globalGet;
+
+fun main(arg, arg2) {
+  var a = "initial";
+  var b = arg;
+  var c = arg2;
+
+  fun set(arg3) { a = "updated"; b = arg3; }
+  fun get(arg4) { print a; c = arg4; }
+
+  globalSet = set;
+  globalGet = get;
+
+}
+
+main(123, 456);
+globalSet(123);
+globalGet(123);

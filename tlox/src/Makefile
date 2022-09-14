@@ -329,6 +329,30 @@ debug.c.s:
 	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/debug.c.s
 .PHONY : debug.c.s
 
+execution_context.o: execution_context.c.o
+.PHONY : execution_context.o
+
+# target to build an object file
+execution_context.c.o:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/execution_context.c.o
+.PHONY : execution_context.c.o
+
+execution_context.i: execution_context.c.i
+.PHONY : execution_context.i
+
+# target to preprocess a source file
+execution_context.c.i:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/execution_context.c.i
+.PHONY : execution_context.c.i
+
+execution_context.s: execution_context.c.s
+.PHONY : execution_context.s
+
+# target to generate assembly for a file
+execution_context.c.s:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/execution_context.c.s
+.PHONY : execution_context.c.s
+
 linked_list.o: linked_list.c.o
 .PHONY : linked_list.o
 
@@ -425,6 +449,30 @@ object.c.s:
 	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/object.c.s
 .PHONY : object.c.s
 
+parser.o: parser.c.o
+.PHONY : parser.o
+
+# target to build an object file
+parser.c.o:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/parser.c.o
+.PHONY : parser.c.o
+
+parser.i: parser.c.i
+.PHONY : parser.i
+
+# target to preprocess a source file
+parser.c.i:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/parser.c.i
+.PHONY : parser.c.i
+
+parser.s: parser.c.s
+.PHONY : parser.s
+
+# target to generate assembly for a file
+parser.c.s:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/parser.c.s
+.PHONY : parser.c.s
+
 scanner.o: scanner.c.o
 .PHONY : scanner.o
 
@@ -448,6 +496,78 @@ scanner.s: scanner.c.s
 scanner.c.s:
 	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/scanner.c.s
 .PHONY : scanner.c.s
+
+scope.o: scope.c.o
+.PHONY : scope.o
+
+# target to build an object file
+scope.c.o:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/scope.c.o
+.PHONY : scope.c.o
+
+scope.i: scope.c.i
+.PHONY : scope.i
+
+# target to preprocess a source file
+scope.c.i:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/scope.c.i
+.PHONY : scope.c.i
+
+scope.s: scope.c.s
+.PHONY : scope.s
+
+# target to generate assembly for a file
+scope.c.s:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/scope.c.s
+.PHONY : scope.c.s
+
+semantic.o: semantic.c.o
+.PHONY : semantic.o
+
+# target to build an object file
+semantic.c.o:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/semantic.c.o
+.PHONY : semantic.c.o
+
+semantic.i: semantic.c.i
+.PHONY : semantic.i
+
+# target to preprocess a source file
+semantic.c.i:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/semantic.c.i
+.PHONY : semantic.c.i
+
+semantic.s: semantic.c.s
+.PHONY : semantic.s
+
+# target to generate assembly for a file
+semantic.c.s:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/semantic.c.s
+.PHONY : semantic.c.s
+
+symbol_table.o: symbol_table.c.o
+.PHONY : symbol_table.o
+
+# target to build an object file
+symbol_table.c.o:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/symbol_table.c.o
+.PHONY : symbol_table.c.o
+
+symbol_table.i: symbol_table.c.i
+.PHONY : symbol_table.i
+
+# target to preprocess a source file
+symbol_table.c.i:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/symbol_table.c.i
+.PHONY : symbol_table.c.i
+
+symbol_table.s: symbol_table.c.s
+.PHONY : symbol_table.s
+
+# target to generate assembly for a file
+symbol_table.c.s:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/symbol_table.c.s
+.PHONY : symbol_table.c.s
 
 table.o: table.c.o
 .PHONY : table.o
@@ -553,6 +673,9 @@ help:
 	@echo "... debug.o"
 	@echo "... debug.i"
 	@echo "... debug.s"
+	@echo "... execution_context.o"
+	@echo "... execution_context.i"
+	@echo "... execution_context.s"
 	@echo "... linked_list.o"
 	@echo "... linked_list.i"
 	@echo "... linked_list.s"
@@ -565,9 +688,21 @@ help:
 	@echo "... object.o"
 	@echo "... object.i"
 	@echo "... object.s"
+	@echo "... parser.o"
+	@echo "... parser.i"
+	@echo "... parser.s"
 	@echo "... scanner.o"
 	@echo "... scanner.i"
 	@echo "... scanner.s"
+	@echo "... scope.o"
+	@echo "... scope.i"
+	@echo "... scope.s"
+	@echo "... semantic.o"
+	@echo "... semantic.i"
+	@echo "... semantic.s"
+	@echo "... symbol_table.o"
+	@echo "... symbol_table.i"
+	@echo "... symbol_table.s"
 	@echo "... table.o"
 	@echo "... table.i"
 	@echo "... table.s"

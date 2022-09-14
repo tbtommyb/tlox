@@ -1,5 +1,6 @@
 #include <stdio.h>
 
+#include "cfg.h"
 #include "debug.h"
 #include "object.h"
 #include "value.h"
@@ -20,7 +21,7 @@ static int constantInstruction(const char *name, Chunk *chunk, int offset) {
 static int constantLongInstruction(const char *name, Chunk *chunk, int offset) {
   uint32_t constant = chunk->code[offset + 1] | (chunk->code[offset + 2] << 8) |
                       (chunk->code[offset + 3] << 16);
-  printf("%-16s %4d '", name, constant);
+  printf("Long %-16s %4d '", name, constant);
   printValue(stdout, chunk->constants.values[constant]);
   printf("'\n");
   return offset + 4;
@@ -173,5 +174,18 @@ void disassembleChunk(Chunk *chunk, const char *name) {
 
   for (int offset = 0; offset < chunk->count;) {
     offset = disassembleInstruction(chunk, offset);
+  }
+}
+
+void disassembleWorkUnits(WorkUnit *root) {
+  Node *child = root->cfg->childFunctions->head;
+  while (child != NULL) {
+    WorkUnit *wu = child->data;
+    disassembleWorkUnits(wu);
+    child = child->next;
+  }
+  if (root->f != NULL) {
+    disassembleChunk(&root->f->chunk,
+                     copyString(root->name.start, root->name.length)->chars);
   }
 }

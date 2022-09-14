@@ -267,10 +267,14 @@ Token scanToken() {
     return makeToken(TOKEN_COMMA);
   case '.':
     return makeToken(TOKEN_DOT);
+  /* case '-': */
+  /*   return makeToken(match('-') ? TOKEN_MINUS_MINUS : TOKEN_MINUS); */
   case '-':
-    return makeToken(match('-') ? TOKEN_MINUS_MINUS : TOKEN_MINUS);
+    return makeToken(TOKEN_MINUS);
+  /* case '+': */
+  /*   return makeToken(match('+') ? TOKEN_PLUS_PLUS : TOKEN_PLUS); */
   case '+':
-    return makeToken(match('+') ? TOKEN_PLUS_PLUS : TOKEN_PLUS);
+    return makeToken(TOKEN_PLUS);
   case '/':
     return makeToken(TOKEN_SLASH);
   case '*':
@@ -293,4 +297,18 @@ Token scanToken() {
     return string();
   }
   return errorToken("Unexpected character.");
+}
+
+bool identifiersEqual(Token *a, Token *b) {
+  if (a->length != b->length) {
+    return false;
+  }
+  return memcmp(a->start, b->start, a->length) == 0;
+}
+
+Token syntheticToken(const char *text) {
+  Token token;
+  token.start = text;
+  token.length = (int)strlen(text);
+  return token;
 }
