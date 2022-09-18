@@ -318,7 +318,7 @@ void analyse(AstNode *node, Compiler *compiler) {
   }
   case STMT_CLASS_BODY: {
     node->functionType = TYPE_CLASS;
-    Node *methodNode = (Node *)node->methods->head;
+    Node *methodNode = (Node *)node->stmts->head;
     while (methodNode != NULL) {
       analyse(methodNode->data, compiler);
       methodNode = methodNode->next;

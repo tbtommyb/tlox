@@ -1,0 +1,6 @@
+fun test1(a) {
+  print a;
+  return;
+}
+
+test1(100);

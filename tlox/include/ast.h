@@ -10,7 +10,6 @@
 
 typedef enum {
   EXPR_AND,
-  EXPR_OR,
   EXPR_BINARY,
   EXPR_CALL,
   EXPR_FUNCTION,
@@ -18,6 +17,7 @@ typedef enum {
   EXPR_INVOKE,
   EXPR_LITERAL,
   EXPR_NIL,
+  EXPR_OR,
   EXPR_SUPER,
   EXPR_SUPER_INVOKE,
   EXPR_THIS,
@@ -30,8 +30,8 @@ typedef enum {
   STMT_DEFINE,
   STMT_DEFINE_CONST,
   STMT_EXPR,
-  STMT_FUNCTION,
   STMT_FOR,
+  STMT_FUNCTION,
   STMT_IF,
   STMT_METHOD,
   STMT_MODULE,
@@ -58,7 +58,6 @@ struct AstNode {
   } branches;
   LinkedList *stmts;
   LinkedList *params;
-  LinkedList *methods;
   Token token;
   Token superclass;
   Scope *scope;
@@ -105,6 +104,6 @@ AstNode *newReturnStmt(Token token, AstNode *expr);
 AstNode *newExprStmt(Token token, AstNode *expr);
 AstNode *newSetPropertyStmt(Token token, AstNode *expr);
 
-void printAST(AstNode root, int indentation);
+void printAST(const AstNode *root, int indentation);
 
 #endif

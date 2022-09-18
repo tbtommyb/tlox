@@ -856,7 +856,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     break;
   }
   case STMT_CLASS_BODY: {
-    Node *methodNode = (Node *)node->methods->head;
+    Node *methodNode = (Node *)node->stmts->head;
     while (methodNode != NULL) {
       walkAst(compiler, bb, methodNode->data, node->scope, activeCFG);
       methodNode = methodNode->next;

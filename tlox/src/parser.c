@@ -304,7 +304,7 @@ static AstNode *classDeclaration(Parser *parser) {
   AstNode *classBodyNode = newClassBodyStmt(name);
   node->expr = classBodyNode;
   while (!check(parser, TOKEN_RIGHT_BRACE) && !check(parser, TOKEN_EOF)) {
-    linkedList_append(classBodyNode->methods, method(parser));
+    linkedList_append(classBodyNode->stmts, method(parser));
   }
 
   consume(parser, TOKEN_RIGHT_BRACE, "Expect '}' before class body.");

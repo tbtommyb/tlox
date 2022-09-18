@@ -19,10 +19,4 @@ class Cruller < Doughnut {
 var donut = Cruller();
 donut.name = "Donny";
 
-var fieldToQuery = "name";
-var otherField = "na" + "me";
-
-print donut.name;
-print donut["na"+"me"];
-donut[otherField] = "new name";
 print donut.name;

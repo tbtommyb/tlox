@@ -286,7 +286,7 @@ ObjFunction *compile(Compiler *compiler, const char *source) {
 
   AstNode *ast = parse(compiler->parser);
 #ifdef DEBUG_PRINT_CODE
-  printAST(*ast, 0);
+  printAST(ast, 0);
 #endif
   if (compiler->hadError) {
     return NULL;

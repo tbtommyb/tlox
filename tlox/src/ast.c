@@ -17,7 +17,6 @@ static AstNode *allocateAstNode(Token token, NodeType type) {
   node->branches.right = NULL;
   node->stmts = NULL;
   node->params = NULL;
-  node->methods = NULL;
   node->arity = 0;
   node->scope = NULL;
 
@@ -201,7 +200,7 @@ AstNode *newClassStmt(Token token) {
 
 AstNode *newClassBodyStmt(Token token) {
   AstNode *node = allocateAstNode(token, STMT_CLASS_BODY);
-  node->methods = linkedList_allocate();
+  node->stmts = linkedList_allocate();
   return node;
 }
 
@@ -242,301 +241,259 @@ char *tokenTypeStr(TokenType op) {
   }
 }
 
-// FIXME: change to take pointers
-void printAST(AstNode node, int indentation) {
-  switch (node.type) {
+static void printArgumentList(const Node *argument, int indentation) {
+  if (argument == NULL) {
+    printf("%*sArguments: ()\n", indentation + 2, "");
+    return;
+  }
+  printf("%*sArguments:\n", indentation + 2, "");
+  while (argument != NULL) {
+    printAST(argument->data, indentation + 4);
+    argument = argument->next;
+  }
+}
+
+static void printParameterList(const Node *parameter, int indentation) {
+  while (parameter != NULL) {
+    Token *name = parameter->data;
+    printf("%.*s", name->length, name->start);
+    parameter = parameter->next;
+    if (parameter != NULL) {
+      printf(", ");
+    }
+  }
+  printf("\n");
+}
+
+static void printStatementList(const Node *statement, int indentation) {
+  while (statement != NULL) {
+    printAST(statement->data, indentation + 2);
+    statement = statement->next;
+  }
+}
+
+void printAST(const AstNode *node, int indentation) {
+  if (node == NULL) {
+    printf("%*s<nil>\n", indentation, "");
+    return;
+  }
+
+  switch (node->type) {
+  case EXPR_AND: {
+    printf("%*sExpr And:\n", indentation, "");
+    printf("%*sLeft:\n", indentation + 2, "");
+    printAST(node->branches.left, indentation + 4);
+    printf("%*sRight:\n", indentation + 2, "");
+    printAST(node->branches.right, indentation + 4);
+    break;
+  }
+  case EXPR_BINARY: {
+    printf("%*sExpr Binary:\n", indentation, "");
+    printf("%*sOp: %s\n", indentation + 2, "", tokenTypeStr(node->op));
+    printf("%*sLeft:\n", indentation + 2, "");
+    printAST(node->branches.left, indentation + 4);
+    printf("%*sRight:\n", indentation + 2, "");
+    printAST(node->branches.right, indentation + 4);
+    break;
+  }
+  case EXPR_CALL: {
+    printf("%*sExpr Call:\n", indentation, "");
+    printf("%*sTarget:\n", indentation + 2, "");
+    printAST(node->branches.left, indentation + 4);
+    printArgumentList(node->params->head, indentation);
+    break;
+  }
+  case EXPR_FUNCTION: {
+    printf("%*sParameters: ", indentation, "");
+    printParameterList(node->params->head, indentation);
+    printf("%*sBody:\n", indentation, "");
+    printAST(node->expr, indentation + 2);
+    break;
+  }
+  case EXPR_GET_PROPERTY: {
+    printf("%*sExpr GetProperty:\n", indentation, "");
+    printf("%*sName: %.*s\n", indentation + 2, "", node->token.length,
+           node->token.start);
+    printf("%*sTarget:\n", indentation + 2, "");
+    printAST(node->branches.left, indentation + 4);
+    break;
+  }
+  case EXPR_INVOKE: {
+    printf("%*sExpr Invoke:\n", indentation, "");
+    printf("%*sTarget:\n", indentation + 2, "");
+    printAST(node->branches.left, indentation + 4);
+    printf("%*sMethod: %.*s\n", indentation + 2, "", node->token.length,
+           node->token.start);
+    printArgumentList(node->params->head, indentation);
+    break;
+  }
   case EXPR_LITERAL: {
-    printf("%*sExpr Lit: ", indentation, "");
-    printValue(stdout, node.literal);
-    printf("%*s\n", indentation, "");
+    printf("%*sExpr Literal: ", indentation, "");
+    printValue(stdout, node->literal);
+    printf("\n");
     break;
   }
   case EXPR_NIL: {
-    printf("%*sExpr Nil\n", indentation, "");
+    printf("%*sExpr: Nil\n", indentation, "");
+    break;
+  }
+  case EXPR_OR: {
+    printf("%*sExpr Or:\n", indentation, "");
+    printf("%*sLeft:\n", indentation + 2, "");
+    printAST(node->branches.left, indentation + 4);
+    printf("%*sRight:\n", indentation + 2, "");
+    printAST(node->branches.right, indentation + 4);
     break;
   }
   case EXPR_UNARY: {
     printf("%*sExpr Unary\n", indentation, "");
-    printf("%*sOp: %s\n", indentation + 2, "", tokenTypeStr(node.op));
+    printf("%*sOp: %s\n", indentation + 2, "", tokenTypeStr(node->op));
     printf("%*sRight:\n", indentation + 2, "");
-    printAST(*node.branches.right, indentation + 4);
-    break;
-  }
-  case EXPR_AND: {
-    printf("%*sExpr And\n", indentation, "");
-    printf("%*sLeft:\n", indentation + 2, "");
-    printAST(*node.branches.left, indentation + 4);
-    printf("%*sRight:\n", indentation + 2, "");
-    printAST(*node.branches.right, indentation + 4);
-    break;
-  }
-  case EXPR_OR: {
-    printf("%*sExpr Or\n", indentation, "");
-    printf("%*sLeft:\n", indentation + 2, "");
-    printAST(*node.branches.left, indentation + 4);
-    printf("%*sRight:\n", indentation + 2, "");
-    printAST(*node.branches.right, indentation + 4);
-    break;
-  }
-  case EXPR_BINARY: {
-    printf("%*sExpr Binary\n", indentation, "");
-    printf("%*sOp: %s\n", indentation + 2, "", tokenTypeStr(node.op));
-    printf("%*sLeft:\n", indentation + 2, "");
-    printAST(*node.branches.left, indentation + 4);
-    printf("%*sRight:\n", indentation + 2, "");
-    printAST(*node.branches.right, indentation + 4);
-    break;
-  }
-  case EXPR_VARIABLE: {
-    ObjString *nameString = copyString(node.token.start, node.token.length);
-    printf("%*sVariable %s\n", indentation, "", nameString->chars);
-    break;
-  }
-  case EXPR_THIS: {
-    printf("%*sThis\n", indentation, "");
-    break;
-  }
-  case EXPR_FUNCTION: {
-    Node *param = (Node *)node.params->head;
-    printf("%*sParams: ", indentation, "");
-    while (param != NULL) {
-      Token *name = param->data;
-      ObjString *paramName = copyString(name->start, name->length);
-      printf("%s", paramName->chars);
-      param = param->next;
-      if (param != NULL) {
-        printf(", ");
-      }
-    }
-    printf("\n");
-    printf("%*sBody:\n", indentation, "");
-    printAST(*node.expr, indentation + 2);
-    break;
-  }
-  case EXPR_CALL: {
-    printf("%*sExpr Call\n", indentation, "");
-    if (node.branches.left != NULL) {
-      printAST(*(AstNode *)node.branches.left, indentation + 2);
-    }
-    Node *param = (Node *)node.params->head;
-    if (param == NULL) {
-      printf("%*sArgs: ()\n", indentation + 2, "");
-    } else {
-      printf("%*sArgs:\n", indentation + 2, "");
-      while (param != NULL) {
-        printAST(*(AstNode *)param->data, indentation + 4);
-        param = param->next;
-      }
-    }
-    break;
-  }
-  case EXPR_INVOKE: {
-    ObjString *nameString = copyString(node.token.start, node.token.length);
-    printf("%*sExpr Invoke\n", indentation, "");
-    if (node.branches.left != NULL) {
-      printAST(*(AstNode *)node.branches.left, indentation + 2);
-    }
-    printf("%*sMethod: %s\n", indentation + 2, "", nameString->chars);
-    Node *param = (Node *)node.params->head;
-    if (param == NULL) {
-      printf("%*sArgs: ()\n", indentation + 2, "");
-    } else {
-      printf("%*sArgs:\n", indentation + 2, "");
-      while (param != NULL) {
-        printAST(*(AstNode *)param->data, indentation + 4);
-        param = param->next;
-      }
-    }
-    break;
-  }
-  case EXPR_SUPER_INVOKE: {
-    ObjString *nameString = copyString(node.token.start, node.token.length);
-    printf("%*sExpr Super Invoke\n", indentation, "");
-    if (node.branches.left != NULL) {
-      printAST(*(AstNode *)node.branches.left, indentation + 2);
-    }
-    printf("%*sMethod: %s\n", indentation + 2, "", nameString->chars);
-    Node *param = (Node *)node.params->head;
-    if (param == NULL) {
-      printf("%*sArgs: ()\n", indentation + 2, "");
-    } else {
-      printf("%*sArgs:\n", indentation + 2, "");
-      while (param != NULL) {
-        printAST(*(AstNode *)param->data, indentation + 4);
-        param = param->next;
-      }
-    }
+    printAST(node->branches.right, indentation + 4);
     break;
   }
   case EXPR_SUPER: {
-    ObjString *nameString = copyString(node.token.start, node.token.length);
-    printf("%*sExpr Super\n", indentation, "");
-    printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
-    printf("%*sExpr:\n", indentation + 2, "");
-    if (node.branches.left != NULL) {
-      printAST(*node.branches.left, indentation + 4);
-    }
+    printf("%*sExpr Super:\n", indentation, "");
+    printf("%*sName: %.*s\n", indentation + 2, "", node->token.length,
+           node->token.start);
     break;
   }
-  case STMT_DEFINE: {
-    ObjString *nameString = copyString(node.token.start, node.token.length);
-    printf("%*sStmt Define\n", indentation, "");
-    printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
-    if (node.expr != NULL) {
-      printf("%*sValue:\n", indentation + 2, "");
-      printAST(*node.expr, indentation + 4);
-    }
+  case EXPR_SUPER_INVOKE: {
+    printf("%*sExpr SuperInvoke:\n", indentation, "");
+    printf("%*sName: %.*s\n", indentation + 2, "", node->token.length,
+           node->token.start);
+    printArgumentList(node->params->head, indentation);
     break;
   }
-  case STMT_DEFINE_CONST: {
-    ObjString *nameString = copyString(node.token.start, node.token.length);
-    printf("%*sStmt Define const\n", indentation, "");
-    printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
-    if (node.expr != NULL) {
-      printf("%*sValue:\n", indentation + 2, "");
-      printAST(*node.expr, indentation + 4);
-    }
+  case EXPR_THIS: {
+    printf("%*sExpr: This\n", indentation, "");
+    break;
+  }
+  case EXPR_VARIABLE: {
+    printf("%*sExpr Variable: %.*s\n", indentation, "", node->token.length,
+           node->token.start);
     break;
   }
   case STMT_ASSIGN: {
-    ObjString *nameString = copyString(node.token.start, node.token.length);
-    printf("%*sStmt Assign\n", indentation, "");
-    printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
+    printf("%*sStmt Assign:\n", indentation, "");
+    printf("%*sName: %.*s\n", indentation + 2, "", node->token.length,
+           node->token.start);
     printf("%*sValue:\n", indentation + 2, "");
-    printAST(*node.expr, indentation + 4);
-    break;
-  }
-  case STMT_IF: {
-    printf("%*sStmt If\n", indentation, "");
-    printf("%*sCondition:\n", indentation + 2, "");
-    printAST(*node.expr, indentation + 4);
-    printf("%*sThen:\n", indentation + 2, "");
-    printAST(*node.branches.left, indentation + 4);
-    if (node.branches.right) {
-      printf("%*sElse:\n", indentation + 2, "");
-      printAST(*node.branches.right, indentation + 4);
-    }
-    break;
-  }
-  case STMT_WHILE: {
-    printf("%*sStmt While\n", indentation, "");
-    printf("%*sCondition:\n", indentation + 2, "");
-    printAST(*node.expr, indentation + 4);
-    printf("%*sThen:\n", indentation + 2, "");
-    printAST(*node.branches.left, indentation + 4);
-    break;
-  }
-  case STMT_FOR: {
-    printf("%*sStmt For\n", indentation, "");
-    if (node.preExpr) {
-      printf("%*sInit:\n", indentation + 2, "");
-      printAST(*node.preExpr, indentation + 4);
-    }
-    if (node.condExpr) {
-      printf("%*sCondition:\n", indentation + 2, "");
-      printAST(*node.condExpr, indentation + 4);
-    }
-    if (node.postExpr) {
-      printf("%*sPost:\n", indentation + 2, "");
-      printAST(*node.postExpr, indentation + 4);
-    }
-    printf("%*sBody:\n", indentation + 2, "");
-    printAST(*node.expr, indentation + 4);
-    break;
-  }
-  case STMT_PRINT: {
-    printf("%*sStmt Print\n", indentation, "");
-    printAST(*node.expr, indentation + 2);
-    break;
-  }
-  case STMT_RETURN: {
-    printf("%*sStmt Return\n", indentation, "");
-    if (node.expr != NULL) {
-      printf("%*sExpr:\n", indentation + 2, "");
-      printAST(*node.expr, indentation + 4);
-    }
-    break;
-  }
-  case STMT_EXPR: {
-    printf("%*sStmt Expr\n", indentation, "");
-    if (node.expr != NULL) {
-      printAST(*node.expr, indentation + 2);
-    }
-    break;
-  }
-  case STMT_MODULE: {
-    printf("%*sStmt Module\n", indentation, "");
-    Node *stmtNode = (Node *)node.stmts->head;
-    while (stmtNode != NULL) {
-      printAST(*(AstNode *)stmtNode->data, indentation + 2);
-      stmtNode = stmtNode->next;
-    }
+    printAST(node->expr, indentation + 4);
     break;
   }
   case STMT_BLOCK: {
-    printf("%*sStmt Block\n", indentation, "");
-    Node *stmtNode = (Node *)node.stmts->head;
-    while (stmtNode != NULL) {
-      printAST(*(AstNode *)stmtNode->data, indentation + 2);
-      stmtNode = stmtNode->next;
-    }
-    break;
-  }
-  case STMT_FUNCTION: {
-    ObjString *nameString = copyString(node.token.start, node.token.length);
-    printf("%*sStmt Function\n", indentation, "");
-    printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
-    printf("%*sExpr:\n", indentation + 2, "");
-    printAST(*node.expr, indentation + 4);
+    printf("%*sStmt Block:\n", indentation, "");
+    printStatementList(node->stmts->head, indentation);
     break;
   }
   case STMT_CLASS: {
-    ObjString *nameString = copyString(node.token.start, node.token.length);
-    printf("%*sStmt Class\n", indentation, "");
-    printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
-    if (node.superclass.length > 0) {
-      ObjString *superclassNameString =
-          copyString(node.superclass.start, node.superclass.length);
-      printf("%*sSuperclass: %s\n", indentation + 2, "",
-             superclassNameString->chars);
+    printf("%*sStmt Class:\n", indentation, "");
+    printf("%*sName: %.*s\n", indentation + 2, "", node->token.length,
+           node->token.start);
+    if (node->superclass.length > 0) {
+      printf("%*sSuperclass: %.*s\n", indentation + 2, "",
+             node->superclass.length, node->superclass.start);
     }
-    printAST(*node.expr, indentation + 2);
+    printAST(node->expr, indentation + 2);
     break;
   }
   case STMT_CLASS_BODY: {
-    Node *method = (Node *)node.methods->head;
-    while (method != NULL) {
-      printAST(*(AstNode *)method->data, indentation + 2);
-      method = method->next;
-    }
+    printf("%*sStmt ClassBody:\n", indentation, "");
+    printStatementList(node->stmts->head, indentation);
+    break;
+  }
+  case STMT_DEFINE: {
+    printf("%*sStmt Define:\n", indentation, "");
+    printf("%*sName: %.*s\n", indentation + 2, "", node->token.length,
+           node->token.start);
+    printf("%*sValue:\n", indentation + 2, "");
+    printAST(node->expr, indentation + 4);
+    break;
+  }
+  case STMT_DEFINE_CONST: {
+    printf("%*sStmt DefineConst:\n", indentation, "");
+    printf("%*sName: %.*s\n", indentation + 2, "", node->token.length,
+           node->token.start);
+    printf("%*sValue:\n", indentation + 2, "");
+    printAST(node->expr, indentation + 4);
+    break;
+  }
+  case STMT_EXPR: {
+    printf("%*sStmt Expr:\n", indentation, "");
+    printAST(node->expr, indentation + 2);
+    break;
+  }
+  case STMT_FOR: {
+    printf("%*sStmt For:\n", indentation, "");
+    printf("%*sPre:\n", indentation + 2, "");
+    printAST(node->preExpr, indentation + 4);
+    printf("%*sCondition:\n", indentation + 2, "");
+    printAST(node->condExpr, indentation + 4);
+    printf("%*sPost:\n", indentation + 2, "");
+    printAST(node->postExpr, indentation + 4);
+    printf("%*sBody:\n", indentation + 2, "");
+    printAST(node->expr, indentation + 4);
+    break;
+  }
+  case STMT_FUNCTION: {
+    printf("%*sStmt Function:\n", indentation, "");
+    printf("%*sName: %.*s\n", indentation + 2, "", node->token.length,
+           node->token.start);
+    printf("%*sExpr:\n", indentation + 2, "");
+    printAST(node->expr, indentation + 4);
+    break;
+  }
+  case STMT_IF: {
+    printf("%*sStmt If:\n", indentation, "");
+    printf("%*sCondition:\n", indentation + 2, "");
+    printAST(node->expr, indentation + 4);
+    printf("%*sThen:\n", indentation + 2, "");
+    printAST(node->branches.left, indentation + 4);
+    printf("%*sElse:\n", indentation + 2, "");
+    printAST(node->branches.right, indentation + 4);
     break;
   }
   case STMT_METHOD: {
-    printf("%*sStmt Method\n", indentation, "");
-    ObjString *nameString = copyString(node.token.start, node.token.length);
-    printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
+    printf("%*sStmt Method:\n", indentation, "");
+    printf("%*sName: %.*s\n", indentation + 2, "", node->token.length,
+           node->token.start);
     printf("%*sExpr:\n", indentation + 2, "");
-    printAST(*node.expr, indentation + 4);
+    printAST(node->expr, indentation + 4);
+    break;
+  }
+  case STMT_MODULE: {
+    printf("%*sStmt Module:\n", indentation, "");
+    printStatementList(node->stmts->head, indentation);
+    break;
+  }
+  case STMT_PRINT: {
+    printf("%*sStmt Print:\n", indentation, "");
+    printAST(node->expr, indentation + 2);
+    break;
+  }
+  case STMT_RETURN: {
+    printf("%*sStmt Return:\n", indentation, "");
+    printf("%*sExpr:\n", indentation + 2, "");
+    printAST(node->expr, indentation + 4);
     break;
   }
   case STMT_SET_PROPERTY: {
-    printf("%*sStmt Set Property\n", indentation, "");
-    ObjString *nameString = copyString(node.token.start, node.token.length);
+    printf("%*sStmt SetProperty:\n", indentation, "");
     printf("%*sTarget:\n", indentation + 2, "");
-    if (node.branches.left != NULL) {
-      printAST(*(AstNode *)node.branches.left, indentation + 4);
-    }
-    printf("%*sProperty: %s\n", indentation + 2, "", nameString->chars);
+    printAST(node->branches.left, indentation + 4);
+    printf("%*sName: %.*s\n", indentation + 2, "", node->token.length,
+           node->token.start);
     printf("%*sExpr:\n", indentation + 2, "");
-    printAST(*node.expr, indentation + 4);
+    printAST(node->expr, indentation + 4);
     break;
   }
-  case EXPR_GET_PROPERTY: {
-    printf("%*sExpr Get Property\n", indentation, "");
-    ObjString *nameString = copyString(node.token.start, node.token.length);
-    printf("%*sName: %s\n", indentation + 2, "", nameString->chars);
-    printf("%*sExpr:\n", indentation + 2, "");
-    printAST(*node.branches.left, indentation + 4);
+  case STMT_WHILE: {
+    printf("%*sStmt While:\n", indentation, "");
+    printf("%*sCondition:\n", indentation + 2, "");
+    printAST(node->expr, indentation + 4);
+    printf("%*sThen:\n", indentation + 2, "");
+    printAST(node->branches.left, indentation + 4);
     break;
   }
   }
