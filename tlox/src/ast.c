@@ -21,7 +21,7 @@ static AstNode *allocateAstNode(Token token, NodeType type) {
   node->scope = NULL;
 
   // TODO: these empty values are code smell
-  node->superclass = (Token){0};
+  node->superclass = optionalTokenInit();
   node->functionType = (FunctionType){0};
 
   return node;
@@ -391,9 +391,10 @@ void printAST(const AstNode *node, int indentation) {
     printf("%*sStmt Class:\n", indentation, "");
     printf("%*sName: %.*s\n", indentation + 2, "", node->token.length,
            node->token.start);
-    if (node->superclass.length > 0) {
+    if (OPTIONAL_HAS_VALUE(node->superclass)) {
+      Token superclassName = OPTIONAL_VALUE(node->superclass);
       printf("%*sSuperclass: %.*s\n", indentation + 2, "",
-             node->superclass.length, node->superclass.start);
+             superclassName.length, superclassName.start);
     }
     printAST(node->expr, indentation + 2);
     break;
@@ -497,4 +498,13 @@ void printAST(const AstNode *node, int indentation) {
     break;
   }
   }
+}
+
+OptionalToken optionalTokenInit() {
+  return (OptionalToken){.present = false, .value = (Token){0}};
+}
+
+void optionalTokenSet(OptionalToken *ot, Token value) {
+  ot->present = true;
+  ot->value = value;
 }

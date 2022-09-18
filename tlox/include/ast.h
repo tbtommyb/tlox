@@ -6,7 +6,12 @@
 #include "scanner.h"
 #include "scope.h"
 #include "symbol_table.h"
+#include "util.h"
 #include "value.h"
+
+typedef OPTIONAL(Token) OptionalToken;
+OptionalToken optionalTokenInit();
+void optionalTokenSet(OptionalToken *ot, Token value);
 
 typedef enum {
   EXPR_AND,
@@ -59,7 +64,7 @@ struct AstNode {
   LinkedList *stmts;
   LinkedList *params;
   Token token;
-  Token superclass;
+  OptionalToken superclass;
   Scope *scope;
   int arity;
   FunctionType functionType;

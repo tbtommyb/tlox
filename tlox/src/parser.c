@@ -296,7 +296,7 @@ static AstNode *classDeclaration(Parser *parser) {
 
   if (match(parser, TOKEN_LESS)) {
     Token superClassName = parseVariable(parser, "Expect superclass name.");
-    node->superclass = superClassName;
+    optionalTokenSet(&node->superclass, superClassName);
   }
 
   consume(parser, TOKEN_LEFT_BRACE, "Expect '{' before class body.");

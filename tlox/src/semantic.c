@@ -295,10 +295,10 @@ void analyse(AstNode *node, Compiler *compiler) {
 
     node->scope = beginScope(compiler, TYPE_CLASS);
 
-    if (node->superclass.length > 0) {
-      if (identifiersEqual(&node->token, &node->superclass)) {
-        errorAt(compiler, &node->superclass,
-                "A class can't inherit from itself.");
+    if (OPTIONAL_HAS_VALUE(node->superclass)) {
+      Token superclass = OPTIONAL_VALUE(node->superclass);
+      if (identifiersEqual(&node->token, &superclass)) {
+        errorAt(compiler, &superclass, "A class can't inherit from itself.");
       }
       node->scope = beginScope(compiler, TYPE_CLASS);
       Token super = {.start = "super", .length = (int)strlen("super")};
@@ -309,7 +309,7 @@ void analyse(AstNode *node, Compiler *compiler) {
     node->expr->superclass = node->superclass;
     analyse(node->expr, compiler);
 
-    if (node->superclass.length > 0) {
+    if (OPTIONAL_HAS_VALUE(node->superclass)) {
       endScope(compiler);
     }
     endScope(compiler);

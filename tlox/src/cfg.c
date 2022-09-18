@@ -3,6 +3,7 @@
 #include "execution_context.h"
 #include "memory.h"
 #include "scanner.h"
+#include "util.h"
 
 #include <stdlib.h>
 
@@ -840,10 +841,10 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     newCFG(compiler, wu);
 
     Operand *pointer = newLiteralOperand(POINTER_VAL(wu));
-    if (node->superclass.length > 0) {
-      Symbol superclassName = {.name = node->superclass};
+    if (OPTIONAL_HAS_VALUE(node->superclass)) {
+      Symbol superclass = {.name = OPTIONAL_VALUE(node->superclass)};
       op = newOperation(&node->token, IR_CLASS, pointer,
-                        newSymbolOperand(superclassName));
+                        newSymbolOperand(superclass));
     } else {
       op = newOperation(&node->token, IR_CLASS, pointer, NULL);
     }
