@@ -185,19 +185,6 @@ cloc/fast:
 .PHONY : cloc/fast
 
 #=============================================================================
-# Target rules for targets named check_cloc
-
-# Build rule for target.
-check_cloc: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 check_cloc
-.PHONY : check_cloc
-
-# fast build rule for target.
-check_cloc/fast:
-	$(MAKE) $(MAKESILENT) -f c-tests/CMakeFiles/check_cloc.dir/build.make c-tests/CMakeFiles/check_cloc.dir/build
-.PHONY : check_cloc/fast
-
-#=============================================================================
 # Target rules for targets named cloc-bin
 
 # Build rule for target.
@@ -223,7 +210,6 @@ help:
 	@echo "... list_install_components"
 	@echo "... rebuild_cache"
 	@echo "... test"
-	@echo "... check_cloc"
 	@echo "... cloc"
 	@echo "... cloc-bin"
 .PHONY : help

@@ -84,7 +84,6 @@ set(CONFIG_HEADER ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 ###############################################################################
 # Subdirectories
 add_subdirectory(src)
-add_subdirectory(c-tests)
 add_subdirectory(build)
 
 ###############################################################################

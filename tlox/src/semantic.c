@@ -36,25 +36,28 @@ void analyse(AstNode *node, Compiler *compiler) {
   if (node == NULL) {
     return;
   }
-  bool variableIsConst = false;
-  switch (node->type) {
+  switch (AST_NODE_TYPE(node)) {
+  case EXPR_LITERAL:
+  case EXPR_NIL:
+    break;
   case EXPR_BINARY: {
-    analyse(node->branches.left, compiler);
-    analyse(node->branches.right, compiler);
+    BinaryExprAstNode *expr = AS_BINARY_EXPR(node);
+    analyse(expr->branches.left, compiler);
+    analyse(expr->branches.right, compiler);
     break;
   }
   case EXPR_UNARY: {
-    analyse(node->branches.right, compiler);
+    analyse(AS_UNARY_EXPR(node)->right, compiler);
     break;
   }
   case EXPR_AND: {
-    analyse(node->branches.left, compiler);
-    analyse(node->branches.right, compiler);
+    analyse(AS_AND_EXPR(node)->branches.left, compiler);
+    analyse(AS_AND_EXPR(node)->branches.right, compiler);
     break;
   }
   case EXPR_OR: {
-    analyse(node->branches.left, compiler);
-    analyse(node->branches.right, compiler);
+    analyse(AS_OR_EXPR(node)->branches.left, compiler);
+    analyse(AS_OR_EXPR(node)->branches.right, compiler);
     break;
   }
   case EXPR_VARIABLE: {
@@ -82,14 +85,11 @@ void analyse(AstNode *node, Compiler *compiler) {
       errorAt(compiler, &node->token, "Cannot reassign a const variable.");
       break;
     }
-    analyse(node->expr, compiler);
+    analyse(AS_ASSIGN_STMT(node)->expr, compiler);
     break;
   }
-  case STMT_DEFINE_CONST: {
-    variableIsConst = true;
-    /* fallthrough */
-  }
   case STMT_DEFINE: {
+    DefineStmtAstNode *stmt = AS_DEFINE_STMT(node);
     Symbol existing = {0};
     if (scope_current_search(compiler->currentScope, node->token.start,
                              node->token.length, &existing)) {
@@ -105,11 +105,11 @@ void analyse(AstNode *node, Compiler *compiler) {
     ScopeType scopeType =
         isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
     Symbol *symbol =
-        newSymbol(node->token, scopeType, false, variableIsConst, false, 0);
+        newSymbol(node->token, scopeType, false, stmt->isConst, false, 0);
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);
 
-    analyse(node->expr, compiler);
+    analyse(stmt->expr, compiler);
 
     symbol->isDefined = true;
     scope_set(compiler->currentScope, node->token.start, node->token.length,
@@ -118,7 +118,8 @@ void analyse(AstNode *node, Compiler *compiler) {
   }
   case STMT_MODULE: {
     node->scope = compiler->currentScope;
-    Node *stmtNode = (Node *)node->stmts->head;
+    ModuleStmtAstNode *stmt = AS_MODULE_STMT(node);
+    Node *stmtNode = (Node *)stmt->stmts->head;
 
     while (stmtNode != NULL) {
       analyse(stmtNode->data, compiler);
@@ -127,7 +128,8 @@ void analyse(AstNode *node, Compiler *compiler) {
     break;
   }
   case STMT_BLOCK: {
-    Node *blockNode = (Node *)node->stmts->head;
+    BlockStmtAstNode *stmt = AS_BLOCK_STMT(node);
+    Node *blockNode = (Node *)stmt->stmts->head;
 
     node->scope = beginScope(compiler, compiler->currentScope->type);
 
@@ -140,11 +142,12 @@ void analyse(AstNode *node, Compiler *compiler) {
     break;
   }
   case STMT_PRINT: {
-    analyse(node->expr, compiler);
+    analyse(AS_PRINT_STMT(node)->expr, compiler);
     break;
   }
   case STMT_EXPR: {
-    analyse(node->expr, compiler);
+    ExprStmtAstNode *stmt = AS_EXPR_STMT(node);
+    analyse(stmt->expr, compiler);
     break;
   }
   case STMT_RETURN: {
@@ -154,35 +157,40 @@ void analyse(AstNode *node, Compiler *compiler) {
       errorAt(compiler, &node->token, "Can't return from top-level code.");
     }
     /* if (parser->compiler->type == TYPE_INITIALIZER) { */
-    /*   error(parser->compiler, "Can't return a value from an initializer.");
+    /*   error(parser->compiler, "Can't return a value from an
+initializer.");
      */
     /* } */
-    analyse(node->expr, compiler);
+    analyse(AS_RETURN_STMT(node)->expr, compiler);
     break;
   }
   case STMT_IF: {
-    analyse(node->expr, compiler);
-    analyse(node->branches.left, compiler);
-    analyse(node->branches.right, compiler);
+    IfStmtAstNode *stmt = AS_IF_STMT(node);
+    analyse(stmt->condition, compiler);
+    analyse(stmt->branches.then, compiler);
+    analyse(stmt->branches.elseB, compiler);
     break;
   }
   case STMT_WHILE: {
-    analyse(node->expr, compiler);
-    analyse(node->branches.left, compiler);
+    WhileStmtAstNode *stmt = AS_WHILE_STMT(node);
+    analyse(stmt->condition, compiler);
+    analyse(stmt->branches.then, compiler);
     break;
   }
   case STMT_FOR: {
+    ForStmtAstNode *stmt = AS_FOR_STMT(node);
     node->scope = beginScope(compiler, compiler->currentScope->type);
 
-    analyse(node->preExpr, compiler);
-    analyse(node->condExpr, compiler);
-    analyse(node->postExpr, compiler);
-    analyse(node->expr, compiler);
+    analyse(stmt->branches.pre, compiler);
+    analyse(stmt->branches.cond, compiler);
+    analyse(stmt->branches.post, compiler);
+    analyse(stmt->branches.body, compiler);
 
     endScope(compiler);
     break;
   }
   case STMT_FUNCTION: {
+    FunctionStmtAstNode *stmt = AS_FUNCTION_STMT(node);
     Symbol existing = {0};
     if (scope_search(compiler->currentScope, node->token.start,
                      node->token.length, &existing)) {
@@ -197,36 +205,36 @@ void analyse(AstNode *node, Compiler *compiler) {
     }
     ScopeType scopeType =
         isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
+    int arity = stmt->expr->arity;
     // FIXME: need better symbol creation.
     Symbol *symbol =
-        newSymbol(node->token, scopeType, false, true, true, node->arity);
+        newSymbol(node->token, scopeType, false, true, true, arity);
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);
 
-    node->expr->token = node->token;
-    analyse(node->expr, compiler);
+    // FIXME: hack
+    AS_AST_NODE(stmt->expr)->token = node->token;
+    analyse(AS_AST_NODE(stmt->expr), compiler);
     break;
   }
   case EXPR_FUNCTION: {
-    node->scope = beginScope(compiler, node->functionType);
-
-    Node *paramNode = (Node *)node->params->head;
+    FunctionExprAstNode *expr = AS_FUNCTION_EXPR(node);
+    node->scope = beginScope(compiler, expr->functionType);
 
     int arity = 0;
-    while (paramNode != NULL) {
-      Token *name = paramNode->data;
+    for (; arity < expr->arity;) {
+      Token name = expr->params[arity];
       Symbol *symbol =
-          newSymbol(*name, SCOPE_FUNCTION_PARAM, false, true, true, 0);
-      st_set(compiler->currentScope->st, name->start, name->length, symbol);
-      paramNode = paramNode->next;
+          newSymbol(name, SCOPE_FUNCTION_PARAM, false, true, true, 0);
+      st_set(compiler->currentScope->st, name.start, name.length, symbol);
       arity++;
     }
 
-    analyse(node->expr, compiler);
+    analyse(AS_AST_NODE(expr->body), compiler);
 
     endScope(compiler);
 
-    if (node->functionType == TYPE_FUNCTION) {
+    if (expr->functionType == TYPE_FUNCTION) {
       // Create empty symbol on heap
       Symbol *functionSymbol =
           newSymbol(node->token, SCOPE_GLOBAL, false, false, false, 0);
@@ -243,8 +251,9 @@ void analyse(AstNode *node, Compiler *compiler) {
     break;
   }
   case EXPR_CALL: {
-    analyse(node->branches.left, compiler);
-    Node *paramNode = (Node *)node->params->head;
+    CallExprAstNode *expr = AS_CALL_EXPR(node);
+    analyse(expr->target, compiler);
+    Node *paramNode = (Node *)expr->params->head;
 
     // FIXME: do something with arity
     int callArity = 0;
@@ -258,9 +267,10 @@ void analyse(AstNode *node, Compiler *compiler) {
     break;
   }
   case EXPR_INVOKE: {
-    analyse(node->branches.left, compiler);
+    InvocationExprAstNode *expr = AS_INVOCATION_EXPR(node);
+    analyse(expr->target, compiler);
 
-    Node *paramNode = (Node *)node->params->head;
+    Node *paramNode = (Node *)expr->params->head;
 
     // FIXME: do something with arity
     int callArity = 0;
@@ -280,6 +290,7 @@ void analyse(AstNode *node, Compiler *compiler) {
     break;
   }
   case STMT_CLASS: {
+    ClassStmtAstNode *stmt = AS_CLASS_STMT(node);
     if (scope_search(compiler->currentScope, node->token.start,
                      node->token.length, &(Symbol){0})) {
       errorAt(compiler, &node->token,
@@ -295,8 +306,8 @@ void analyse(AstNode *node, Compiler *compiler) {
 
     node->scope = beginScope(compiler, TYPE_CLASS);
 
-    if (OPTIONAL_HAS_VALUE(node->superclass)) {
-      Token superclass = OPTIONAL_VALUE(node->superclass);
+    if (OPTIONAL_HAS_VALUE(stmt->superclass)) {
+      Token superclass = OPTIONAL_VALUE(stmt->superclass);
       if (identifiersEqual(&node->token, &superclass)) {
         errorAt(compiler, &superclass, "A class can't inherit from itself.");
       }
@@ -306,10 +317,10 @@ void analyse(AstNode *node, Compiler *compiler) {
       scope_set(compiler->currentScope, super.start, super.length, symbol);
     }
 
-    node->expr->superclass = node->superclass;
-    analyse(node->expr, compiler);
+    /* stmt->body->superclass = stmt->superclass; */
+    analyse(AS_AST_NODE(stmt->body), compiler);
 
-    if (OPTIONAL_HAS_VALUE(node->superclass)) {
+    if (OPTIONAL_HAS_VALUE(stmt->superclass)) {
       endScope(compiler);
     }
     endScope(compiler);
@@ -317,8 +328,8 @@ void analyse(AstNode *node, Compiler *compiler) {
     break;
   }
   case STMT_CLASS_BODY: {
-    node->functionType = TYPE_CLASS;
-    Node *methodNode = (Node *)node->stmts->head;
+    ClassBodyStmtAstNode *stmt = AS_CLASS_BODY_STMT(node);
+    Node *methodNode = (Node *)stmt->stmts->head;
     while (methodNode != NULL) {
       analyse(methodNode->data, compiler);
       methodNode = methodNode->next;
@@ -327,6 +338,7 @@ void analyse(AstNode *node, Compiler *compiler) {
     break;
   }
   case STMT_METHOD: {
+    MethodStmtAstNode *stmt = AS_METHOD_STMT(node);
     if (scope_current_search(compiler->currentScope, node->token.start,
                              node->token.length, &(Symbol){0})) {
       errorAt(compiler, &node->token,
@@ -334,29 +346,32 @@ void analyse(AstNode *node, Compiler *compiler) {
       break;
     }
 
+    int arity = stmt->body->arity;
     Symbol *symbol =
-        newSymbol(node->token, SCOPE_GLOBAL, false, true, true, node->arity);
+        newSymbol(node->token, SCOPE_GLOBAL, false, true, true, arity);
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);
 
-    node->expr->token = node->token;
-    analyse(node->expr, compiler);
+    // FIXME: hack
+    AS_AST_NODE(stmt->body)->token = node->token;
+    analyse(AS_AST_NODE(stmt->body), compiler);
     break;
   }
   case STMT_SET_PROPERTY: {
+    SetPropertyStmtAstNode *stmt = AS_SET_PROPERTY_STMT(node);
     ScopeType scopeType =
         isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
-    Symbol *symbol =
-        newSymbol(node->token, scopeType, false, false, true, node->arity);
+    // FIXME: what to do with arity here?
+    Symbol *symbol = newSymbol(node->token, scopeType, false, false, true, 0);
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);
 
-    analyse(node->branches.left, compiler);
-    analyse(node->expr, compiler);
+    analyse(stmt->target, compiler);
+    analyse(stmt->expr, compiler);
     break;
   }
   case EXPR_GET_PROPERTY: {
-    analyse(node->branches.left, compiler);
+    analyse(AS_GET_PROPERTY_EXPR(node)->target, compiler);
     break;
   }
   case EXPR_SUPER: {
@@ -365,19 +380,20 @@ void analyse(AstNode *node, Compiler *compiler) {
       errorAt(compiler, &node->token, "Can't use 'super' outside of a class.");
       break;
     }
-    analyse(node->branches.left, compiler);
+    analyse(AS_SUPER_EXPR(node)->target, compiler);
     break;
   }
   case EXPR_SUPER_INVOKE: {
+    InvocationExprAstNode *expr = AS_INVOCATION_EXPR(node);
     if (!isInClassScope(compiler->currentScope)) {
       errorAt(compiler, &node->token, "Can't use 'super' outside of a class.");
       break;
     }
     // TODO: need a way to know what class is being used in order to do semantic
     // checks
-    analyse(node->branches.left, compiler);
+    analyse(expr->target, compiler);
 
-    Node *paramNode = (Node *)node->params->head;
+    Node *paramNode = (Node *)expr->params->head;
 
     // FIXME: do something with arity
     int callArity = 0;

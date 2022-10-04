@@ -694,7 +694,8 @@ ObjFunction *compileWorkUnit(Compiler *compiler, WorkUnit *wu, Table *labels) {
   wu->f = f;
 
   Local *local = &wu->cfg->context->locals[wu->cfg->context->localCount++];
-  if (wu->node->functionType != TYPE_FUNCTION) {
+  // fixme: should be some kind of function here
+  if (wu->functionType != TYPE_FUNCTION) {
     local->name.start = "this";
     local->name.length = 4;
   } else {
@@ -704,7 +705,7 @@ ObjFunction *compileWorkUnit(Compiler *compiler, WorkUnit *wu, Table *labels) {
 
   generateChunk(compiler, wu->cfg, labels, f);
   // FIXME: lineno is wrong
-  emitReturn(wu->node->functionType, &f->chunk, wu->name.line);
+  emitReturn(wu->functionType, &f->chunk, wu->name.line);
 
   return f;
 }

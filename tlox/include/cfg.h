@@ -116,12 +116,13 @@ typedef struct WorkUnit {
   Token name;
   CFG *cfg;
   ObjFunction *f;
+  FunctionType functionType;
 } WorkUnit;
 
 BasicBlock *newBasicBlock(AstNode *node);
 Operation *newOperation(Token *token, IROp opcode, Operand *first,
                         Operand *second);
-WorkUnit *createWorkUnit(Compiler *compiler, AstNode *root);
+WorkUnit *createMainWorkUnit(Compiler *compiler, AstNode *root);
 
 LinkedList *postOrderTraverseBasicBlock(CFG *cfg);
 void printCFG(CFG *cfg);

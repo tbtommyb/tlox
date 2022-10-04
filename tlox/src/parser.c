@@ -4,15 +4,6 @@
 #include "scanner.h"
 #include <stdlib.h>
 
-// just use syntheticToken?
-static Token *allocateToken(Token token) {
-  Token *heapToken = (Token *)reallocate(NULL, 0, sizeof(Token));
-  heapToken->length = token.length;
-  heapToken->line = token.line;
-  heapToken->start = token.start;
-  heapToken->type = token.type;
-  return heapToken;
-}
 static void advance(Parser *parser) {
   parser->previousPrevious = parser->previous;
   parser->previous = parser->current;
@@ -51,21 +42,21 @@ static AstNode *expression(Parser *parser);
 static AstNode *statement(Parser *parser);
 static AstNode *declaration(Parser *parser);
 
-static AstNode *printStatement(Parser *parser) {
+static PrintStmtAstNode *printStatement(Parser *parser) {
   AstNode *expr = expression(parser);
   Token token = parser->previous;
   consume(parser, TOKEN_SEMICOLON, "Expect ';' after value.");
   return newPrintStmt(token, expr);
 }
 
-static AstNode *returnStatement(Parser *parser) {
+static ReturnStmtAstNode *returnStatement(Parser *parser) {
   AstNode *returnExpr = NULL;
   Token returnToken = parser->previous;
   if (!check(parser, TOKEN_SEMICOLON)) {
     returnExpr = expression(parser);
   }
   consume(parser, TOKEN_SEMICOLON, "Expect ';' after return value.");
-  AstNode *node = newReturnStmt(returnToken, returnExpr);
+  ReturnStmtAstNode *node = newReturnStmt(returnToken, returnExpr);
   return node;
 }
 
@@ -123,7 +114,7 @@ static AstNode *binary(Parser *parser, bool canAssign) {
       operatorType == TOKEN_GREATER || operatorType == TOKEN_GREATER_EQUAL ||
       operatorType == TOKEN_LESS || operatorType == TOKEN_LESS_EQUAL ||
       operatorType == TOKEN_PERCENT) {
-    return newBinaryExpr(token, NULL, right, operatorType);
+    return AS_AST_NODE(newBinaryExpr(token, NULL, right, operatorType));
   }
   return NULL;
 }
@@ -131,11 +122,11 @@ static AstNode *binary(Parser *parser, bool canAssign) {
 static AstNode *literal(Parser *parser, bool canAssign) {
   switch (parser->previous.type) {
   case TOKEN_FALSE:
-    return newLiteralExpr(parser->previous, FALSE_VAL);
+    return AS_AST_NODE(newLiteralExpr(parser->previous, FALSE_VAL));
   case TOKEN_NIL:
-    return newNilExpr(parser->previous);
+    return AS_AST_NODE(newNilExpr(parser->previous));
   case TOKEN_TRUE:
-    return newLiteralExpr(parser->previous, TRUE_VAL);
+    return AS_AST_NODE(newLiteralExpr(parser->previous, TRUE_VAL));
   default:
     return NULL; // Unreachable.
   }
@@ -145,8 +136,8 @@ static AstNode *expression(Parser *parser) {
   return parsePrecedence(parser, PREC_ASSIGNMENT);
 }
 
-static AstNode *block(Parser *parser) {
-  AstNode *node = newBlockStmt(parser->current);
+static BlockStmtAstNode *block(Parser *parser) {
+  BlockStmtAstNode *node = newBlockStmt(parser->current);
   while (!check(parser, TOKEN_RIGHT_BRACE) && !check(parser, TOKEN_EOF)) {
     linkedList_append(node->stmts, declaration(parser));
   }
@@ -155,16 +146,10 @@ static AstNode *block(Parser *parser) {
   return node;
 }
 
-static AstNode *varDeclaration(Parser *parser, bool isConst) {
+static DefineStmtAstNode *varDeclaration(Parser *parser, bool isConst) {
   Token name = parseVariable(parser, "Expect variable name.");
 
-  AstNode *node = NULL;
-  if (isConst) {
-    // TODO maybe combine into one when creating subtypes for AST nodes
-    node = newConstDefineStmt(name, NULL);
-  } else {
-    node = newDefineStmt(name, NULL);
-  }
+  DefineStmtAstNode *node = newDefineStmt(name, isConst, NULL);
   if (match(parser, TOKEN_EQUAL)) {
     node->expr = expression(parser);
   }
@@ -173,24 +158,24 @@ static AstNode *varDeclaration(Parser *parser, bool isConst) {
   return node;
 }
 
-static AstNode *expressionStatement(Parser *parser) {
-  AstNode *node = newExprStmt(parser->current, expression(parser));
+static ExprStmtAstNode *expressionStatement(Parser *parser) {
+  ExprStmtAstNode *node = newExprStmt(parser->current, expression(parser));
   consume(parser, TOKEN_SEMICOLON, "Expect ';' after expression.");
   return node;
 }
 
-static AstNode *forStatement(Parser *parser) {
+static ForStmtAstNode *forStatement(Parser *parser) {
   Token token = parser->previous;
 
   consume(parser, TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
 
-  AstNode *initNode = NULL;
+  AstNode *preNode = NULL;
   if (match(parser, TOKEN_SEMICOLON)) {
     // No initializer.
   } else if (match(parser, TOKEN_VAR)) {
-    initNode = varDeclaration(parser, false);
+    preNode = AS_AST_NODE(varDeclaration(parser, false));
   } else {
-    initNode = expressionStatement(parser);
+    preNode = AS_AST_NODE(expressionStatement(parser));
   }
 
   AstNode *conditionNode = NULL;
@@ -207,10 +192,10 @@ static AstNode *forStatement(Parser *parser) {
 
   AstNode *bodyNode = statement(parser);
 
-  return newForStmt(token, initNode, conditionNode, postNode, bodyNode);
+  return newForStmt(token, preNode, conditionNode, postNode, bodyNode);
 }
 
-static AstNode *ifStatement(Parser *parser) {
+static IfStmtAstNode *ifStatement(Parser *parser) {
   Token token = parser->previous;
 
   consume(parser, TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
@@ -226,7 +211,7 @@ static AstNode *ifStatement(Parser *parser) {
   return newIfStmt(token, condition, thenBranch, elseBranch);
 }
 
-static AstNode *whileStatement(Parser *parser) {
+static WhileStmtAstNode *whileStatement(Parser *parser) {
   Token token = parser->previous;
 
   consume(parser, TOKEN_LEFT_PAREN, "Expect '(' after 'while'.");
@@ -242,13 +227,13 @@ static AstNode *variable(Parser *parser, bool canAssign) {
   Token token = parser->previous;
 
   if (canAssign && match(parser, TOKEN_EQUAL)) {
-    return newAssignStmt(token, expression(parser));
+    return AS_AST_NODE(newAssignStmt(token, expression(parser)));
   }
-  return newVariableExpr(token);
+  return AS_AST_NODE(newVariableExpr(token));
 }
 
-static AstNode *function(Parser *parser, FunctionType type) {
-  AstNode *node = newFunctionExpr(parser->current, type);
+static FunctionExprAstNode *function(Parser *parser, FunctionType type) {
+  FunctionExprAstNode *node = newFunctionExpr(parser->current, type);
 
   int arity = 0;
   consume(parser, TOKEN_LEFT_PAREN, "Expect '(' after function name.");
@@ -260,24 +245,24 @@ static AstNode *function(Parser *parser, FunctionType type) {
                        "Can't have more than 255 parameters.");
       }
       Token paramName = parseVariable(parser, "Expect parameter name.");
-      linkedList_append(node->params, allocateToken(paramName));
+      node->params[arity - 1] = paramName;
     } while (match(parser, TOKEN_COMMA));
   }
   consume(parser, TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
   consume(parser, TOKEN_LEFT_BRACE, "Expect '{' before function body.");
-  node->expr = block(parser);
+  node->body = block(parser);
   node->arity = arity;
 
   return node;
 }
 
-static AstNode *funDeclaration(Parser *parser) {
+static FunctionStmtAstNode *funDeclaration(Parser *parser) {
   Token name = parseVariable(parser, "Expect function name.");
-  AstNode *body = function(parser, TYPE_FUNCTION);
+  FunctionExprAstNode *body = function(parser, TYPE_FUNCTION);
   return newFunctionStmt(name, body);
 }
 
-static AstNode *method(Parser *parser) {
+static MethodStmtAstNode *method(Parser *parser) {
   Token name = parseVariable(parser, "Expect method name.");
 
   FunctionType type = TYPE_METHOD;
@@ -286,13 +271,13 @@ static AstNode *method(Parser *parser) {
     type = TYPE_INITIALIZER;
   }
 
-  AstNode *body = function(parser, type);
+  FunctionExprAstNode *body = function(parser, type);
   return newMethodStmt(name, body);
 }
 
-static AstNode *classDeclaration(Parser *parser) {
+static ClassStmtAstNode *classDeclaration(Parser *parser) {
   Token name = parseVariable(parser, "Expect class name.");
-  AstNode *node = newClassStmt(name);
+  ClassStmtAstNode *node = newClassStmt(name);
 
   if (match(parser, TOKEN_LESS)) {
     Token superClassName = parseVariable(parser, "Expect superclass name.");
@@ -301,8 +286,8 @@ static AstNode *classDeclaration(Parser *parser) {
 
   consume(parser, TOKEN_LEFT_BRACE, "Expect '{' before class body.");
 
-  AstNode *classBodyNode = newClassBodyStmt(name);
-  node->expr = classBodyNode;
+  ClassBodyStmtAstNode *classBodyNode = newClassBodyStmt(name);
+  node->body = classBodyNode;
   while (!check(parser, TOKEN_RIGHT_BRACE) && !check(parser, TOKEN_EOF)) {
     linkedList_append(classBodyNode->stmts, method(parser));
   }
@@ -314,13 +299,13 @@ static AstNode *classDeclaration(Parser *parser) {
 
 static AstNode *declaration(Parser *parser) {
   if (match(parser, TOKEN_CONST)) {
-    return varDeclaration(parser, true);
+    return AS_AST_NODE(varDeclaration(parser, true));
   } else if (match(parser, TOKEN_VAR)) {
-    return varDeclaration(parser, false);
+    return AS_AST_NODE(varDeclaration(parser, false));
   } else if (match(parser, TOKEN_FUN)) {
-    return funDeclaration(parser);
+    return AS_AST_NODE(funDeclaration(parser));
   } else if (match(parser, TOKEN_CLASS)) {
-    return classDeclaration(parser);
+    return AS_AST_NODE(classDeclaration(parser));
   } else {
     return statement(parser);
   }
@@ -331,19 +316,19 @@ static AstNode *declaration(Parser *parser) {
 
 static AstNode *statement(Parser *parser) {
   if (match(parser, TOKEN_PRINT)) {
-    return printStatement(parser);
+    return AS_AST_NODE(printStatement(parser));
   } else if (match(parser, TOKEN_IF)) {
-    return ifStatement(parser);
+    return AS_AST_NODE(ifStatement(parser));
   } else if (match(parser, TOKEN_FOR)) {
-    return forStatement(parser);
+    return AS_AST_NODE(forStatement(parser));
   } else if (match(parser, TOKEN_LEFT_BRACE)) {
-    return block(parser);
+    return AS_AST_NODE(block(parser));
   } else if (match(parser, TOKEN_RETURN)) {
-    return returnStatement(parser);
+    return AS_AST_NODE(returnStatement(parser));
   } else if (match(parser, TOKEN_WHILE)) {
-    return whileStatement(parser);
+    return AS_AST_NODE(whileStatement(parser));
   } else {
-    return expressionStatement(parser);
+    return AS_AST_NODE(expressionStatement(parser));
   }
   /* } else if (match(TOKEN_SWITCH)) { */
   /*   switchStatement(); */
@@ -359,20 +344,20 @@ static AstNode *unary(Parser *parser, bool canAssign) {
   AstNode *operand = parsePrecedence(parser, PREC_UNARY);
 
   if (operatorType == TOKEN_BANG || operatorType == TOKEN_MINUS) {
-    return newUnaryExpr(token, operand, operatorType);
+    return AS_AST_NODE(newUnaryExpr(token, operand, operatorType));
   }
   return NULL;
 }
 
 static AstNode *number(Parser *parser, bool canAssign) {
   double value = strtod(parser->previous.start, NULL);
-  return newLiteralExpr(parser->previous, NUMBER_VAL(value));
+  return AS_AST_NODE(newLiteralExpr(parser->previous, NUMBER_VAL(value)));
 }
 
 static AstNode *string(Parser *parser, bool canAssign) {
   Token token = parser->previous;
-  return newLiteralExpr(token,
-                        OBJ_VAL(copyString(token.start + 1, token.length - 2)));
+  return AS_AST_NODE(newLiteralExpr(
+      token, OBJ_VAL(copyString(token.start + 1, token.length - 2))));
 }
 
 static AstNode *grouping(Parser *parser, bool canAssign) {
@@ -385,7 +370,29 @@ static void argumentList(Parser *parser, AstNode *parent) {
   uint8_t argCount = 0;
   if (!check(parser, TOKEN_RIGHT_PAREN)) {
     do {
-      linkedList_append(parent->params, expression(parser));
+      // FIXME: code smell
+      switch (AST_NODE_TYPE(parent)) {
+      case EXPR_CALL: {
+        linkedList_append(((CallExprAstNode *)parent)->params,
+                          expression(parser));
+        break;
+      }
+      case EXPR_SUPER_INVOKE: {
+        linkedList_append(((SuperInvocationExprAstNode *)parent)->params,
+                          expression(parser));
+        break;
+      }
+      case EXPR_INVOKE: {
+        linkedList_append(((InvocationExprAstNode *)parent)->params,
+                          expression(parser));
+        break;
+      }
+      default: {
+        error(parser->compiler,
+              "Received unexpected AstNode type in argumentList");
+        return;
+      }
+      }
       if (argCount == 255) {
         errorAt(parser->compiler, &parser->previous,
                 "Can't have more than 255 arguments.");
@@ -397,42 +404,42 @@ static void argumentList(Parser *parser, AstNode *parent) {
 }
 
 static AstNode *call(Parser *parser, bool canAssign) {
-  AstNode *expr = newCallExpr(parser->current);
-  argumentList(parser, expr);
+  CallExprAstNode *expr = newCallExpr(parser->current);
+  argumentList(parser, AS_AST_NODE(expr));
 
-  return expr;
+  return AS_AST_NODE(expr);
 }
 
 static AstNode *and_(Parser *parser, bool canAssign) {
-  AstNode *expr = newAndExpr(parser->current);
+  AndExprAstNode *expr = newAndExpr(parser->current);
   expr->branches.right = parsePrecedence(parser, PREC_AND);
 
-  return expr;
+  return AS_AST_NODE(expr);
 }
 
 static AstNode *or_(Parser *parser, bool canAssign) {
-  AstNode *expr = newOrExpr(parser->current);
+  OrExprAstNode *expr = newOrExpr(parser->current);
   expr->branches.right = parsePrecedence(parser, PREC_OR);
 
-  return expr;
+  return AS_AST_NODE(expr);
 }
 
 static AstNode *dot(Parser *parser, bool canAssign) {
   Token name = parseVariable(parser, "Expect property name after '.'.");
 
   if (canAssign && match(parser, TOKEN_EQUAL)) {
-    return newSetPropertyStmt(name, expression(parser));
+    return AS_AST_NODE(newSetPropertyStmt(name, expression(parser)));
   } else if (match(parser, TOKEN_LEFT_PAREN)) {
-    AstNode *node = newInvocationExpr(name);
-    argumentList(parser, node);
-    return node;
+    InvocationExprAstNode *node = newInvocationExpr(name);
+    argumentList(parser, AS_AST_NODE(node));
+    return AS_AST_NODE(node);
   } else {
-    return newGetPropertyExpr(name);
+    return AS_AST_NODE(newGetPropertyExpr(name));
   }
 }
 
 static AstNode *this_(Parser *parser, bool canAssign) {
-  return newThisExpr(parser->previous);
+  return AS_AST_NODE(newThisExpr(parser->previous));
 }
 
 static AstNode *super_(Parser *parser, bool canAssign) {
@@ -440,36 +447,13 @@ static AstNode *super_(Parser *parser, bool canAssign) {
   Token method = parseVariable(parser, "Expect superclass method name.");
 
   if (match(parser, TOKEN_LEFT_PAREN)) {
-    AstNode *node = newSuperInvocationExpr(method);
-    argumentList(parser, node);
-    return node;
+    SuperInvocationExprAstNode *node = newSuperInvocationExpr(method);
+    argumentList(parser, AS_AST_NODE(node));
+    return AS_AST_NODE(node);
   } else {
-    return newSuperExpr(method);
+    return AS_AST_NODE(newSuperExpr(method));
   }
 }
-
-/* static void super_(bool canAssign) { */
-/*   if (currentClass == NULL) { */
-/*     error("Can't use 'super' outside of a class."); */
-/*   } else if (!currentClass->hasSuperclass) { */
-/*     error("Can't use 'super' in a class with no superclass."); */
-/*   } */
-
-/*   consume(TOKEN_DOT, "Expect '.' after 'super'."); */
-/*   consume(TOKEN_IDENTIFIER, "Expect superclass method name."); */
-/*   uint8_t name = identifierConstant(&parser.previous); */
-
-/*   namedVariable(syntheticToken("this"), false); */
-/*   if (match(TOKEN_LEFT_PAREN)) { */
-/*     uint8_t argCount = argumentList(); */
-/*     namedVariable(syntheticToken("super"), false); */
-/*     emitBytes(OP_SUPER_INVOKE, name); */
-/*     emitByte(argCount); */
-/*   } else { */
-/*     namedVariable(syntheticToken("super"), false); */
-/*     emitBytes(OP_GET_SUPER, name); */
-/*   } */
-/* } */
 
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
@@ -477,7 +461,7 @@ ParseRule rules[] = {
     [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
     /* [TOKEN_LEFT_BRACKET] = {arrayLiteral, leftBracket, PREC_CALL}, */
-    /* [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE}, */
+    [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
     [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
     [TOKEN_DOT] = {NULL, dot, PREC_CALL},
     [TOKEN_MINUS] = {unary, binary, PREC_TERM},
@@ -538,7 +522,44 @@ static AstNode *parsePrecedence(Parser *parser, Precedence precedence) {
       return NULL;
     }
     AstNode *newNode = infixRule(parser, canAssign);
-    newNode->branches.left = left;
+    // FIXME: code smell
+    switch (AST_NODE_TYPE(newNode)) {
+    case EXPR_AND: {
+      ((AndExprAstNode *)newNode)->branches.left = left;
+      break;
+    }
+    case EXPR_CALL: {
+      ((CallExprAstNode *)newNode)->target = left;
+      break;
+    }
+    case EXPR_SUPER_INVOKE: {
+      ((SuperInvocationExprAstNode *)newNode)->target = left;
+      break;
+    }
+    case EXPR_INVOKE: {
+      ((InvocationExprAstNode *)newNode)->target = left;
+      break;
+    }
+    case EXPR_GET_PROPERTY: {
+      ((GetPropertyExprAstNode *)newNode)->target = left;
+      break;
+    }
+    case STMT_SET_PROPERTY: {
+      ((SetPropertyStmtAstNode *)newNode)->target = left;
+      break;
+    }
+    case EXPR_OR: {
+      ((OrExprAstNode *)newNode)->branches.left = left;
+      break;
+    }
+    case EXPR_BINARY: {
+      ((BinaryExprAstNode *)newNode)->branches.left = left;
+      break;
+    }
+    default: {
+      error(parser->compiler, "Received unexpected AstNode type");
+    }
+    }
     left = newNode;
   }
 
@@ -558,10 +579,10 @@ static ParseRule *getRule(TokenType type) { return &rules[type]; }
 AstNode *parse(Parser *parser) {
   advance(parser);
 
-  AstNode *ast = newModuleStmt(parser->previous);
+  ModuleStmtAstNode *ast = newModuleStmt(parser->previous);
   while (!match(parser, TOKEN_EOF)) {
     linkedList_append(ast->stmts, declaration(parser));
   }
 
-  return ast;
+  return AS_AST_NODE(ast);
 }
