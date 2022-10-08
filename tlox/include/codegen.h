@@ -7,7 +7,8 @@
 #include "table.h"
 
 Chunk *allocateChunk();
-void generateChunk(Compiler *compiler, CFG *cfg, Table *labels, ObjFunction *f);
+void generateChunk(Compiler *compiler, WorkUnit *wu, Table *labels,
+                   ObjFunction *f);
 ObjFunction *compileFunction(Compiler *compiler, CFG *cfg, Table *labels);
 ObjFunction *compileMain(Compiler *compiler, CFG *cfg, Node *fs, Table *labels);
 ObjFunction *compileWorkUnit(Compiler *compiler, WorkUnit *wu, Table *labels);

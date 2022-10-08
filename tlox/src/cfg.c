@@ -21,12 +21,15 @@ static BasicBlockId getBasicBlockId() { return currentBasicBlockId++; }
 static OperationId getOperationId() { return currentOperationId++; }
 static LabelId getLabelId() { return currentLabelId++; }
 
-static CFG *newCFG(Compiler *compiler, WorkUnit *wu);
+static void buildCFG(Compiler *compiler, WorkUnit *wu);
 
 static WorkUnit *wu_allocate(ExecutionContext *ec, AstNode *node, Token name,
                              FunctionType functionType) {
   WorkUnit *wu = (WorkUnit *)reallocate(NULL, 0, sizeof(WorkUnit));
-  wu->enclosing = ec;
+  wu->enclosingContext = ec;
+  wu->activeContext = ec_allocate();
+  wu->activeContext->enclosing = wu->enclosingContext;
+  wu->childFunctions = linkedList_allocate();
   wu->node = node;
   wu->cfg = NULL;
   wu->f = NULL;
@@ -70,8 +73,6 @@ static CFG *allocateCFG(Token name) {
   CFG *cfg = (CFG *)reallocate(NULL, 0, sizeof(CFG));
   cfg->start = NULL;
   cfg->name = name;
-  cfg->context = ec_allocate();
-  cfg->childFunctions = linkedList_allocate();
   cfg->arity = 0;
 
   return cfg;
@@ -208,22 +209,22 @@ static void write(BasicBlock *bb, Operation *op) {
 }
 
 static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
-                          Scope *activeScope, CFG *activeCFG);
+                          Scope *activeScope, WorkUnit *activeWorkUnit);
 
 static int walkParams(Compiler *compiler, BasicBlock *bb, AstNode *node,
-                      CFG *activeCFG, const LinkedList *params) {
+                      WorkUnit *activeWorkUnit, const LinkedList *params) {
   int arity = 0;
   Node *paramNode = params->head;
   while (paramNode != NULL) {
     arity++;
-    walkAst(compiler, bb, paramNode->data, node->scope, activeCFG);
+    walkAst(compiler, bb, paramNode->data, node->scope, activeWorkUnit);
     paramNode = paramNode->next;
   }
   return arity;
 }
 
 static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
-                          Scope *activeScope, CFG *activeCFG) {
+                          Scope *activeScope, WorkUnit *activeWorkUnit) {
   if (node == NULL) {
     return NULL;
   }
@@ -247,7 +248,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   case EXPR_UNARY: {
     UnaryExprAstNode *expr = AS_UNARY_EXPR(node);
     Operation *right =
-        walkAst(compiler, bb, expr->right, activeScope, activeCFG);
+        walkAst(compiler, bb, expr->right, activeScope, activeWorkUnit);
     Operand *value = newRegisterOperand(right->destination);
 
     op = newOperation(&node->token, tokenToUnaryOp(expr->op), value, NULL);
@@ -258,15 +259,15 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     BinaryExprAstNode *expr = AS_BINARY_EXPR(node);
 
     Operation *left =
-        walkAst(compiler, bb, expr->branches.left, activeScope, activeCFG);
+        walkAst(compiler, bb, expr->branches.left, activeScope, activeWorkUnit);
     if (left == NULL) {
       errorAt(compiler, &node->token,
               "Failed to build left branch of binary expression.");
       break;
     }
 
-    Operation *right =
-        walkAst(compiler, bb, expr->branches.right, activeScope, activeCFG);
+    Operation *right = walkAst(compiler, bb, expr->branches.right, activeScope,
+                               activeWorkUnit);
     if (right == NULL) {
       errorAt(compiler, &node->token,
               "Failed to build right branch of binary expression.");
@@ -285,7 +286,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     LabelId trueLabelId = getLabelId();
 
     Operation *left =
-        walkAst(compiler, bb, expr->branches.left, activeScope, activeCFG);
+        walkAst(compiler, bb, expr->branches.left, activeScope, activeWorkUnit);
 
     op = newOperation(&node->token, IR_COND,
                       newRegisterOperand(left->destination),
@@ -295,7 +296,8 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     op = newLabelOperation(&node->token, trueLabelId, IR_LABEL);
     write(bb, op);
 
-    op = walkAst(compiler, bb, expr->branches.right, activeScope, activeCFG);
+    op = walkAst(compiler, bb, expr->branches.right, activeScope,
+                 activeWorkUnit);
     write(bb, op);
 
     op = newLabelOperation(&node->token, afterLabelId, IR_LABEL);
@@ -309,7 +311,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     LabelId elseLabelId = getLabelId();
 
     Operation *left =
-        walkAst(compiler, bb, expr->branches.left, activeScope, activeCFG);
+        walkAst(compiler, bb, expr->branches.left, activeScope, activeWorkUnit);
 
     op = newOperation(&node->token, IR_COND_NO_POP,
                       newRegisterOperand(left->destination),
@@ -326,8 +328,8 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     op = newOperation(&node->token, IR_POP, NULL, NULL);
     write(bb, op);
 
-    Operation *right =
-        walkAst(compiler, bb, expr->branches.right, activeScope, activeCFG);
+    Operation *right = walkAst(compiler, bb, expr->branches.right, activeScope,
+                               activeWorkUnit);
 
     op = newLabelOperation(&node->token, afterLabelId, IR_LABEL);
     write(bb, op);
@@ -358,7 +360,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   case STMT_PRINT: {
     PrintStmtAstNode *stmt = AS_PRINT_STMT(node);
 
-    op = walkAst(compiler, bb, stmt->expr, activeScope, activeCFG);
+    op = walkAst(compiler, bb, stmt->expr, activeScope, activeWorkUnit);
     Operand *value = newRegisterOperand(op->destination);
 
     op = newOperation(&node->token, IR_PRINT, value, NULL);
@@ -376,14 +378,14 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     write(bb, op);
 
     Operation *expr =
-        walkAst(compiler, bb, stmt->condition, activeScope, activeCFG);
+        walkAst(compiler, bb, stmt->condition, activeScope, activeWorkUnit);
 
     op = newOperation(
         &node->token, IR_COND, newRegisterOperand(expr->destination),
         newLabelOperand(elseBranchPresent ? elseLabelId : afterLabelId));
     write(bb, op);
 
-    walkAst(compiler, bb, stmt->branches.then, activeScope, activeCFG);
+    walkAst(compiler, bb, stmt->branches.then, activeScope, activeWorkUnit);
 
     op = newGotoOperation(&node->token, skipLabelId);
     write(bb, op);
@@ -396,7 +398,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
       op = newOperation(&node->token, IR_POP, NULL, NULL);
       write(bb, op);
 
-      walkAst(compiler, bb, stmt->branches.elseB, activeScope, activeCFG);
+      walkAst(compiler, bb, stmt->branches.elseB, activeScope, activeWorkUnit);
     }
 
     op = newLabelOperation(&node->token, afterLabelId, IR_LABEL);
@@ -429,7 +431,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     write(bb, op);
 
     Operation *expr =
-        walkAst(compiler, bb, stmt->condition, activeScope, activeCFG);
+        walkAst(compiler, bb, stmt->condition, activeScope, activeWorkUnit);
 
     op = newOperation(&node->token, IR_COND,
                       newRegisterOperand(expr->destination),
@@ -442,7 +444,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     op = newOperation(&node->token, IR_BEGIN_SCOPE, NULL, NULL);
     write(bb, op);
 
-    walkAst(compiler, bb, stmt->branches.then, activeScope, activeCFG);
+    walkAst(compiler, bb, stmt->branches.then, activeScope, activeWorkUnit);
 
     op = newOperation(&node->token, IR_END_SCOPE, NULL, NULL);
     write(bb, op);
@@ -474,15 +476,15 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     write(bb, op);
 
     if (stmt->branches.pre != NULL) {
-      walkAst(compiler, bb, stmt->branches.pre, node->scope, activeCFG);
+      walkAst(compiler, bb, stmt->branches.pre, node->scope, activeWorkUnit);
     }
 
     op = newLabelOperation(&node->token, condLabelId, IR_LABEL);
     write(bb, op);
 
     if (stmt->branches.cond != NULL) {
-      Operation *condExpr =
-          walkAst(compiler, bb, stmt->branches.cond, node->scope, activeCFG);
+      Operation *condExpr = walkAst(compiler, bb, stmt->branches.cond,
+                                    node->scope, activeWorkUnit);
       op = newOperation(&node->token, IR_COND,
                         newRegisterOperand(condExpr->destination),
                         newLabelOperand(afterLabelId));
@@ -496,7 +498,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
       op = newLabelOperation(&node->token, postLabelId, IR_LABEL);
       write(bb, op);
 
-      walkAst(compiler, bb, stmt->branches.post, node->scope, activeCFG);
+      walkAst(compiler, bb, stmt->branches.post, node->scope, activeWorkUnit);
       // FIXME: don't like having POP in IR
       op = newOperation(&node->token, IR_POP, NULL, NULL);
       write(bb, op);
@@ -512,7 +514,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     op = newLabelOperation(&node->token, bodyLabelId, IR_LABEL);
     write(bb, op);
 
-    walkAst(compiler, bb, stmt->branches.body, node->scope, activeCFG);
+    walkAst(compiler, bb, stmt->branches.body, node->scope, activeWorkUnit);
 
     op = newOperation(&node->token, IR_END_SCOPE, NULL, NULL);
     write(bb, op);
@@ -539,7 +541,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     if (stmt->expr == NULL) {
       op = newOperation(&node->token, IR_NIL, NULL, NULL);
     } else {
-      op = walkAst(compiler, bb, stmt->expr, activeScope, activeCFG);
+      op = walkAst(compiler, bb, stmt->expr, activeScope, activeWorkUnit);
     }
     write(bb, op);
 
@@ -560,7 +562,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   }
   case STMT_ASSIGN: {
     AssignStmtAstNode *stmt = AS_ASSIGN_STMT(node);
-    op = walkAst(compiler, bb, stmt->expr, activeScope, activeCFG);
+    op = walkAst(compiler, bb, stmt->expr, activeScope, activeWorkUnit);
 
     Symbol *symbol = NULL;
     if (!scope_search(activeScope, node->token.start, node->token.length,
@@ -582,7 +584,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     Node *stmtNode = (Node *)stmt->stmts->head;
 
     while (stmtNode != NULL) {
-      walkAst(compiler, bb, stmtNode->data, activeScope, activeCFG);
+      walkAst(compiler, bb, stmtNode->data, activeScope, activeWorkUnit);
       stmtNode = stmtNode->next;
     }
     break;
@@ -595,7 +597,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     Node *blockNode = (Node *)stmt->stmts->head;
 
     while (blockNode != NULL) {
-      walkAst(compiler, bb, blockNode->data, node->scope, activeCFG);
+      walkAst(compiler, bb, blockNode->data, node->scope, activeWorkUnit);
       blockNode = blockNode->next;
     }
 
@@ -609,10 +611,10 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     AS_AST_NODE(stmt->expr)->token = node->token;
 
     WorkUnit *wu =
-        wu_allocate(activeCFG->context, AS_AST_NODE(stmt->expr), node->token,
-                    AS_FUNCTION_EXPR(stmt->expr)->functionType);
-    newCFG(compiler, wu);
-    linkedList_append(activeCFG->childFunctions, wu);
+        wu_allocate(activeWorkUnit->activeContext, AS_AST_NODE(stmt->expr),
+                    node->token, AS_FUNCTION_EXPR(stmt->expr)->functionType);
+    buildCFG(compiler, wu);
+    linkedList_append(activeWorkUnit->childFunctions, wu);
 
     Operand *pointer = newLiteralOperand(POINTER_VAL(wu));
     op = newOperation(&node->token, IR_FUNCTION, pointer, NULL);
@@ -634,7 +636,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
                         pointer);
       write(bb, op);
     }
-    activeCFG->arity = expr->arity; // FIXME: used but confusing
+    activeWorkUnit->cfg->arity = expr->arity; // FIXME: used but confusing
 
     op = newOperation(&node->token, IR_BEGIN_SCOPE, NULL, NULL);
     write(bb, op);
@@ -644,7 +646,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
 
     while (blockNode != NULL) {
       walkAst(compiler, bb, blockNode->data, AS_AST_NODE(expr->body)->scope,
-              activeCFG);
+              activeWorkUnit);
       blockNode = blockNode->next;
     }
     break;
@@ -661,7 +663,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
       expr = newOperation(&node->token, IR_NIL, NULL, NULL);
       write(bb, expr);
     } else {
-      expr = walkAst(compiler, bb, stmt->expr, activeScope, activeCFG);
+      expr = walkAst(compiler, bb, stmt->expr, activeScope, activeWorkUnit);
     }
     op = newOperation(&node->token, IR_RETURN,
                       newRegisterOperand(expr->destination), NULL);
@@ -671,7 +673,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   case STMT_EXPR: {
     ExprStmtAstNode *stmt = AS_EXPR_STMT(node);
 
-    walkAst(compiler, bb, stmt->expr, activeScope, activeCFG);
+    walkAst(compiler, bb, stmt->expr, activeScope, activeWorkUnit);
 
     op = newOperation(&node->token, IR_STMT_EXPR, NULL, NULL);
     write(bb, op);
@@ -679,7 +681,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   }
   case EXPR_GET_PROPERTY: {
     walkAst(compiler, bb, AS_GET_PROPERTY_EXPR(node)->target, activeScope,
-            activeCFG);
+            activeWorkUnit);
 
     op = newOperation(&node->token, IR_GET_PROPERTY,
                       newTokenOperand(node->token), NULL);
@@ -689,8 +691,8 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   case STMT_SET_PROPERTY: {
     SetPropertyStmtAstNode *stmt = AS_SET_PROPERTY_STMT(node);
 
-    walkAst(compiler, bb, stmt->target, activeScope, activeCFG);
-    walkAst(compiler, bb, stmt->expr, activeScope, activeCFG);
+    walkAst(compiler, bb, stmt->target, activeScope, activeWorkUnit);
+    walkAst(compiler, bb, stmt->expr, activeScope, activeWorkUnit);
 
     op = newOperation(&node->token, IR_SET_PROPERTY,
                       newTokenOperand(node->token), NULL);
@@ -699,9 +701,9 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   }
   case EXPR_CALL: {
     CallExprAstNode *expr = AS_CALL_EXPR(node);
-    walkAst(compiler, bb, expr->target, node->scope, activeCFG);
+    walkAst(compiler, bb, expr->target, node->scope, activeWorkUnit);
 
-    int arity = walkParams(compiler, bb, node, activeCFG, expr->params);
+    int arity = walkParams(compiler, bb, node, activeWorkUnit, expr->params);
     Operand *arityOperand = newLiteralOperand(NUMBER_VAL(arity));
 
     op = newOperation(&node->token, IR_CALL, arityOperand, NULL);
@@ -710,9 +712,9 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
   }
   case EXPR_INVOKE: {
     InvocationExprAstNode *expr = AS_INVOCATION_EXPR(node);
-    walkAst(compiler, bb, expr->target, node->scope, activeCFG);
+    walkAst(compiler, bb, expr->target, node->scope, activeWorkUnit);
 
-    int arity = walkParams(compiler, bb, node, activeCFG, expr->params);
+    int arity = walkParams(compiler, bb, node, activeWorkUnit, expr->params);
     Operand *arityOperand = newLiteralOperand(NUMBER_VAL(arity));
 
     op = newOperation(&node->token, IR_INVOKE, newTokenOperand(node->token),
@@ -726,9 +728,9 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
                       newTokenOperand(syntheticToken("this")), NULL);
     write(bb, op);
 
-    walkAst(compiler, bb, expr->target, node->scope, activeCFG);
+    walkAst(compiler, bb, expr->target, node->scope, activeWorkUnit);
 
-    int arity = walkParams(compiler, bb, node, activeCFG, expr->params);
+    int arity = walkParams(compiler, bb, node, activeWorkUnit, expr->params);
     Operand *arityOperand = newLiteralOperand(NUMBER_VAL(arity));
 
     op = newOperation(&node->token, IR_SUPER_INVOKE,
@@ -743,7 +745,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     op = newOperation(&node->token, IR_GET_LOCAL, newTokenOperand(this), NULL);
     write(bb, op);
 
-    walkAst(compiler, bb, expr->target, node->scope, activeCFG);
+    walkAst(compiler, bb, expr->target, node->scope, activeWorkUnit);
 
     op = newOperation(&node->token, IR_SUPER, newTokenOperand(node->token),
                       NULL);
@@ -754,10 +756,11 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     ClassStmtAstNode *stmt = AS_CLASS_STMT(node);
     // FIXME: bit of a hack to get the name working
     AS_AST_NODE(stmt->body)->token = node->token;
-    WorkUnit *wu = wu_allocate(activeCFG->context, AS_AST_NODE(stmt->body),
-                               node->token, TYPE_CLASS);
-    newCFG(compiler, wu);
-    linkedList_append(activeCFG->childFunctions, wu);
+    WorkUnit *wu =
+        wu_allocate(activeWorkUnit->activeContext, AS_AST_NODE(stmt->body),
+                    node->token, TYPE_CLASS);
+    buildCFG(compiler, wu);
+    linkedList_append(activeWorkUnit->childFunctions, wu);
 
     Operand *pointer = newLiteralOperand(POINTER_VAL(wu));
     if (OPTIONAL_HAS_VALUE(stmt->superclass)) {
@@ -774,7 +777,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     ClassBodyStmtAstNode *stmt = AS_CLASS_BODY_STMT(node);
     Node *methodNode = (Node *)stmt->stmts->head;
     while (methodNode != NULL) {
-      walkAst(compiler, bb, methodNode->data, node->scope, activeCFG);
+      walkAst(compiler, bb, methodNode->data, node->scope, activeWorkUnit);
       methodNode = methodNode->next;
     }
     break;
@@ -785,11 +788,13 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     // FIXME: bit of a hack to get the name working
     AS_AST_NODE(stmt->body)->token = node->token;
 
+    // TODO: is there a cleaner way to update CFG->childF and context?
+    // to avoid passing activeCFG around
     WorkUnit *wu =
-        wu_allocate(activeCFG->context, AS_AST_NODE(stmt->body), node->token,
-                    AS_FUNCTION_EXPR(stmt->body)->functionType);
-    newCFG(compiler, wu);
-    linkedList_append(activeCFG->childFunctions, wu);
+        wu_allocate(activeWorkUnit->activeContext, AS_AST_NODE(stmt->body),
+                    node->token, AS_FUNCTION_EXPR(stmt->body)->functionType);
+    buildCFG(compiler, wu);
+    linkedList_append(activeWorkUnit->childFunctions, wu);
 
     Operand *pointer = newLiteralOperand(POINTER_VAL(wu));
     op = newOperation(&node->token, IR_METHOD, pointer, NULL);
@@ -911,6 +916,7 @@ void constructCFG(CFG *cfg, BasicBlock *irList) {
   freeTable(&labelBasicBlockMapping);
 }
 
+// FIXME: tokens
 char *operandString(Operand *operand) {
   if (operand == NULL) {
     return "";
@@ -1116,35 +1122,29 @@ void printCFG(CFG *cfg) {
   }
 }
 
-void printWorkUnits(WorkUnit *root) {
-  Node *child = root->cfg->childFunctions->head;
+void printWorkUnits(WorkUnit *wu) {
+  Node *child = wu->childFunctions->head;
   while (child != NULL) {
-    WorkUnit *wu = child->data;
-    printWorkUnits(wu);
+    printWorkUnits(child->data);
     child = child->next;
   }
-  printCFG(root->cfg);
+  printCFG(wu->cfg);
 }
 
-static CFG *newCFG(Compiler *compiler, WorkUnit *wu) {
+static void buildCFG(Compiler *compiler, WorkUnit *wu) {
   BasicBlock *irList = newBasicBlock(wu->node);
 
-  CFG *cfg = allocateCFG(wu->node->token);
-  cfg->context->enclosing = wu->enclosing;
+  wu->cfg = allocateCFG(wu->node->token);
   // generate flat IR list by walking AST
-  walkAst(compiler, irList, wu->node, wu->node->scope, cfg);
+  walkAst(compiler, irList, wu->node, wu->node->scope, wu);
   // split IR list into CFG
-  constructCFG(cfg, irList);
-
-  wu->cfg = cfg; // temp location
-
-  return cfg;
+  constructCFG(wu->cfg, irList);
 }
 
 WorkUnit *createMainWorkUnit(Compiler *compiler, AstNode *root) {
   WorkUnit *main_wu =
       wu_allocate(NULL, root, syntheticToken("script"), TYPE_SCRIPT);
-  main_wu->cfg = newCFG(compiler, main_wu);
+  buildCFG(compiler, main_wu);
 
   return main_wu;
 }

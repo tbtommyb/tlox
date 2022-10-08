@@ -7,7 +7,7 @@ static void generateBasicBlockCode(Compiler *compiler, ObjFunction *f,
                                    BasicBlock *bb, Table *labels,
                                    ExecutionContext *context);
 
-static void generateClass(Compiler *compiler, CFG *cfg, Table *labels,
+static void generateClass(Compiler *compiler, WorkUnit *wu, Table *labels,
                           ObjFunction *f, Operation *op);
 
 static void emitByte(Chunk *chunk, uint8_t byte, int lineno) {
@@ -405,7 +405,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
       }
     }
 
-    generateClass(compiler, wu->cfg, labels, f, op);
+    generateClass(compiler, wu, labels, f, op);
 
     break;
   }
@@ -417,15 +417,16 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
 
     // Test fix hack
     // Need to rethink where to store upvalues
-    childF->upvalueCount = wu->cfg->context->upvalueCount;
+    childF->upvalueCount = wu->activeContext->upvalueCount;
     childF->arity = wu->cfg->arity;
     int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
 
     emitBytes(&f->chunk, OP_CLOSURE, position, op->token->line);
-    for (int i = 0; i < wu->cfg->context->upvalueCount; i++) {
-      emitByte(&f->chunk, wu->cfg->context->upvalues[i].isLocal ? 1 : 0,
+    for (int i = 0; i < wu->activeContext->upvalueCount; i++) {
+      emitByte(&f->chunk, wu->activeContext->upvalues[i].isLocal ? 1 : 0,
                op->token->line);
-      emitByte(&f->chunk, wu->cfg->context->upvalues[i].index, op->token->line);
+      emitByte(&f->chunk, wu->activeContext->upvalues[i].index,
+               op->token->line);
     }
     int namePosition =
         identifierConstant(compiler, &f->chunk, OBJ_VAL(childF->name));
@@ -447,15 +448,16 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
 
     // Test fix hack
     // Need to rethink where to store upvalues
-    childF->upvalueCount = wu->cfg->context->upvalueCount;
+    childF->upvalueCount = wu->activeContext->upvalueCount;
     childF->arity = wu->cfg->arity;
     int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
 
     emitBytes(&f->chunk, OP_CLOSURE, position, op->token->line);
-    for (int i = 0; i < wu->cfg->context->upvalueCount; i++) {
-      emitByte(&f->chunk, wu->cfg->context->upvalues[i].isLocal ? 1 : 0,
+    for (int i = 0; i < wu->activeContext->upvalueCount; i++) {
+      emitByte(&f->chunk, wu->activeContext->upvalues[i].isLocal ? 1 : 0,
                op->token->line);
-      emitByte(&f->chunk, wu->cfg->context->upvalues[i].index, op->token->line);
+      emitByte(&f->chunk, wu->activeContext->upvalues[i].index,
+               op->token->line);
     }
 
     // Fixes issue when using scopes at top level. Do we need both checks here?
@@ -620,9 +622,9 @@ static void rewriteLabels(Chunk *chunk, Table *labels) {
   }
 }
 
-void generateClass(Compiler *compiler, CFG *cfg, Table *labels, ObjFunction *f,
-                   Operation *op) {
-  ExecutionContext *context = cfg->context;
+static void generateClass(Compiler *compiler, WorkUnit *wu, Table *labels,
+                          ObjFunction *f, Operation *op) {
+  ExecutionContext *context = wu->activeContext;
 
   Local *local = &context->locals[context->localCount++];
   local->name.start = "this";
@@ -637,10 +639,10 @@ void generateClass(Compiler *compiler, CFG *cfg, Table *labels, ObjFunction *f,
     local->isCaptured = false;
   }
 
-  LinkedList *postOrdered = postOrderTraverseBasicBlock(cfg);
+  LinkedList *postOrdered = postOrderTraverseBasicBlock(wu->cfg);
   Node *tail = postOrdered->tail;
   while (tail != NULL) {
-    generateBasicBlockCode(compiler, f, tail->data, labels, cfg->context);
+    generateBasicBlockCode(compiler, f, tail->data, labels, wu->activeContext);
     tail = tail->prev;
   }
   emitByte(&f->chunk, OP_POP, op->token->line);
@@ -656,12 +658,12 @@ void generateClass(Compiler *compiler, CFG *cfg, Table *labels, ObjFunction *f,
 }
 
 // FIXME: rename
-void generateChunk(Compiler *compiler, CFG *cfg, Table *labels,
+void generateChunk(Compiler *compiler, WorkUnit *wu, Table *labels,
                    ObjFunction *f) {
-  LinkedList *postOrdered = postOrderTraverseBasicBlock(cfg);
+  LinkedList *postOrdered = postOrderTraverseBasicBlock(wu->cfg);
   Node *tail = postOrdered->tail;
   while (tail != NULL) {
-    generateBasicBlockCode(compiler, f, tail->data, labels, cfg->context);
+    generateBasicBlockCode(compiler, f, tail->data, labels, wu->activeContext);
     tail = tail->prev;
   }
 
@@ -673,7 +675,7 @@ ObjFunction *compileWorkUnit(Compiler *compiler, WorkUnit *wu, Table *labels) {
   f->name = copyString(wu->name.start, wu->name.length);
   wu->f = f;
 
-  Local *local = &wu->cfg->context->locals[wu->cfg->context->localCount++];
+  Local *local = &wu->activeContext->locals[wu->activeContext->localCount++];
   // fixme: should be some kind of function here
   if (wu->functionType != TYPE_FUNCTION) {
     local->name.start = "this";
@@ -683,7 +685,7 @@ ObjFunction *compileWorkUnit(Compiler *compiler, WorkUnit *wu, Table *labels) {
     local->name.length = 0;
   }
 
-  generateChunk(compiler, wu->cfg, labels, f);
+  generateChunk(compiler, wu, labels, f);
   // FIXME: lineno is wrong
   emitReturn(wu->functionType, &f->chunk, wu->name.line);
 

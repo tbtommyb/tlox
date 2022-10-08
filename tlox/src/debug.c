@@ -178,7 +178,7 @@ void disassembleChunk(Chunk *chunk, const char *name) {
 }
 
 void disassembleWorkUnits(WorkUnit *root) {
-  Node *child = root->cfg->childFunctions->head;
+  Node *child = root->childFunctions->head;
   while (child != NULL) {
     WorkUnit *wu = child->data;
     disassembleWorkUnits(wu);

@@ -107,13 +107,13 @@ typedef struct BasicBlock {
 typedef struct CFG {
   BasicBlock *start;
   Token name;
-  ExecutionContext *context;
-  LinkedList *childFunctions; // move to wu
-  int arity;                  // temp location
+  int arity; // temp location
 } CFG;
 
 typedef struct WorkUnit {
-  ExecutionContext *enclosing;
+  ExecutionContext *enclosingContext;
+  ExecutionContext *activeContext;
+  LinkedList *childFunctions; // move to wu
   AstNode *node;
   Token name;
   CFG *cfg;
