@@ -205,15 +205,23 @@ initializer.");
     }
     ScopeType scopeType =
         isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
-    int arity = stmt->expr->arity;
     // FIXME: need better symbol creation.
-    Symbol symbol = newSymbol(node->token, scopeType, false, true, true, arity);
+    Symbol symbol = newSymbol(node->token, scopeType, false, true, true, 0);
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);
 
-    // FIXME: hack
-    AS_AST_NODE(stmt->expr)->token = node->token;
     analyse(AS_AST_NODE(stmt->expr), compiler);
+
+    Symbol *functionSymbol = NULL;
+    // TODO: scope_current_search here?
+    bool found = scope_current_search(compiler->currentScope, node->token.start,
+                                      node->token.length, &functionSymbol);
+    if (!found) {
+      errorAt(compiler, &node->token, "Function definition is not in scope.");
+      break;
+    }
+    functionSymbol->arity = stmt->expr->arity;
+
     break;
   }
   case EXPR_FUNCTION: {
@@ -233,20 +241,8 @@ initializer.");
 
     endScope(compiler);
 
-    if (expr->functionType == TYPE_FUNCTION) {
-      // Create empty symbol on heap
-      Symbol *functionSymbol = NULL;
-      bool found = st_get(compiler->currentScope->st, node->token.start,
-                          node->token.length, &functionSymbol);
-      if (!found) {
-        errorAt(compiler, &node->token, "Function definition is not in scope.");
-        break;
-      }
-      functionSymbol->arity = arity;
-      /* st_set(compiler->currentScope->st, node->token.start,
-       * node->token.length, */
-      /*        functionSymbol); */
-    }
+    expr->arity = arity;
+
     break;
   }
   case EXPR_CALL: {
@@ -316,7 +312,6 @@ initializer.");
       scope_set(compiler->currentScope, super.start, super.length, symbol);
     }
 
-    /* stmt->body->superclass = stmt->superclass; */
     analyse(AS_AST_NODE(stmt->body), compiler);
 
     if (OPTIONAL_HAS_VALUE(stmt->superclass)) {
@@ -345,22 +340,28 @@ initializer.");
       break;
     }
 
-    int arity = stmt->body->arity;
-    Symbol symbol =
-        newSymbol(node->token, SCOPE_GLOBAL, false, true, true, arity);
+    ScopeType scopeType =
+        isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
+    Symbol symbol = newSymbol(node->token, scopeType, false, true, true, 0);
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);
 
-    // FIXME: hack
-    AS_AST_NODE(stmt->body)->token = node->token;
     analyse(AS_AST_NODE(stmt->body), compiler);
+
+    Symbol *methodSymbol = NULL;
+    bool found = scope_current_search(compiler->currentScope, node->token.start,
+                                      node->token.length, &methodSymbol);
+    if (!found) {
+      errorAt(compiler, &node->token, "Function definition is not in scope.");
+      break;
+    }
+    methodSymbol->arity = stmt->body->arity;
     break;
   }
   case STMT_SET_PROPERTY: {
     SetPropertyStmtAstNode *stmt = AS_SET_PROPERTY_STMT(node);
     ScopeType scopeType =
         isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
-    // FIXME: what to do with arity here?
     Symbol symbol = newSymbol(node->token, scopeType, false, false, true, 0);
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);

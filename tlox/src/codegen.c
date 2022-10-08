@@ -414,11 +414,12 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     Value wuPtr = op->first->val.literal;
     WorkUnit *wu = AS_POINTER(wuPtr);
     ObjFunction *childF = compileWorkUnit(compiler, wu, labels);
+    int arity = AS_NUMBER(op->second->val.literal);
 
     // Test fix hack
     // Need to rethink where to store upvalues
     childF->upvalueCount = wu->activeContext->upvalueCount;
-    childF->arity = wu->cfg->arity;
+    childF->arity = arity;
     int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
 
     emitBytes(&f->chunk, OP_CLOSURE, position, op->token->line);
@@ -436,6 +437,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
   case IR_FUNCTION: {
     Value wuPtr = op->first->val.literal;
     WorkUnit *wu = AS_POINTER(wuPtr);
+    int arity = AS_NUMBER(op->second->val.literal);
 
     if (!(context->enclosing == NULL && context->scopeDepth == 0)) {
       Local *local = &context->locals[context->localCount++];
@@ -449,7 +451,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     // Test fix hack
     // Need to rethink where to store upvalues
     childF->upvalueCount = wu->activeContext->upvalueCount;
-    childF->arity = wu->cfg->arity;
+    childF->arity = arity;
     int position = makeConstant(compiler, &f->chunk, OBJ_VAL(childF));
 
     emitBytes(&f->chunk, OP_CLOSURE, position, op->token->line);

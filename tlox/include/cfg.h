@@ -107,7 +107,6 @@ typedef struct BasicBlock {
 typedef struct CFG {
   BasicBlock *start;
   Token name;
-  int arity; // temp location
 } CFG;
 
 typedef struct WorkUnit {
