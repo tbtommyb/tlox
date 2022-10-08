@@ -133,6 +133,7 @@ ObjArrayInstance *newArrayInstance(ObjClass *klass);
 uint32_t hashString(const char *key, int length);
 
 void printObject(FILE *stream, Value value);
+char *writeObject(Value value);
 
 static inline bool isObjType(Value value, ObjType type) {
   return IS_OBJ(value) && AS_OBJ(value)->type == type;

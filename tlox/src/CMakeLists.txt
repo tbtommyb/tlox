@@ -16,6 +16,7 @@ set(LIB_SOURCES
   scope.c
   symbol_table.c
   table.c
+  util.c
   value.c
   vm.c
 )

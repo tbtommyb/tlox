@@ -8,4 +8,7 @@
   }
 #define OPTIONAL_HAS_VALUE(opt) ((opt).present)
 #define OPTIONAL_VALUE(opt) ((opt).value)
+
+char *writeString(char *fmt, ...);
+
 #endif // UTIL_H_

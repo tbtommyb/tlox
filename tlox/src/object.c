@@ -4,6 +4,7 @@
 #include "memory.h"
 #include "object.h"
 #include "table.h"
+#include "util.h"
 #include "value.h"
 #include "vm.h"
 
@@ -172,6 +173,39 @@ static void printFunction(ObjFunction *function) {
     return;
   }
   printf("<fn %s>", function->name->chars);
+}
+
+static char *writeFunction(ObjFunction *function) {
+  if (function->name == NULL) {
+    return "<script>";
+  }
+  return writeString("<fn %s>", function->name->chars);
+}
+
+char *writeObject(Value value) {
+  switch (OBJ_TYPE(value)) {
+  case OBJ_FUNCTION:
+    return writeFunction(AS_FUNCTION(value));
+  case OBJ_NATIVE:
+    return "<native fn>";
+  case OBJ_STRING:
+    return writeString("%s", AS_CSTRING(value));
+  case OBJ_CLOSURE:
+    return writeFunction(AS_CLOSURE(value)->function);
+  case OBJ_CLASS:
+    return writeString("%s", AS_CLASS(value)->name->chars);
+  case OBJ_INSTANCE:
+    return writeString("%s instance", AS_INSTANCE(value)->klass->name->chars);
+  case OBJ_BOUND_METHOD:
+    return writeFunction(AS_BOUND_METHOD(value)->method->function);
+  case OBJ_BOUND_NATIVE_METHOD:
+    return "<native method>";
+  case OBJ_UPVALUE:
+    return "<upvalue>";
+  case OBJ_ARRAY_INSTANCE:
+    return writeString("array len %d",
+                       AS_ARRAY_INSTANCE(value)->elements.count);
+  }
 }
 
 void printObject(FILE *stream, Value value) {

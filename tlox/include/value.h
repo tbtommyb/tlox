@@ -110,6 +110,7 @@ void initValueArray(ValueArray *array);
 void writeValueArray(ValueArray *array, Value value);
 void freeValueArray(ValueArray *array);
 void printValue(FILE *stream, Value value);
+char *writeValue(Value value);
 uint32_t computeHash(Value value);
 
 #endif

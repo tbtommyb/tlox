@@ -1,8 +1,11 @@
+#include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "memory.h"
 #include "object.h"
+#include "util.h"
 #include "value.h"
 
 bool valuesEqual(Value a, Value b) {
@@ -62,6 +65,31 @@ void freeValueArray(ValueArray *array) {
   initValueArray(array);
 }
 
+char *writeValue(Value value) {
+  switch (value.type) {
+  case VAL_BOOL:
+    return writeString(AS_BOOL(value) ? "true" : "false");
+  case VAL_NIL:
+    return writeString("nil");
+  case VAL_NUMBER:
+    return writeString("%g", AS_NUMBER(value));
+  case VAL_EMPTY:
+    return writeString("<empty>");
+  case VAL_OBJ: {
+    if (IS_STRING(value)) {
+      return writeString("%s", AS_STRING(value)->chars);
+    }
+    return writeObject(value);
+  }
+  case VAL_POINTER:
+    return "";
+    // return writeString("%p", AS_POINTER(value)) Doesn't seem useful in output
+  case VAL_SYMBOL:
+    return writeString("<symbol> %.*s", AS_SYMBOL(value).name.length,
+                       AS_SYMBOL(value).name.start);
+  }
+}
+
 void printValue(FILE *stream, Value value) {
 #ifdef NAN_BOXING
   if (IS_BOOL(value)) {
@@ -74,30 +102,9 @@ void printValue(FILE *stream, Value value) {
     printObject(stream, value);
   }
 #else
-  switch (value.type) {
-  case VAL_BOOL:
-    fprintf(stream, AS_BOOL(value) ? "true" : "false");
-    break;
-  case VAL_NIL:
-    fprintf(stream, "nil");
-    break;
-  case VAL_NUMBER:
-    fprintf(stream, "%g", AS_NUMBER(value));
-    break;
-  case VAL_OBJ:
-    printObject(stream, value);
-    break;
-  case VAL_EMPTY:
-    fprintf(stream, "<empty>");
-    break;
-  case VAL_POINTER:
-    fprintf(stream, "%p", AS_POINTER(value));
-    break;
-  case VAL_SYMBOL:
-    fprintf(stream, "<symbol> %.*s", AS_SYMBOL(value).name.length,
-            AS_SYMBOL(value).name.start);
-    break;
-  }
+  char *output = writeValue(value);
+  fputs(output, stream);
+  free(output);
 #endif
 }
 

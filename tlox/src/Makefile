@@ -593,6 +593,30 @@ table.c.s:
 	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/table.c.s
 .PHONY : table.c.s
 
+util.o: util.c.o
+.PHONY : util.o
+
+# target to build an object file
+util.c.o:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/util.c.o
+.PHONY : util.c.o
+
+util.i: util.c.i
+.PHONY : util.i
+
+# target to preprocess a source file
+util.c.i:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/util.c.i
+.PHONY : util.c.i
+
+util.s: util.c.s
+.PHONY : util.s
+
+# target to generate assembly for a file
+util.c.s:
+	cd /Users/thomasbarrett/coding/crafting-interpreters/tlox && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/cloc.dir/build.make src/CMakeFiles/cloc.dir/util.c.s
+.PHONY : util.c.s
+
 value.o: value.c.o
 .PHONY : value.o
 
@@ -706,6 +730,9 @@ help:
 	@echo "... table.o"
 	@echo "... table.i"
 	@echo "... table.s"
+	@echo "... util.o"
+	@echo "... util.i"
+	@echo "... util.s"
 	@echo "... value.o"
 	@echo "... value.i"
 	@echo "... value.s"
