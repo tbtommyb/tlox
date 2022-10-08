@@ -58,7 +58,8 @@ typedef enum {
   VAL_NUMBER,
   VAL_OBJ,
   VAL_EMPTY,
-  VAL_POINTER
+  VAL_POINTER,
+  VAL_SYMBOL
 } ValueType;
 
 typedef struct {
@@ -68,6 +69,7 @@ typedef struct {
     double number;
     Obj *obj;
     void *ptr;
+    Symbol symbol;
   } as;
 } Value;
 
@@ -77,11 +79,13 @@ typedef struct {
 #define IS_OBJ(value) ((value).type == VAL_OBJ)
 #define IS_EMPTY(value) ((value).type == VAL_EMPTY)
 #define IS_POINTER(value) ((value).type == VAL_POINTER)
+#define IS_SYMBOL(value) ((value).type == VAL_SYMBOL)
 
 #define AS_BOOL(value) ((value).as.boolean)
 #define AS_NUMBER(value) ((value).as.number)
 #define AS_OBJ(value) ((value).as.obj)
 #define AS_POINTER(value) ((value).as.ptr)
+#define AS_SYMBOL(value) ((value).as.symbol)
 
 #define BOOL_VAL(value) ((Value){VAL_BOOL, {.boolean = value}})
 #define TRUE_VAL ((Value){VAL_BOOL, {.boolean = true}})
@@ -91,6 +95,7 @@ typedef struct {
 #define OBJ_VAL(object) ((Value){VAL_OBJ, {.obj = (Obj *)object}})
 #define EMPTY_VAL ((Value){VAL_EMPTY, {.number = 0}})
 #define POINTER_VAL(value) ((Value){VAL_POINTER, {.ptr = value}})
+#define SYMBOL_VAL(value) ((Value){VAL_SYMBOL, {.symbol = value}})
 
 #endif
 

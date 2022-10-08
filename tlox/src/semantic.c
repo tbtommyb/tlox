@@ -61,13 +61,13 @@ void analyse(AstNode *node, Compiler *compiler) {
     break;
   }
   case EXPR_VARIABLE: {
-    Symbol symbol = {0};
+    Symbol *symbol = NULL;
     if (!scope_search(compiler->currentScope, node->token.start,
                       node->token.length, &symbol)) {
       errorAt(compiler, &node->token, "Undefined variable.");
       break;
     }
-    if (!symbol.isDefined) {
+    if (!symbol->isDefined) {
       errorAt(compiler, &node->token,
               "Cannot reference variable in its own initialiser.");
       break;
@@ -75,13 +75,13 @@ void analyse(AstNode *node, Compiler *compiler) {
     break;
   }
   case STMT_ASSIGN: {
-    Symbol symbol = {0};
+    Symbol *symbol = NULL;
     if (!scope_search(compiler->currentScope, node->token.start,
                       node->token.length, &symbol)) {
       errorAt(compiler, &node->token, "Undefined variable.");
       break;
     }
-    if (symbol.isConst) {
+    if (symbol->isConst) {
       errorAt(compiler, &node->token, "Cannot reassign a const variable.");
       break;
     }
@@ -90,10 +90,10 @@ void analyse(AstNode *node, Compiler *compiler) {
   }
   case STMT_DEFINE: {
     DefineStmtAstNode *stmt = AS_DEFINE_STMT(node);
-    Symbol existing = {0};
+    Symbol *existing = NULL;
     if (scope_current_search(compiler->currentScope, node->token.start,
                              node->token.length, &existing)) {
-      if (existing.isConst) {
+      if (existing->isConst) {
         errorAt(compiler, &node->token, "Cannot redefine a const variable.");
         break;
       } else {
@@ -104,14 +104,14 @@ void analyse(AstNode *node, Compiler *compiler) {
     }
     ScopeType scopeType =
         isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
-    Symbol *symbol =
+    Symbol symbol =
         newSymbol(node->token, scopeType, false, stmt->isConst, false, 0);
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);
 
     analyse(stmt->expr, compiler);
 
-    symbol->isDefined = true;
+    symbol.isDefined = true;
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);
     break;
@@ -191,10 +191,10 @@ initializer.");
   }
   case STMT_FUNCTION: {
     FunctionStmtAstNode *stmt = AS_FUNCTION_STMT(node);
-    Symbol existing = {0};
+    Symbol *existing = NULL;
     if (scope_search(compiler->currentScope, node->token.start,
                      node->token.length, &existing)) {
-      if (existing.isConst) {
+      if (existing->isConst) {
         errorAt(compiler, &node->token, "Cannot redefine a const variable.");
         break;
       } else {
@@ -207,8 +207,7 @@ initializer.");
         isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
     int arity = stmt->expr->arity;
     // FIXME: need better symbol creation.
-    Symbol *symbol =
-        newSymbol(node->token, scopeType, false, true, true, arity);
+    Symbol symbol = newSymbol(node->token, scopeType, false, true, true, arity);
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);
 
@@ -224,7 +223,7 @@ initializer.");
     int arity = 0;
     for (; arity < expr->arity;) {
       Token name = expr->params[arity];
-      Symbol *symbol =
+      Symbol symbol =
           newSymbol(name, SCOPE_FUNCTION_PARAM, false, true, true, 0);
       st_set(compiler->currentScope->st, name.start, name.length, symbol);
       arity++;
@@ -236,17 +235,17 @@ initializer.");
 
     if (expr->functionType == TYPE_FUNCTION) {
       // Create empty symbol on heap
-      Symbol *functionSymbol =
-          newSymbol(node->token, SCOPE_GLOBAL, false, false, false, 0);
+      Symbol *functionSymbol = NULL;
       bool found = st_get(compiler->currentScope->st, node->token.start,
-                          node->token.length, functionSymbol);
+                          node->token.length, &functionSymbol);
       if (!found) {
         errorAt(compiler, &node->token, "Function definition is not in scope.");
         break;
       }
       functionSymbol->arity = arity;
-      st_set(compiler->currentScope->st, node->token.start, node->token.length,
-             functionSymbol);
+      /* st_set(compiler->currentScope->st, node->token.start,
+       * node->token.length, */
+      /*        functionSymbol); */
     }
     break;
   }
@@ -292,7 +291,7 @@ initializer.");
   case STMT_CLASS: {
     ClassStmtAstNode *stmt = AS_CLASS_STMT(node);
     if (scope_search(compiler->currentScope, node->token.start,
-                     node->token.length, &(Symbol){0})) {
+                     node->token.length, NULL)) {
       errorAt(compiler, &node->token,
               "Already a variable with this name in this scope.");
     }
@@ -300,7 +299,7 @@ initializer.");
     ScopeType scopeType =
         isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
     // FIXME: need better symbol creation.
-    Symbol *symbol = newSymbol(node->token, scopeType, false, false, true, 0);
+    Symbol symbol = newSymbol(node->token, scopeType, false, false, true, 0);
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);
 
@@ -313,7 +312,7 @@ initializer.");
       }
       node->scope = beginScope(compiler, TYPE_CLASS);
       Token super = {.start = "super", .length = (int)strlen("super")};
-      Symbol *symbol = newSymbol(super, SCOPE_LOCAL, false, false, true, 0);
+      Symbol symbol = newSymbol(super, SCOPE_LOCAL, false, false, true, 0);
       scope_set(compiler->currentScope, super.start, super.length, symbol);
     }
 
@@ -340,14 +339,14 @@ initializer.");
   case STMT_METHOD: {
     MethodStmtAstNode *stmt = AS_METHOD_STMT(node);
     if (scope_current_search(compiler->currentScope, node->token.start,
-                             node->token.length, &(Symbol){0})) {
+                             node->token.length, NULL)) {
       errorAt(compiler, &node->token,
               "Already a method with this name in this scope.");
       break;
     }
 
     int arity = stmt->body->arity;
-    Symbol *symbol =
+    Symbol symbol =
         newSymbol(node->token, SCOPE_GLOBAL, false, true, true, arity);
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);
@@ -362,7 +361,7 @@ initializer.");
     ScopeType scopeType =
         isGlobalScope(compiler->currentScope) ? SCOPE_GLOBAL : SCOPE_LOCAL;
     // FIXME: what to do with arity here?
-    Symbol *symbol = newSymbol(node->token, scopeType, false, false, true, 0);
+    Symbol symbol = newSymbol(node->token, scopeType, false, false, true, 0);
     scope_set(compiler->currentScope, node->token.start, node->token.length,
               symbol);
 

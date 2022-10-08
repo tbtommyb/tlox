@@ -26,6 +26,13 @@ bool valuesEqual(Value a, Value b) {
     return AS_OBJ(a) == AS_OBJ(b);
   case VAL_EMPTY:
     return true;
+  case VAL_SYMBOL: {
+    Symbol symA = AS_SYMBOL(a);
+    Symbol symB = AS_SYMBOL(b);
+    return memcmp(&symA, &symB, sizeof symA);
+  }
+  case VAL_POINTER:
+    return AS_POINTER(a) == AS_POINTER(b);
   default:
     return false; // Unreachable.
   }
@@ -83,6 +90,13 @@ void printValue(FILE *stream, Value value) {
   case VAL_EMPTY:
     fprintf(stream, "<empty>");
     break;
+  case VAL_POINTER:
+    fprintf(stream, "%p", AS_POINTER(value));
+    break;
+  case VAL_SYMBOL:
+    fprintf(stream, "<symbol> %.*s", AS_SYMBOL(value).name.length,
+            AS_SYMBOL(value).name.start);
+    break;
   }
 #endif
 }
@@ -98,21 +112,36 @@ static uint32_t hashDouble(double value) {
   return cast.ints[0] + cast.ints[1];
 }
 
+static uint32_t hashSymbol(Symbol *symbol) {
+  uint32_t hash = 0;
+  unsigned short c;
+  unsigned short *reinterpret_symbol = (unsigned short *)symbol;
+  size_t size_ = sizeof(Symbol);
+  size_t elem_size_ = sizeof(unsigned short);
+  int len = (int)size_ / elem_size_;
+
+  for (int i = 0; i < len; i++) {
+    c = reinterpret_symbol[i];
+    hash += c;
+  }
+  return hash;
+}
+
 uint32_t computeHash(Value value) {
-  if (IS_BOOL(value)) {
+  switch (value.type) {
+  case VAL_BOOL:
     return AS_BOOL(value) ? 3 : 5;
-  }
-  if (IS_NIL(value)) {
+  case VAL_NIL:
     return 7;
-  }
-  if (IS_NUMBER(value)) {
+  case VAL_NUMBER:
     return hashDouble(AS_NUMBER(value));
-  }
-  if (IS_OBJ(value)) {
+  case VAL_OBJ:
     return AS_STRING(value)->hash;
-  }
-  if (IS_EMPTY(value)) {
+  case VAL_EMPTY:
     return 0;
+  case VAL_POINTER:
+    return *(double *)AS_POINTER(value);
+  case VAL_SYMBOL:
+    return hashSymbol(&AS_SYMBOL(value));
   }
-  // TODO: support arrays?
 }

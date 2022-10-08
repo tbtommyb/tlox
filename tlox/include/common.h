@@ -40,4 +40,15 @@ typedef struct {
   bool isLocal;
 } Upvalue;
 
+typedef enum { SCOPE_LOCAL, SCOPE_GLOBAL, SCOPE_FUNCTION_PARAM } ScopeType;
+
+typedef struct Symbol {
+  Token name;
+  bool isCaptured;
+  bool isConst;
+  bool isDefined;
+  ScopeType type;
+  int arity;
+} Symbol;
+
 #endif

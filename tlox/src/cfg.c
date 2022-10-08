@@ -45,6 +45,12 @@ char *valueToString(Value value) {
     }
     break;
   }
+  case VAL_POINTER:
+    snprintf(output, 128, "%p", AS_POINTER(value));
+    break;
+  case VAL_SYMBOL:
+    snprintf(output, 128, "%s", AS_SYMBOL(value).name.start);
+    break;
   }
   return output;
 }
@@ -357,7 +363,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
         OBJ_VAL(copyString(node->token.start, node->token.length));
     Operand *name = newLiteralOperand(nameString);
 
-    Symbol symbol = {0};
+    Symbol *symbol = NULL;
     if (!scope_search(activeScope, node->token.start, node->token.length,
                       &symbol)) {
       errorAt(compiler, &node->token,
@@ -365,22 +371,22 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
       break;
     }
 
-    IROp opcode = symbol.type == SCOPE_GLOBAL ? IR_GET_GLOBAL : IR_GET_LOCAL;
+    IROp opcode = symbol->type == SCOPE_GLOBAL ? IR_GET_GLOBAL : IR_GET_LOCAL;
 
-    op = newOperation(&node->token, opcode, newSymbolOperand(symbol), NULL);
+    op = newOperation(&node->token, opcode, newSymbolOperand(*symbol), NULL);
     bb->curr->next = op;
     bb->curr = op;
     break;
   }
   case EXPR_THIS: {
-    Symbol symbol = {0};
+    Symbol *symbol = NULL;
     if (!scope_search(activeScope, "this", 4, &symbol)) {
       errorAt(compiler, &node->token,
               "Symbol is not defined in current scope.4");
       break;
     }
 
-    op = newOperation(&node->token, IR_GET_LOCAL, newSymbolOperand(symbol),
+    op = newOperation(&node->token, IR_GET_LOCAL, newSymbolOperand(*symbol),
                       NULL);
     bb->curr->next = op;
     bb->curr = op;
@@ -618,7 +624,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
       op = walkAst(compiler, bb, stmt->expr, activeScope, activeCFG);
     }
 
-    Symbol symbol = {0};
+    Symbol *symbol = NULL;
     if (!scope_search(activeScope, node->token.start, node->token.length,
                       &symbol)) {
       errorAt(compiler, &node->token,
@@ -627,11 +633,11 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     }
 
     IROp opcode =
-        symbol.type == SCOPE_GLOBAL ? IR_DEFINE_GLOBAL : IR_DEFINE_LOCAL;
+        symbol->type == SCOPE_GLOBAL ? IR_DEFINE_GLOBAL : IR_DEFINE_LOCAL;
 
     // FIXME: Skipping register here. Need to fix this
     Operand *scopeOperand = newLiteralOperand(POINTER_VAL(activeScope));
-    op = newOperation(&node->token, opcode, newSymbolOperand(symbol),
+    op = newOperation(&node->token, opcode, newSymbolOperand(*symbol),
                       scopeOperand);
     bb->curr->next = op;
     bb->curr = op;
@@ -641,7 +647,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     AssignStmtAstNode *stmt = AS_ASSIGN_STMT(node);
     op = walkAst(compiler, bb, stmt->expr, activeScope, activeCFG);
 
-    Symbol symbol = {0};
+    Symbol *symbol = NULL;
     if (!scope_search(activeScope, node->token.start, node->token.length,
                       &symbol)) {
       errorAt(compiler, &node->token,
@@ -649,9 +655,9 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
       break;
     }
 
-    IROp opcode = symbol.type == SCOPE_GLOBAL ? IR_SET_GLOBAL : IR_SET_LOCAL;
+    IROp opcode = symbol->type == SCOPE_GLOBAL ? IR_SET_GLOBAL : IR_SET_LOCAL;
 
-    op = newOperation(&node->token, opcode, newSymbolOperand(symbol),
+    op = newOperation(&node->token, opcode, newSymbolOperand(*symbol),
                       newRegisterOperand(op->destination));
     bb->curr->next = op;
     bb->curr = op;
@@ -706,15 +712,15 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     FunctionExprAstNode *expr = AS_FUNCTION_EXPR(node);
 
     for (int arity = 0; arity < expr->arity; arity++) {
-      Symbol symbol = {0};
+      Symbol *symbol = NULL;
       Token name = expr->params[arity];
       if (!scope_search(node->scope, name.start, name.length, &symbol)) {
         errorAt(compiler, &name, "Symbol is not defined in current scope.2");
         break;
       }
       Operand *pointer = newLiteralOperand(POINTER_VAL(node->scope));
-      op = newOperation(&node->token, IR_DEFINE_LOCAL, newSymbolOperand(symbol),
-                        pointer);
+      op = newOperation(&node->token, IR_DEFINE_LOCAL,
+                        newSymbolOperand(*symbol), pointer);
       bb->curr->next = op;
       bb->curr = op;
     }

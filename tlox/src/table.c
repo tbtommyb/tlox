@@ -85,6 +85,19 @@ bool tableGet(Table *table, Value key, Value *value) {
   return true;
 }
 
+bool tableGetPointer(Table *table, Value key, Value **value) {
+  if (table->count == 0)
+    return false;
+
+  Entry *entry = findEntry(table->entries, table->capacity, key);
+  if (IS_EMPTY(entry->key)) {
+    return false;
+  }
+
+  *value = &entry->value;
+  return true;
+}
+
 bool tableSet(Table *table, Value key, Value value) {
   if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
     int capacity = GROW_CAPACITY(table->capacity);

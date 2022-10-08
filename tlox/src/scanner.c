@@ -308,6 +308,7 @@ bool identifiersEqual(Token *a, Token *b) {
 
 Token syntheticToken(const char *text) {
   Token token;
+  memset(&token, 0, sizeof(Token));
   token.start = text;
   token.length = (int)strlen(text);
   return token;
