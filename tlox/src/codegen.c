@@ -233,8 +233,8 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     emitByte(&f->chunk, OP_POP, op->token->line);
     break;
   case IR_INVOKE: {
-    Symbol symbol = op->first->val.symbol;
-    Value name = OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
+    Token token = op->first->val.token;
+    Value name = OBJ_VAL(copyString(token.start, token.length));
     uint8_t position = identifierConstant(compiler, &f->chunk, name);
 
     emitBytes(&f->chunk, OP_INVOKE, position, op->token->line);
@@ -242,37 +242,37 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     break;
   }
   case IR_DEFINE_GLOBAL: {
-    Symbol symbol = op->first->val.symbol;
-    Value name = OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
+    Symbol *symbol = op->first->val.symbol;
+    Value name = OBJ_VAL(copyString(symbol->name.start, symbol->name.length));
     uint8_t position = identifierConstant(compiler, &f->chunk, name);
 
     emitBytes(&f->chunk, OP_DEFINE_GLOBAL, position, op->token->line);
     break;
   }
   case IR_DEFINE_LOCAL: {
-    Symbol symbol = op->first->val.symbol;
+    Symbol *symbol = op->first->val.symbol;
     Local *local = &context->locals[context->localCount++];
-    local->name = symbol.name;
+    local->name = symbol->name;
     local->depth = context->scopeDepth;
-    local->isCaptured = symbol.isCaptured;
+    local->isCaptured = symbol->isCaptured;
     break;
   }
   case IR_GET_GLOBAL: {
-    Symbol symbol = op->first->val.symbol;
-    Value name = OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
+    Token token = op->first->val.token;
+    Value name = OBJ_VAL(copyString(token.start, token.length));
     uint8_t position = identifierConstant(compiler, &f->chunk, name);
 
     emitBytes(&f->chunk, OP_GET_GLOBAL, position, op->token->line);
     break;
   }
   case IR_GET_LOCAL: {
-    Symbol symbol = op->first->val.symbol;
+    Token token = op->first->val.token;
 
     OpCode opcode = OP_GET_LOCAL;
-    int position = resolveLocal(context, &symbol.name);
+    int position = resolveLocal(context, &token);
 
     if (position == -1) {
-      position = resolveUpvalue(context, &symbol.name);
+      position = resolveUpvalue(context, &token);
       opcode = OP_GET_UPVALUE;
     }
 
@@ -281,7 +281,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     // global variabl
     // TODO: think of a cleaner solution to this
     if (position == -1) {
-      Value name = OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
+      Value name = OBJ_VAL(copyString(token.start, token.length));
       position = identifierConstant(compiler, &f->chunk, name);
       opcode = OP_GET_GLOBAL;
     }
@@ -291,9 +291,8 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     break;
   }
   case IR_SET_GLOBAL: {
-    Symbol symbol = op->first->val.symbol;
-    Value nameString =
-        OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
+    Token token = op->first->val.token;
+    Value nameString = OBJ_VAL(copyString(token.start, token.length));
     // FIXME: not actually used?
     Register source = op->second->val.source;
     uint8_t position = identifierConstant(compiler, &f->chunk, nameString);
@@ -302,13 +301,13 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     break;
   }
   case IR_SET_LOCAL: {
-    Symbol symbol = op->first->val.symbol;
+    Token token = op->first->val.token;
 
     OpCode opcode = OP_SET_LOCAL;
-    int position = resolveLocal(context, &symbol.name);
+    int position = resolveLocal(context, &token);
 
     if (position == -1) {
-      position = resolveUpvalue(context, &symbol.name);
+      position = resolveUpvalue(context, &token);
       opcode = OP_SET_UPVALUE;
     }
 
@@ -317,7 +316,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     // global variabl
     // TODO: think of a cleaner solution to this
     if (position == -1) {
-      Value name = OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
+      Value name = OBJ_VAL(copyString(token.start, token.length));
       position = identifierConstant(compiler, &f->chunk, name);
       opcode = OP_SET_GLOBAL;
     }
@@ -356,17 +355,17 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
       if (op->second != NULL) {
         // TODO extract out to a namedVariable function
         int superclassNamePosition =
-            resolveLocal(context, &op->second->val.symbol.name);
+            resolveLocal(context, &op->second->val.token);
         OpCode opcode = OP_GET_LOCAL;
 
         if (superclassNamePosition == -1) {
           superclassNamePosition =
-              resolveUpvalue(context, &op->second->val.symbol.name);
+              resolveUpvalue(context, &op->second->val.token);
           opcode = OP_GET_UPVALUE;
         }
         if (superclassNamePosition == -1) {
-          ObjString *superName = copyString(op->second->val.symbol.name.start,
-                                            op->second->val.symbol.name.length);
+          ObjString *superName = copyString(op->second->val.token.start,
+                                            op->second->val.token.length);
           superclassNamePosition =
               identifierConstant(compiler, &f->chunk, OBJ_VAL(superName));
           opcode = OP_GET_GLOBAL;
@@ -388,17 +387,17 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
 
       if (op->second != NULL) {
         int superclassNamePosition =
-            resolveLocal(context, &op->second->val.symbol.name);
+            resolveLocal(context, &op->second->val.token);
         OpCode opcode = OP_GET_LOCAL;
 
         if (superclassNamePosition == -1) {
           superclassNamePosition =
-              resolveUpvalue(context, &op->second->val.symbol.name);
+              resolveUpvalue(context, &op->second->val.token);
           opcode = OP_GET_UPVALUE;
         }
         if (superclassNamePosition == -1) {
-          ObjString *superName = copyString(op->second->val.symbol.name.start,
-                                            op->second->val.symbol.name.length);
+          ObjString *superName = copyString(op->second->val.token.start,
+                                            op->second->val.token.length);
           superclassNamePosition =
               identifierConstant(compiler, &f->chunk, OBJ_VAL(superName));
           opcode = OP_GET_GLOBAL;
@@ -497,25 +496,23 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     break;
   }
   case IR_SET_PROPERTY: {
-    Symbol symbol = op->first->val.symbol;
-    Value nameString =
-        OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
+    Token token = op->first->val.token;
+    Value nameString = OBJ_VAL(copyString(token.start, token.length));
     int namePosition = identifierConstant(compiler, &f->chunk, nameString);
     emitBytes(&f->chunk, OP_SET_PROPERTY, namePosition, op->token->line);
     break;
   }
   case IR_GET_PROPERTY: {
-    Symbol symbol = op->first->val.symbol;
-    Value nameString =
-        OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
+    Token token = op->first->val.token;
+
+    Value nameString = OBJ_VAL(copyString(token.start, token.length));
     int namePosition = identifierConstant(compiler, &f->chunk, nameString);
     emitBytes(&f->chunk, OP_GET_PROPERTY, namePosition, op->token->line);
     break;
   }
   case IR_SUPER_INVOKE: {
-    Symbol symbol = op->first->val.symbol;
-    Value nameString =
-        OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
+    Token token = op->first->val.token;
+    Value nameString = OBJ_VAL(copyString(token.start, token.length));
     uint8_t position = identifierConstant(compiler, &f->chunk, nameString);
 
     Token localSuper = syntheticToken("super");
@@ -528,9 +525,8 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     break;
   }
   case IR_SUPER: {
-    Symbol symbol = op->first->val.symbol;
-    Value nameString =
-        OBJ_VAL(copyString(symbol.name.start, symbol.name.length));
+    Token token = op->first->val.token;
+    Value nameString = OBJ_VAL(copyString(token.start, token.length));
     uint8_t position = identifierConstant(compiler, &f->chunk, nameString);
 
     Token localSuper = syntheticToken("super");

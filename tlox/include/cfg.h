@@ -13,7 +13,8 @@ typedef enum OperandType {
   OPERAND_LITERAL,
   OPERAND_REG,
   OPERAND_LABEL,
-  OPERAND_SYMBOL
+  OPERAND_SYMBOL,
+  OPERAND_TOKEN
 } OperandType;
 
 typedef enum IROp {
@@ -75,7 +76,8 @@ typedef struct Operand {
     Value literal;
     Register source;
     LabelId label;
-    Symbol symbol;
+    Symbol *symbol;
+    Token token;
   } val;
 } Operand;
 
