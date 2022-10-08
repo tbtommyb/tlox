@@ -521,7 +521,7 @@ void printAST(const AstNode *node, int indentation) {
 }
 
 OptionalToken optionalTokenInit() {
-  return (OptionalToken){.present = false, .value = (Token){0}};
+  return (OptionalToken){.present = false, .value = syntheticToken("")};
 }
 
 void optionalTokenSet(OptionalToken *ot, Token value) {

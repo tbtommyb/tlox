@@ -311,7 +311,7 @@ initializer.");
         errorAt(compiler, &superclass, "A class can't inherit from itself.");
       }
       node->scope = beginScope(compiler, TYPE_CLASS);
-      Token super = {.start = "super", .length = (int)strlen("super")};
+      Token super = syntheticToken("super");
       Symbol symbol = newSymbol(super, SCOPE_LOCAL, false, false, true, 0);
       scope_set(compiler->currentScope, super.start, super.length, symbol);
     }
