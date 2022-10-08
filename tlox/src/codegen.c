@@ -69,6 +69,11 @@ static uint8_t identifierConstant(Compiler *compiler, Chunk *chunk,
   return makeConstant(compiler, chunk, name);
 }
 
+static uint8_t identifierToken(Compiler *compiler, Chunk *chunk, Token name) {
+  Value nameString = OBJ_VAL(copyString(name.start, name.length));
+  return identifierConstant(compiler, chunk, nameString);
+}
+
 static int resolveLocal(ExecutionContext *context, Token *name) {
   // FIXME: values read from stack are offset by one
   for (int i = context->localCount - 1; i >= 0; i--) {
@@ -233,18 +238,17 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     emitByte(&f->chunk, OP_POP, op->token->line);
     break;
   case IR_INVOKE: {
-    Token token = op->first->val.token;
-    Value name = OBJ_VAL(copyString(token.start, token.length));
-    uint8_t position = identifierConstant(compiler, &f->chunk, name);
+    // TODO: some kind of macro that checks for correct operand type
+    uint8_t position =
+        identifierToken(compiler, &f->chunk, op->first->val.token);
 
     emitBytes(&f->chunk, OP_INVOKE, position, op->token->line);
     emitByte(&f->chunk, AS_NUMBER(op->second->val.literal), op->token->line);
     break;
   }
   case IR_DEFINE_GLOBAL: {
-    Symbol *symbol = op->first->val.symbol;
-    Value name = OBJ_VAL(copyString(symbol->name.start, symbol->name.length));
-    uint8_t position = identifierConstant(compiler, &f->chunk, name);
+    uint8_t position =
+        identifierToken(compiler, &f->chunk, op->first->val.symbol->name);
 
     emitBytes(&f->chunk, OP_DEFINE_GLOBAL, position, op->token->line);
     break;
@@ -258,9 +262,8 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     break;
   }
   case IR_GET_GLOBAL: {
-    Token token = op->first->val.token;
-    Value name = OBJ_VAL(copyString(token.start, token.length));
-    uint8_t position = identifierConstant(compiler, &f->chunk, name);
+    uint8_t position =
+        identifierToken(compiler, &f->chunk, op->first->val.token);
 
     emitBytes(&f->chunk, OP_GET_GLOBAL, position, op->token->line);
     break;
@@ -281,8 +284,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     // global variabl
     // TODO: think of a cleaner solution to this
     if (position == -1) {
-      Value name = OBJ_VAL(copyString(token.start, token.length));
-      position = identifierConstant(compiler, &f->chunk, name);
+      position = identifierToken(compiler, &f->chunk, op->first->val.token);
       opcode = OP_GET_GLOBAL;
     }
     assert(position != -1);
@@ -291,11 +293,10 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     break;
   }
   case IR_SET_GLOBAL: {
-    Token token = op->first->val.token;
-    Value nameString = OBJ_VAL(copyString(token.start, token.length));
     // FIXME: not actually used?
     Register source = op->second->val.source;
-    uint8_t position = identifierConstant(compiler, &f->chunk, nameString);
+    uint8_t position =
+        identifierToken(compiler, &f->chunk, op->first->val.token);
 
     emitBytes(&f->chunk, OP_SET_GLOBAL, position, op->token->line);
     break;
@@ -316,8 +317,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     // global variabl
     // TODO: think of a cleaner solution to this
     if (position == -1) {
-      Value name = OBJ_VAL(copyString(token.start, token.length));
-      position = identifierConstant(compiler, &f->chunk, name);
+      position = identifierToken(compiler, &f->chunk, op->first->val.token);
       opcode = OP_SET_GLOBAL;
     }
 
@@ -343,14 +343,11 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     Value wuPtr = op->first->val.literal;
     WorkUnit *wu = AS_POINTER(wuPtr);
 
-    /* ObjFunction *childF = compileWorkUnit(compiler, wu, labels); */
-    ObjString *name = copyString(wu->name.start, wu->name.length);
-    /* childF->name = name; */
-    int position = identifierConstant(compiler, &f->chunk, OBJ_VAL(name));
+    int position = identifierToken(compiler, &f->chunk, wu->name);
     emitBytes(&f->chunk, OP_CLASS, position, op->token->line);
 
     if (context->enclosing == NULL) {
-      int namePosition = identifierConstant(compiler, &f->chunk, OBJ_VAL(name));
+      int namePosition = identifierToken(compiler, &f->chunk, wu->name);
       emitBytes(&f->chunk, OP_DEFINE_GLOBAL, namePosition, op->token->line);
       if (op->second != NULL) {
         // TODO extract out to a namedVariable function
@@ -364,10 +361,8 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
           opcode = OP_GET_UPVALUE;
         }
         if (superclassNamePosition == -1) {
-          ObjString *superName = copyString(op->second->val.token.start,
-                                            op->second->val.token.length);
           superclassNamePosition =
-              identifierConstant(compiler, &f->chunk, OBJ_VAL(superName));
+              identifierToken(compiler, &f->chunk, op->second->val.token);
           opcode = OP_GET_GLOBAL;
         }
 
@@ -396,10 +391,8 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
           opcode = OP_GET_UPVALUE;
         }
         if (superclassNamePosition == -1) {
-          ObjString *superName = copyString(op->second->val.token.start,
-                                            op->second->val.token.length);
           superclassNamePosition =
-              identifierConstant(compiler, &f->chunk, OBJ_VAL(superName));
+              identifierToken(compiler, &f->chunk, op->second->val.token);
           opcode = OP_GET_GLOBAL;
         }
 
@@ -413,8 +406,6 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     }
 
     generateClass(compiler, wu->cfg, labels, f, op);
-
-    wu->f = NULL; // TODO: document/clarify
 
     break;
   }
@@ -496,24 +487,19 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     break;
   }
   case IR_SET_PROPERTY: {
-    Token token = op->first->val.token;
-    Value nameString = OBJ_VAL(copyString(token.start, token.length));
-    int namePosition = identifierConstant(compiler, &f->chunk, nameString);
+    int namePosition =
+        identifierToken(compiler, &f->chunk, op->first->val.token);
     emitBytes(&f->chunk, OP_SET_PROPERTY, namePosition, op->token->line);
     break;
   }
   case IR_GET_PROPERTY: {
-    Token token = op->first->val.token;
-
-    Value nameString = OBJ_VAL(copyString(token.start, token.length));
-    int namePosition = identifierConstant(compiler, &f->chunk, nameString);
+    int namePosition =
+        identifierToken(compiler, &f->chunk, op->first->val.token);
     emitBytes(&f->chunk, OP_GET_PROPERTY, namePosition, op->token->line);
     break;
   }
   case IR_SUPER_INVOKE: {
-    Token token = op->first->val.token;
-    Value nameString = OBJ_VAL(copyString(token.start, token.length));
-    uint8_t position = identifierConstant(compiler, &f->chunk, nameString);
+    int position = identifierToken(compiler, &f->chunk, op->first->val.token);
 
     Token localSuper = syntheticToken("super");
     int superPosition = resolveUpvalue(context, &localSuper);
@@ -525,9 +511,7 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
     break;
   }
   case IR_SUPER: {
-    Token token = op->first->val.token;
-    Value nameString = OBJ_VAL(copyString(token.start, token.length));
-    uint8_t position = identifierConstant(compiler, &f->chunk, nameString);
+    int position = identifierToken(compiler, &f->chunk, op->first->val.token);
 
     Token localSuper = syntheticToken("super");
     int superPosition = resolveUpvalue(context, &localSuper);

@@ -23,13 +23,15 @@ static LabelId getLabelId() { return currentLabelId++; }
 
 static CFG *newCFG(Compiler *compiler, WorkUnit *wu);
 
-static WorkUnit *wu_allocate(ExecutionContext *ec, AstNode *node, Token name) {
+static WorkUnit *wu_allocate(ExecutionContext *ec, AstNode *node, Token name,
+                             FunctionType functionType) {
   WorkUnit *wu = (WorkUnit *)reallocate(NULL, 0, sizeof(WorkUnit));
   wu->enclosing = ec;
   wu->node = node;
   wu->cfg = NULL;
   wu->f = NULL;
   wu->name = name;
+  wu->functionType = functionType;
   return wu;
 }
 
@@ -203,6 +205,21 @@ static Operation *newLabelOperation(Token *token, LabelId labelId,
 static void write(BasicBlock *bb, Operation *op) {
   bb->curr->next = op;
   bb->curr = op;
+}
+
+static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
+                          Scope *activeScope, CFG *activeCFG);
+
+static int walkParams(Compiler *compiler, BasicBlock *bb, AstNode *node,
+                      CFG *activeCFG, const LinkedList *params) {
+  int arity = 0;
+  Node *paramNode = params->head;
+  while (paramNode != NULL) {
+    arity++;
+    walkAst(compiler, bb, paramNode->data, node->scope, activeCFG);
+    paramNode = paramNode->next;
+  }
+  return arity;
 }
 
 static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
@@ -592,8 +609,8 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     AS_AST_NODE(stmt->expr)->token = node->token;
 
     WorkUnit *wu =
-        wu_allocate(activeCFG->context, AS_AST_NODE(stmt->expr), node->token);
-    wu->functionType = AS_FUNCTION_EXPR(stmt->expr)->functionType;
+        wu_allocate(activeCFG->context, AS_AST_NODE(stmt->expr), node->token,
+                    AS_FUNCTION_EXPR(stmt->expr)->functionType);
     newCFG(compiler, wu);
     linkedList_append(activeCFG->childFunctions, wu);
 
@@ -609,7 +626,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
       Symbol *symbol = NULL;
       Token name = expr->params[arity];
       if (!scope_search(node->scope, name.start, name.length, &symbol)) {
-        errorAt(compiler, &name, "Symbol is not defined in current scope.2");
+        errorAt(compiler, &name, "Symbol is not defined in current scope.");
         break;
       }
       Operand *pointer = newLiteralOperand(POINTER_VAL(node->scope));
@@ -617,7 +634,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
                         pointer);
       write(bb, op);
     }
-    activeCFG->arity = expr->arity; // FIXME: unused?
+    activeCFG->arity = expr->arity; // FIXME: used but confusing
 
     op = newOperation(&node->token, IR_BEGIN_SCOPE, NULL, NULL);
     write(bb, op);
@@ -684,13 +701,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     CallExprAstNode *expr = AS_CALL_EXPR(node);
     walkAst(compiler, bb, expr->target, node->scope, activeCFG);
 
-    int arity = 0;
-    Node *paramNode = (Node *)expr->params->head;
-    while (paramNode != NULL) {
-      arity++;
-      walkAst(compiler, bb, paramNode->data, node->scope, activeCFG);
-      paramNode = paramNode->next;
-    }
+    int arity = walkParams(compiler, bb, node, activeCFG, expr->params);
     Operand *arityOperand = newLiteralOperand(NUMBER_VAL(arity));
 
     op = newOperation(&node->token, IR_CALL, arityOperand, NULL);
@@ -701,13 +712,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     InvocationExprAstNode *expr = AS_INVOCATION_EXPR(node);
     walkAst(compiler, bb, expr->target, node->scope, activeCFG);
 
-    int arity = 0;
-    Node *paramNode = (Node *)expr->params->head;
-    while (paramNode != NULL) {
-      arity++;
-      walkAst(compiler, bb, paramNode->data, node->scope, activeCFG);
-      paramNode = paramNode->next;
-    }
+    int arity = walkParams(compiler, bb, node, activeCFG, expr->params);
     Operand *arityOperand = newLiteralOperand(NUMBER_VAL(arity));
 
     op = newOperation(&node->token, IR_INVOKE, newTokenOperand(node->token),
@@ -723,13 +728,7 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
 
     walkAst(compiler, bb, expr->target, node->scope, activeCFG);
 
-    int arity = 0;
-    Node *paramNode = (Node *)expr->params->head;
-    while (paramNode != NULL) {
-      arity++;
-      walkAst(compiler, bb, paramNode->data, node->scope, activeCFG);
-      paramNode = paramNode->next;
-    }
+    int arity = walkParams(compiler, bb, node, activeCFG, expr->params);
     Operand *arityOperand = newLiteralOperand(NUMBER_VAL(arity));
 
     op = newOperation(&node->token, IR_SUPER_INVOKE,
@@ -755,9 +754,8 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     ClassStmtAstNode *stmt = AS_CLASS_STMT(node);
     // FIXME: bit of a hack to get the name working
     AS_AST_NODE(stmt->body)->token = node->token;
-    WorkUnit *wu =
-        wu_allocate(activeCFG->context, AS_AST_NODE(stmt->body), node->token);
-    wu->functionType = TYPE_CLASS;
+    WorkUnit *wu = wu_allocate(activeCFG->context, AS_AST_NODE(stmt->body),
+                               node->token, TYPE_CLASS);
     newCFG(compiler, wu);
     linkedList_append(activeCFG->childFunctions, wu);
 
@@ -788,8 +786,8 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     AS_AST_NODE(stmt->body)->token = node->token;
 
     WorkUnit *wu =
-        wu_allocate(activeCFG->context, AS_AST_NODE(stmt->body), node->token);
-    wu->functionType = AS_FUNCTION_EXPR(stmt->body)->functionType;
+        wu_allocate(activeCFG->context, AS_AST_NODE(stmt->body), node->token,
+                    AS_FUNCTION_EXPR(stmt->body)->functionType);
     newCFG(compiler, wu);
     linkedList_append(activeCFG->childFunctions, wu);
 
@@ -1144,8 +1142,8 @@ static CFG *newCFG(Compiler *compiler, WorkUnit *wu) {
 }
 
 WorkUnit *createMainWorkUnit(Compiler *compiler, AstNode *root) {
-  WorkUnit *main_wu = wu_allocate(NULL, root, syntheticToken("script"));
-  main_wu->functionType = TYPE_SCRIPT; // or TYPE_FUNCTION?
+  WorkUnit *main_wu =
+      wu_allocate(NULL, root, syntheticToken("script"), TYPE_SCRIPT);
   main_wu->cfg = newCFG(compiler, main_wu);
 
   return main_wu;
