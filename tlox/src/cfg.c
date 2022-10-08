@@ -21,32 +21,22 @@ static BasicBlockId getBasicBlockId() { return currentBasicBlockId++; }
 static OperationId getOperationId() { return currentOperationId++; }
 static LabelId getLabelId() { return currentLabelId++; }
 
-static void buildCFG(Compiler *compiler, WorkUnit *wu);
+static void cfg_construct(Compiler *compiler, WorkUnit *wu);
+static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
+                          Scope *activeScope, WorkUnit *activeWorkUnit);
 
 static WorkUnit *wu_allocate(ExecutionContext *ec, AstNode *node, Token name,
                              FunctionType functionType) {
   WorkUnit *wu = (WorkUnit *)reallocate(NULL, 0, sizeof(WorkUnit));
-  wu->enclosingContext = ec;
   wu->activeContext = ec_allocate();
-  wu->activeContext->enclosing = wu->enclosingContext;
-  wu->childFunctions = linkedList_allocate();
+  wu->activeContext->enclosing = ec;
+  wu->childWorkUnits = linkedList_allocate();
   wu->node = node;
   wu->cfg = NULL;
   wu->f = NULL;
   wu->name = name;
   wu->functionType = functionType;
   return wu;
-}
-
-static Operation *allocateOperation() {
-  Operation *op = (Operation *)reallocate(NULL, 0, sizeof(Operation));
-  op->id = 0;
-  op->token = NULL;
-  op->first = NULL;
-  op->second = NULL;
-  op->next = NULL;
-
-  return op;
 }
 
 static BasicBlock *allocateBasicBlock() {
@@ -62,20 +52,146 @@ static BasicBlock *allocateBasicBlock() {
   return bb;
 }
 
-static Operand *allocateOperand(OperandType type) {
-  Operand *operand = (Operand *)reallocate(NULL, 0, sizeof(Operand));
-  operand->type = type;
-
-  return operand;
-}
-
-static CFG *allocateCFG(Token name) {
+static CFG *cfg_allocate(Token name) {
   CFG *cfg = (CFG *)reallocate(NULL, 0, sizeof(CFG));
   cfg->start = NULL;
   cfg->name = name;
   cfg->arity = 0;
 
   return cfg;
+}
+
+// TODO: make beautiful
+void toBasicBlocks(CFG *cfg, BasicBlock *irList) {
+  cfg->start = allocateBasicBlock();
+
+  initTable(&labelBasicBlockMapping);
+
+  BasicBlock *currentBB = cfg->start;
+  currentBB->ops = irList->ops;
+  Operation *currentOp = irList->ops;
+
+  while (currentOp != NULL) {
+    currentBB->opsCount++;
+
+    if (currentOp->opcode == IR_COND) {
+      Value ifBranchPtr;
+      // TODO seeking next here is a code smell
+      Operation *ifBranchLabelInstr = currentOp->next;
+      while (ifBranchLabelInstr->first == NULL) {
+        ifBranchLabelInstr = ifBranchLabelInstr->next;
+      }
+      LabelId ifBranchHead = ifBranchLabelInstr->first->val.label;
+      BasicBlock *ifBranchBB = NULL;
+      if (tableGet(&labelBasicBlockMapping, NUMBER_VAL(ifBranchHead),
+                   &ifBranchPtr)) {
+        ifBranchBB = AS_POINTER(ifBranchPtr);
+      } else {
+        ifBranchBB = allocateBasicBlock();
+        tableSet(&labelBasicBlockMapping, NUMBER_VAL(ifBranchHead),
+                 POINTER_VAL(ifBranchBB));
+      }
+
+      Value elseBranchPtr;
+      LabelId elseBranchHead = currentOp->second->val.label;
+      BasicBlock *elseBranchBB = NULL;
+      if (tableGet(&labelBasicBlockMapping, NUMBER_VAL(elseBranchHead),
+                   &elseBranchPtr)) {
+        elseBranchBB = AS_POINTER(elseBranchPtr);
+      } else {
+        elseBranchBB = allocateBasicBlock();
+        tableSet(&labelBasicBlockMapping, NUMBER_VAL(elseBranchHead),
+                 POINTER_VAL(elseBranchBB));
+      }
+
+      currentBB->trueEdge = ifBranchBB;
+      currentBB->falseEdge = elseBranchBB;
+    } else if (currentOp->opcode == IR_LABEL ||
+               currentOp->opcode == IR_ELSE_LABEL) {
+      Value labelBBPtr;
+      BasicBlock *labelBB = NULL;
+      LabelId labelId = currentOp->first->val.label;
+      if (tableGet(&labelBasicBlockMapping, NUMBER_VAL(labelId), &labelBBPtr)) {
+        labelBB = AS_POINTER(labelBBPtr);
+        labelBB->labelId = labelId;
+      } else {
+        labelBB = allocateBasicBlock();
+        labelBB->labelId = labelId;
+        tableSet(&labelBasicBlockMapping, NUMBER_VAL(labelId),
+                 POINTER_VAL(labelBB));
+      }
+      currentBB->trueEdge = labelBB;
+      currentBB = labelBB;
+      currentBB->ops = currentOp->next;
+    } else if (currentOp->opcode == IR_GOTO) {
+      Value elseBranchPtr;
+      LabelId elseBranchHead = currentOp->first->val.label;
+      BasicBlock *elseBranchBB = NULL;
+      if (tableGet(&labelBasicBlockMapping, NUMBER_VAL(elseBranchHead),
+                   &elseBranchPtr)) {
+        elseBranchBB = AS_POINTER(elseBranchPtr);
+      } else {
+        elseBranchBB = allocateBasicBlock();
+        tableSet(&labelBasicBlockMapping, NUMBER_VAL(elseBranchHead),
+                 POINTER_VAL(elseBranchBB));
+      }
+
+      currentBB->trueEdge = elseBranchBB;
+    } else if (currentOp->next != NULL &&
+               (currentOp->next->opcode == IR_LABEL ||
+                currentOp->next->opcode == IR_ELSE_LABEL)) {
+      Value labelBBPtr;
+      BasicBlock *labelBB = NULL;
+      LabelId labelId = currentOp->next->first->val.label;
+      if (tableGet(&labelBasicBlockMapping, NUMBER_VAL(labelId), &labelBBPtr)) {
+        labelBB = AS_POINTER(labelBBPtr);
+      } else {
+        labelBB = allocateBasicBlock();
+        tableSet(&labelBasicBlockMapping, NUMBER_VAL(labelId),
+                 POINTER_VAL(labelBB));
+      }
+      currentBB->trueEdge = labelBB;
+    }
+    currentOp = currentOp->next;
+  }
+
+  freeTable(&labelBasicBlockMapping);
+}
+
+static void cfg_construct(Compiler *compiler, WorkUnit *wu) {
+  BasicBlock *irList = newBasicBlock(wu->node);
+
+  wu->cfg = cfg_allocate(wu->node->token);
+  // generate flat IR list by walking AST
+  walkAst(compiler, irList, wu->node, wu->node->scope, wu);
+  // split IR list into CFG
+  toBasicBlocks(wu->cfg, irList);
+}
+
+static WorkUnit *wu_construct(Compiler *compiler, ExecutionContext *ec,
+                              AstNode *node, Token name,
+                              FunctionType functionType) {
+  WorkUnit *wu = wu_allocate(ec, node, name, functionType);
+  cfg_construct(compiler, wu);
+  return wu;
+}
+
+static Operation *allocateOperation() {
+  Operation *op = (Operation *)reallocate(NULL, 0, sizeof(Operation));
+  op->id = 0;
+  op->token = NULL;
+  op->first = NULL;
+  op->second = NULL;
+  op->next = NULL;
+
+  return op;
+}
+
+static Operand *allocateOperand(OperandType type) {
+  Operand *operand = (Operand *)reallocate(NULL, 0, sizeof(Operand));
+  operand->type = type;
+
+  return operand;
 }
 
 static IROp tokenToBinaryOp(TokenType token) {
@@ -207,9 +323,6 @@ static void write(BasicBlock *bb, Operation *op) {
   bb->curr->next = op;
   bb->curr = op;
 }
-
-static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
-                          Scope *activeScope, WorkUnit *activeWorkUnit);
 
 static int walkParams(Compiler *compiler, BasicBlock *bb, AstNode *node,
                       WorkUnit *activeWorkUnit, const LinkedList *params) {
@@ -610,11 +723,10 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     // FIXME: bit of a hack to get the name working
     AS_AST_NODE(stmt->expr)->token = node->token;
 
-    WorkUnit *wu =
-        wu_allocate(activeWorkUnit->activeContext, AS_AST_NODE(stmt->expr),
-                    node->token, AS_FUNCTION_EXPR(stmt->expr)->functionType);
-    buildCFG(compiler, wu);
-    linkedList_append(activeWorkUnit->childFunctions, wu);
+    WorkUnit *wu = wu_construct(compiler, activeWorkUnit->activeContext,
+                                AS_AST_NODE(stmt->expr), node->token,
+                                AS_FUNCTION_EXPR(stmt->expr)->functionType);
+    linkedList_append(activeWorkUnit->childWorkUnits, wu);
 
     Operand *pointer = newLiteralOperand(POINTER_VAL(wu));
     op = newOperation(&node->token, IR_FUNCTION, pointer, NULL);
@@ -757,10 +869,9 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     // FIXME: bit of a hack to get the name working
     AS_AST_NODE(stmt->body)->token = node->token;
     WorkUnit *wu =
-        wu_allocate(activeWorkUnit->activeContext, AS_AST_NODE(stmt->body),
-                    node->token, TYPE_CLASS);
-    buildCFG(compiler, wu);
-    linkedList_append(activeWorkUnit->childFunctions, wu);
+        wu_construct(compiler, activeWorkUnit->activeContext,
+                     AS_AST_NODE(stmt->body), node->token, TYPE_CLASS);
+    linkedList_append(activeWorkUnit->childWorkUnits, wu);
 
     Operand *pointer = newLiteralOperand(POINTER_VAL(wu));
     if (OPTIONAL_HAS_VALUE(stmt->superclass)) {
@@ -788,13 +899,10 @@ static Operation *walkAst(Compiler *compiler, BasicBlock *bb, AstNode *node,
     // FIXME: bit of a hack to get the name working
     AS_AST_NODE(stmt->body)->token = node->token;
 
-    // TODO: is there a cleaner way to update CFG->childF and context?
-    // to avoid passing activeCFG around
-    WorkUnit *wu =
-        wu_allocate(activeWorkUnit->activeContext, AS_AST_NODE(stmt->body),
-                    node->token, AS_FUNCTION_EXPR(stmt->body)->functionType);
-    buildCFG(compiler, wu);
-    linkedList_append(activeWorkUnit->childFunctions, wu);
+    WorkUnit *wu = wu_construct(compiler, activeWorkUnit->activeContext,
+                                AS_AST_NODE(stmt->body), node->token,
+                                AS_FUNCTION_EXPR(stmt->body)->functionType);
+    linkedList_append(activeWorkUnit->childWorkUnits, wu);
 
     Operand *pointer = newLiteralOperand(POINTER_VAL(wu));
     op = newOperation(&node->token, IR_METHOD, pointer, NULL);
@@ -817,103 +925,6 @@ BasicBlock *newBasicBlock(AstNode *node) {
   bb->curr = bb->ops;
 
   return bb;
-}
-
-// TODO: make beautiful
-void constructCFG(CFG *cfg, BasicBlock *irList) {
-  cfg->start = allocateBasicBlock();
-
-  initTable(&labelBasicBlockMapping);
-
-  BasicBlock *currentBB = cfg->start;
-  currentBB->ops = irList->ops;
-  Operation *currentOp = irList->ops;
-
-  while (currentOp != NULL) {
-    currentBB->opsCount++;
-
-    if (currentOp->opcode == IR_COND) {
-      Value ifBranchPtr;
-      // TODO seeking next here is a code smell
-      Operation *ifBranchLabelInstr = currentOp->next;
-      while (ifBranchLabelInstr->first == NULL) {
-        ifBranchLabelInstr = ifBranchLabelInstr->next;
-      }
-      LabelId ifBranchHead = ifBranchLabelInstr->first->val.label;
-      BasicBlock *ifBranchBB = NULL;
-      if (tableGet(&labelBasicBlockMapping, NUMBER_VAL(ifBranchHead),
-                   &ifBranchPtr)) {
-        ifBranchBB = AS_POINTER(ifBranchPtr);
-      } else {
-        ifBranchBB = allocateBasicBlock();
-        tableSet(&labelBasicBlockMapping, NUMBER_VAL(ifBranchHead),
-                 POINTER_VAL(ifBranchBB));
-      }
-
-      Value elseBranchPtr;
-      LabelId elseBranchHead = currentOp->second->val.label;
-      BasicBlock *elseBranchBB = NULL;
-      if (tableGet(&labelBasicBlockMapping, NUMBER_VAL(elseBranchHead),
-                   &elseBranchPtr)) {
-        elseBranchBB = AS_POINTER(elseBranchPtr);
-      } else {
-        elseBranchBB = allocateBasicBlock();
-        tableSet(&labelBasicBlockMapping, NUMBER_VAL(elseBranchHead),
-                 POINTER_VAL(elseBranchBB));
-      }
-
-      currentBB->trueEdge = ifBranchBB;
-      currentBB->falseEdge = elseBranchBB;
-    } else if (currentOp->opcode == IR_LABEL ||
-               currentOp->opcode == IR_ELSE_LABEL) {
-      Value labelBBPtr;
-      BasicBlock *labelBB = NULL;
-      LabelId labelId = currentOp->first->val.label;
-      if (tableGet(&labelBasicBlockMapping, NUMBER_VAL(labelId), &labelBBPtr)) {
-        labelBB = AS_POINTER(labelBBPtr);
-        labelBB->labelId = labelId;
-      } else {
-        labelBB = allocateBasicBlock();
-        labelBB->labelId = labelId;
-        tableSet(&labelBasicBlockMapping, NUMBER_VAL(labelId),
-                 POINTER_VAL(labelBB));
-      }
-      currentBB->trueEdge = labelBB;
-      currentBB = labelBB;
-      currentBB->ops = currentOp->next;
-    } else if (currentOp->opcode == IR_GOTO) {
-      Value elseBranchPtr;
-      LabelId elseBranchHead = currentOp->first->val.label;
-      BasicBlock *elseBranchBB = NULL;
-      if (tableGet(&labelBasicBlockMapping, NUMBER_VAL(elseBranchHead),
-                   &elseBranchPtr)) {
-        elseBranchBB = AS_POINTER(elseBranchPtr);
-      } else {
-        elseBranchBB = allocateBasicBlock();
-        tableSet(&labelBasicBlockMapping, NUMBER_VAL(elseBranchHead),
-                 POINTER_VAL(elseBranchBB));
-      }
-
-      currentBB->trueEdge = elseBranchBB;
-    } else if (currentOp->next != NULL &&
-               (currentOp->next->opcode == IR_LABEL ||
-                currentOp->next->opcode == IR_ELSE_LABEL)) {
-      Value labelBBPtr;
-      BasicBlock *labelBB = NULL;
-      LabelId labelId = currentOp->next->first->val.label;
-      if (tableGet(&labelBasicBlockMapping, NUMBER_VAL(labelId), &labelBBPtr)) {
-        labelBB = AS_POINTER(labelBBPtr);
-      } else {
-        labelBB = allocateBasicBlock();
-        tableSet(&labelBasicBlockMapping, NUMBER_VAL(labelId),
-                 POINTER_VAL(labelBB));
-      }
-      currentBB->trueEdge = labelBB;
-    }
-    currentOp = currentOp->next;
-  }
-
-  freeTable(&labelBasicBlockMapping);
 }
 
 // FIXME: tokens
@@ -1123,7 +1134,7 @@ void printCFG(CFG *cfg) {
 }
 
 void printWorkUnits(WorkUnit *wu) {
-  Node *child = wu->childFunctions->head;
+  Node *child = wu->childWorkUnits->head;
   while (child != NULL) {
     printWorkUnits(child->data);
     child = child->next;
@@ -1131,20 +1142,10 @@ void printWorkUnits(WorkUnit *wu) {
   printCFG(wu->cfg);
 }
 
-static void buildCFG(Compiler *compiler, WorkUnit *wu) {
-  BasicBlock *irList = newBasicBlock(wu->node);
-
-  wu->cfg = allocateCFG(wu->node->token);
-  // generate flat IR list by walking AST
-  walkAst(compiler, irList, wu->node, wu->node->scope, wu);
-  // split IR list into CFG
-  constructCFG(wu->cfg, irList);
-}
-
 WorkUnit *createMainWorkUnit(Compiler *compiler, AstNode *root) {
   WorkUnit *main_wu =
       wu_allocate(NULL, root, syntheticToken("script"), TYPE_SCRIPT);
-  buildCFG(compiler, main_wu);
+  cfg_construct(compiler, main_wu);
 
   return main_wu;
 }

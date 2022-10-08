@@ -111,9 +111,8 @@ typedef struct CFG {
 } CFG;
 
 typedef struct WorkUnit {
-  ExecutionContext *enclosingContext;
   ExecutionContext *activeContext;
-  LinkedList *childFunctions; // move to wu
+  LinkedList *childWorkUnits;
   AstNode *node;
   Token name;
   CFG *cfg;
