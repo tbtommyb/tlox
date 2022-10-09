@@ -51,9 +51,9 @@ static IRList *ir_allocate() {
 static BasicBlock *bb_allocate() {
   BasicBlock *bb = (BasicBlock *)reallocate(NULL, 0, sizeof(BasicBlock));
   bb->id = getBasicBlockId();
-  bb->trueEdge = NULL;
-  bb->falseEdge = NULL;
-  bb->labelId = -1;
+  for (int i = 0; i < EDGE_COUNT; i++) {
+    bb->edges[i] = NULL;
+  }
   bb->ir = ir_allocate();
 
   return bb;
@@ -77,7 +77,19 @@ static void bb_write(BasicBlock *bb, Operation *op) { ir_write(bb->ir, op); }
 
 static int bb_ops_count(BasicBlock *bb) { return ir_length(bb->ir); }
 
-// TODO: make beautiful. Return CFG
+static BasicBlock *bb_fetch_or_allocate(Table *labels, LabelId id) {
+  Value pointer;
+  BasicBlock *nextBasicBlock = NULL;
+  if (tableGet(labels, NUMBER_VAL(id), &pointer)) {
+    nextBasicBlock = AS_POINTER(pointer);
+  } else {
+    nextBasicBlock = bb_allocate();
+    tableSet(labels, NUMBER_VAL(id), POINTER_VAL(nextBasicBlock));
+  }
+  return nextBasicBlock;
+}
+
+// TODO: Return CFG?
 static BasicBlock *ir_split(IRList *ir, Table *labels) {
   BasicBlock *root = bb_allocate();
 
@@ -87,58 +99,38 @@ static BasicBlock *ir_split(IRList *ir, Table *labels) {
   while (irListNode != NULL) {
     Operation *currentOp = irListNode->data;
 
-    if (currentOp->opcode == IR_LABEL || currentOp->opcode == IR_ELSE_LABEL) {
-      Value labelBBPtr;
-      BasicBlock *nextBasicBlock = NULL;
+    switch (currentOp->opcode) {
+    case IR_LABEL:
+    case IR_ELSE_LABEL: {
       LabelId labelId = currentOp->first->val.label;
-      if (tableGet(labels, NUMBER_VAL(labelId), &labelBBPtr)) {
-        nextBasicBlock = AS_POINTER(labelBBPtr);
-      } else {
-        nextBasicBlock = bb_allocate();
-        tableSet(labels, NUMBER_VAL(labelId), POINTER_VAL(nextBasicBlock));
-      }
-      currentBasicBlock->trueEdge = nextBasicBlock;
-      currentBasicBlock = nextBasicBlock;
+      BasicBlock *next = bb_fetch_or_allocate(labels, labelId);
+      currentBasicBlock->edges[0] = next;
+      currentBasicBlock = next;
+      break;
     }
-    if (currentOp->opcode == IR_COND) {
-      Value ifBranchPtr;
+    case IR_COND: {
       Operation *ifBranchNode = (Operation *)irListNode->next->data;
+      // We assume that instructions using COND have been written so that
+      // every branch starts with a label
       assert(ifBranchNode->opcode == IR_LABEL);
 
-      LabelId ifBranchHead = ifBranchNode->first->val.label;
-      BasicBlock *ifBranchBB = NULL;
-      if (tableGet(labels, NUMBER_VAL(ifBranchHead), &ifBranchPtr)) {
-        ifBranchBB = AS_POINTER(ifBranchPtr);
-      } else {
-        ifBranchBB = bb_allocate();
-        tableSet(labels, NUMBER_VAL(ifBranchHead), POINTER_VAL(ifBranchBB));
-      }
+      LabelId ifLabelId = ifBranchNode->first->val.label;
+      BasicBlock *ifBasicBlock = bb_fetch_or_allocate(labels, ifLabelId);
 
-      Value elseBranchPtr;
-      LabelId elseBranchHead = currentOp->second->val.label;
-      BasicBlock *elseBranchBB = NULL;
-      if (tableGet(labels, NUMBER_VAL(elseBranchHead), &elseBranchPtr)) {
-        elseBranchBB = AS_POINTER(elseBranchPtr);
-      } else {
-        elseBranchBB = bb_allocate();
-        tableSet(labels, NUMBER_VAL(elseBranchHead), POINTER_VAL(elseBranchBB));
-      }
+      LabelId elseLabelId = currentOp->second->val.label;
+      BasicBlock *elseBasicBlock = bb_fetch_or_allocate(labels, elseLabelId);
 
-      currentBasicBlock->trueEdge = ifBranchBB;
-      currentBasicBlock->falseEdge = elseBranchBB;
+      currentBasicBlock->edges[0] = ifBasicBlock;
+      currentBasicBlock->edges[1] = elseBasicBlock;
     }
-    if (currentOp->opcode == IR_GOTO) {
-      Value elseBranchPtr;
-      LabelId elseBranchHead = currentOp->first->val.label;
-      BasicBlock *elseBranchBB = NULL;
-      if (tableGet(labels, NUMBER_VAL(elseBranchHead), &elseBranchPtr)) {
-        elseBranchBB = AS_POINTER(elseBranchPtr);
-      } else {
-        elseBranchBB = bb_allocate();
-        tableSet(labels, NUMBER_VAL(elseBranchHead), POINTER_VAL(elseBranchBB));
-      }
+    case IR_GOTO: {
+      LabelId elseLabelId = currentOp->first->val.label;
+      BasicBlock *elseBasicBlock = bb_fetch_or_allocate(labels, elseLabelId);
 
-      currentBasicBlock->trueEdge = elseBranchBB;
+      currentBasicBlock->edges[0] = elseBasicBlock;
+    }
+    default: {
+    }
     }
     bb_write(currentBasicBlock, currentOp);
     irListNode = irListNode->next;
@@ -472,7 +464,6 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
     LabelId thenLabelId = getLabelId();
     LabelId elseLabelId = getLabelId();
     LabelId afterLabelId = getLabelId();
-    /* LabelId skipLabelId = getLabelId(); */
     bool elseBranchPresent = stmt->branches.elseB != NULL;
 
     op = operation_create(&node->token, IR_BEGIN_SCOPE, NULL, NULL);
@@ -536,13 +527,7 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
     op = newLabelOperation(&node->token, ifLabelId, IR_LABEL);
     ir_write(ir, op);
 
-    /* op = operation_create(&node->token, IR_BEGIN_SCOPE, NULL, NULL); */
-    /* ir_write(ir, op); */
-
     ast_walk(compiler, ir, stmt->branches.then, activeScope, activeWorkUnit);
-
-    /* op = operation_create(&node->token, IR_END_SCOPE, NULL, NULL); */
-    /* ir_write(ir, op); */
 
     op = operation_create(&node->token, IR_LOOP, newLabelOperand(exprLabelId),
                           NULL);
@@ -592,14 +577,8 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
     op = newLabelOperation(&node->token, bodyLabelId, IR_LABEL);
     ir_write(ir, op);
 
-    /* op = operation_create(&node->token, IR_BEGIN_SCOPE, NULL, NULL); */
-    /* ir_write(ir, op); */
-
     ast_walk(compiler, ir, stmt->branches.body,
              node->scope != NULL ? node->scope : activeScope, activeWorkUnit);
-
-    /* op = operation_create(&node->token, IR_END_SCOPE, NULL, NULL); */
-    /* ir_write(ir, op); */
 
     op = newGotoOperation(&node->token, loopLabelId);
     ir_write(ir, op);
@@ -617,9 +596,6 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
       op = operation_create(&node->token, IR_LOOP, newLabelOperand(condLabelId),
                             NULL);
       ir_write(ir, op);
-
-      /* op = newGotoOperation(&node->token, condLabelId); */
-      /* ir_write(ir, op); */
     }
 
     op = newLabelOperation(&node->token, loopLabelId, IR_LABEL);
@@ -1029,41 +1005,41 @@ char *opcodeString(IROp opcode) {
   case IR_LOOP:
     return "loop";
   case IR_DEFINE_LOCAL:
-    return "l define";
+    return "local_define";
   case IR_DEFINE_GLOBAL:
-    return "g define";
+    return "global_define";
   case IR_GET_GLOBAL:
-    return "g var";
+    return "global_var";
   case IR_SET_GLOBAL:
-    return "g assign";
+    return "global_assign";
   case IR_GET_LOCAL:
-    return "l var";
+    return "local_var";
   case IR_SET_LOCAL:
-    return "l assign";
+    return "local_assign";
   case IR_GET_PROPERTY:
-    return "get prop";
+    return "get_prop";
   case IR_SET_PROPERTY:
-    return "set prop";
+    return "set_prop";
   case IR_POP:
     return "pop";
   case IR_RETURN:
-    return "return";
+    return "return_init";
   case IR_RETURN_FROM_INIT:
     return "return";
   case IR_BEGIN_SCOPE:
-    return "begin scope";
+    return "begin_scope";
   case IR_END_SCOPE:
-    return "end scope";
+    return "end_scope";
   case IR_FUNCTION:
     return "function";
   case IR_SUBTRACT:
     return "-";
   case IR_STMT_EXPR:
-    return "stmt expr";
+    return "stmt_expr";
   case IR_INVOKE:
     return "invoke";
   case IR_SUPER_INVOKE:
-    return "super invoke";
+    return "super_invoke";
   case IR_SUPER:
     return "super";
   case IR_UNKNOWN:
@@ -1075,14 +1051,14 @@ char *opcodeString(IROp opcode) {
 void dfsWalk(BasicBlock *bb, Table *visitedSet, LinkedList *ordered) {
   tableSet(visitedSet, NUMBER_VAL(bb->id), TRUE_VAL);
   Value unused;
-  if (bb->falseEdge != NULL) {
-    if (!tableGet(visitedSet, NUMBER_VAL(bb->falseEdge->id), &unused)) {
-      dfsWalk(bb->falseEdge, visitedSet, ordered);
+  if (bb->edges[0] != NULL) {
+    if (!tableGet(visitedSet, NUMBER_VAL(bb->edges[0]->id), &unused)) {
+      dfsWalk(bb->edges[0], visitedSet, ordered);
     }
   }
-  if (bb->trueEdge != NULL) {
-    if (!tableGet(visitedSet, NUMBER_VAL(bb->trueEdge->id), &unused)) {
-      dfsWalk(bb->trueEdge, visitedSet, ordered);
+  if (bb->edges[1] != NULL) {
+    if (!tableGet(visitedSet, NUMBER_VAL(bb->edges[1]->id), &unused)) {
+      dfsWalk(bb->edges[1], visitedSet, ordered);
     }
   }
   linkedList_append(ordered, bb);
@@ -1101,25 +1077,21 @@ LinkedList *postOrderTraverseBasicBlock(CFG *cfg) {
   return ordered;
 }
 
-// TODO: print in less structured format that doesn't need alignment
-// Free strings from writeString
+// TODO: Free strings from writeString
 void printBasicBlock(BasicBlock *bb) {
   int opcount = ir_length(bb->ir);
 
-  if (bb->labelId == -1) {
-    printf("Basic block %llu", bb->id);
-  } else {
-    printf("Basic block %llu (L%lld)", bb->id, bb->labelId);
+  printf("BB #%llu", bb->id);
+  printf(" | Edge(s): ");
+  for (int i = 0; i < EDGE_COUNT; i++) {
+    if (bb->edges[i] == NULL) {
+      printf("_ ");
+    } else {
+      printf("B%llu ", bb->edges[i]->id);
+    }
   }
-  if (bb->trueEdge) {
-    printf(" | Edges: %llu", bb->trueEdge->id);
-  }
-  if (bb->falseEdge) {
-    printf(", %llu", bb->falseEdge->id);
-  }
-  printf("\n");
   // Slightly incorrect due to labels
-  printf("Op count: %d\n", opcount);
+  printf("| Op count: %d\n", opcount);
 
   // FIXME: gross
   Node *curr = bb->ir->ops->head;
@@ -1127,19 +1099,18 @@ void printBasicBlock(BasicBlock *bb) {
   while (curr != NULL) {
     Operation *op = curr->data;
     if (op->opcode == IR_LABEL || op->opcode == IR_ELSE_LABEL) {
-      printf("%4llu: [ label %llu ]\n", op->id, op->first->val.label);
+      printf("%4llu| LABEL %llu\n", op->id, op->first->val.label);
     } else if (op->destination == 0) {
-      printf("%4llu: [       | %14s | %6s | %6s ]\n", op->id,
-             opcodeString(op->opcode), operandString(op->first),
-             operandString(op->second));
+      printf("%4llu| %s %s %s\n", op->id, opcodeString(op->opcode),
+             operandString(op->first), operandString(op->second));
     } else if (op->opcode == IR_FUNCTION || op->opcode == IR_METHOD ||
                op->opcode == IR_CLASS) {
       Value wuPtr = op->first->val.literal;
       WorkUnit *wu = AS_POINTER(wuPtr);
-      printf("%4llu: [       | %14s | %.*s | %6s ]\n", op->id,
-             opcodeString(op->opcode), wu->name.length, wu->name.start, "");
+      printf("%4llu| %s %.*s %s\n", op->id, opcodeString(op->opcode),
+             wu->name.length, wu->name.start, "");
     } else {
-      printf("%4llu: [ t%-4llu | %14s | %6s | %6s ]\n", op->id, op->destination,
+      printf("%4llu| t%llu := %s %s %s\n", op->id, op->destination,
              opcodeString(op->opcode), operandString(op->first),
              operandString(op->second));
     }

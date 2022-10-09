@@ -9,6 +9,8 @@
 #include "value.h"
 #include <stdint.h>
 
+#define EDGE_COUNT 2
+
 typedef enum OperandType {
   OPERAND_LITERAL,
   OPERAND_REG,
@@ -90,7 +92,6 @@ struct Operation {
   Register destination;
   Operand *first;
   Operand *second;
-  /* Operation *next; */
   Token *token;
 };
 
@@ -100,10 +101,8 @@ typedef struct IRList {
 
 typedef struct BasicBlock {
   BasicBlockId id;
-  LabelId labelId;
   IRList *ir;
-  struct BasicBlock *trueEdge;
-  struct BasicBlock *falseEdge;
+  struct BasicBlock *edges[EDGE_COUNT];
 } BasicBlock;
 
 typedef struct CFG {
