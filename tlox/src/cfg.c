@@ -8,7 +8,6 @@
 #include <assert.h>
 #include <stdlib.h>
 
-Table labelBasicBlockMapping;
 static IRList *ir_create(AstNode *node);
 
 // TODO: make thread safe
@@ -104,6 +103,7 @@ static BasicBlock *ir_split(IRList *ir, Table *labels) {
     case IR_ELSE_LABEL: {
       LabelId labelId = currentOp->first->val.label;
       BasicBlock *next = bb_fetch_or_allocate(labels, labelId);
+
       currentBasicBlock->edges[0] = next;
       currentBasicBlock = next;
       break;
@@ -122,12 +122,14 @@ static BasicBlock *ir_split(IRList *ir, Table *labels) {
 
       currentBasicBlock->edges[0] = ifBasicBlock;
       currentBasicBlock->edges[1] = elseBasicBlock;
+      break;
     }
     case IR_GOTO: {
-      LabelId elseLabelId = currentOp->first->val.label;
-      BasicBlock *elseBasicBlock = bb_fetch_or_allocate(labels, elseLabelId);
+      LabelId labelId = currentOp->first->val.label;
+      BasicBlock *next = bb_fetch_or_allocate(labels, labelId);
 
-      currentBasicBlock->edges[0] = elseBasicBlock;
+      currentBasicBlock->edges[0] = next;
+      break;
     }
     default: {
     }
@@ -217,7 +219,7 @@ static IROp tokenToUnaryOp(TokenType token) {
   }
 }
 
-static Operand *newLiteralOperand(Value value) {
+static Operand *literal_operand_create(Value value) {
   Operand *operand = operand_allocate(OPERAND_LITERAL);
   operand->val.literal = value;
 
@@ -225,28 +227,28 @@ static Operand *newLiteralOperand(Value value) {
 }
 
 // TODO: cache operands rather than recreating
-static Operand *newRegisterOperand(Register reg) {
+static Operand *register_operand_create(Register reg) {
   Operand *operand = operand_allocate(OPERAND_REG);
   operand->val.source = reg;
 
   return operand;
 }
 
-static Operand *newLabelOperand(LabelId id) {
+static Operand *label_operand_create(LabelId id) {
   Operand *operand = operand_allocate(OPERAND_LABEL);
   operand->val.label = id;
 
   return operand;
 }
 
-static Operand *newSymbolOperand(Symbol *symbol) {
+static Operand *symbol_operand_create(Symbol *symbol) {
   Operand *operand = operand_allocate(OPERAND_SYMBOL);
   operand->val.symbol = symbol;
 
   return operand;
 }
 
-static Operand *newTokenOperand(Token token) {
+static Operand *token_operand_create(Token token) {
   Operand *operand = operand_allocate(OPERAND_TOKEN);
   operand->val.token = token;
 
@@ -268,7 +270,7 @@ Operation *operation_create(Token *token, IROp opcode, Operand *first,
   return op;
 }
 
-static Operation *newStartOperation() {
+static Operation *start_op_create() {
   Operation *op = operation_allocate();
 
   op->destination = 0;
@@ -277,24 +279,23 @@ static Operation *newStartOperation() {
   return op;
 }
 
-static Operation *newGotoOperation(Token *token, LabelId labelId) {
+static Operation *goto_op_create(Token *token, LabelId labelId) {
   Operation *op = operation_allocate();
 
   op->id = getOperationId();
   op->opcode = IR_GOTO;
-  op->first = newLabelOperand(labelId);
+  op->first = label_operand_create(labelId);
   op->token = token;
 
   return op;
 }
 
-static Operation *newLabelOperation(Token *token, LabelId labelId,
-                                    IROp opcode) {
+static Operation *label_op_create(Token *token, LabelId labelId, IROp opcode) {
   Operation *op = operation_allocate();
 
   op->id = getOperationId();
   op->opcode = opcode;
-  op->first = newLabelOperand(labelId);
+  op->first = label_operand_create(labelId);
   op->token = token;
 
   return op;
@@ -325,7 +326,8 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
 
   switch (node->type) {
   case EXPR_LITERAL: {
-    Operand *constantValue = newLiteralOperand(AS_LITERAL_EXPR(node)->literal);
+    Operand *constantValue =
+        literal_operand_create(AS_LITERAL_EXPR(node)->literal);
 
     op = operation_create(&node->token, IR_CONSTANT, constantValue, NULL);
     ir_write(ir, op);
@@ -340,7 +342,7 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
     UnaryExprAstNode *expr = AS_UNARY_EXPR(node);
     Operation *right =
         ast_walk(compiler, ir, expr->right, activeScope, activeWorkUnit);
-    Operand *value = newRegisterOperand(right->destination);
+    Operand *value = register_operand_create(right->destination);
 
     op = operation_create(&node->token, tokenToUnaryOp(expr->op), value, NULL);
     ir_write(ir, op);
@@ -366,8 +368,8 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
     }
 
     op = operation_create(&node->token, tokenToBinaryOp(expr->op),
-                          newRegisterOperand(left->destination),
-                          newRegisterOperand(right->destination));
+                          register_operand_create(left->destination),
+                          register_operand_create(right->destination));
     ir_write(ir, op);
     break;
   }
@@ -380,18 +382,18 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
                                activeWorkUnit);
 
     op = operation_create(&node->token, IR_COND,
-                          newRegisterOperand(left->destination),
-                          newLabelOperand(afterLabelId));
+                          register_operand_create(left->destination),
+                          label_operand_create(afterLabelId));
     ir_write(ir, op);
 
-    op = newLabelOperation(&node->token, trueLabelId, IR_LABEL);
+    op = label_op_create(&node->token, trueLabelId, IR_LABEL);
     ir_write(ir, op);
 
     op = ast_walk(compiler, ir, expr->branches.right, activeScope,
                   activeWorkUnit);
     ir_write(ir, op);
 
-    op = newLabelOperation(&node->token, afterLabelId, IR_LABEL);
+    op = label_op_create(&node->token, afterLabelId, IR_LABEL);
     ir_write(ir, op);
 
     break;
@@ -405,14 +407,14 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
                                activeWorkUnit);
 
     op = operation_create(&node->token, IR_COND_NO_POP,
-                          newRegisterOperand(left->destination),
-                          newLabelOperand(elseLabelId));
+                          register_operand_create(left->destination),
+                          label_operand_create(elseLabelId));
     ir_write(ir, op);
 
-    op = newGotoOperation(&node->token, afterLabelId);
+    op = goto_op_create(&node->token, afterLabelId);
     ir_write(ir, op);
 
-    op = newLabelOperation(&node->token, elseLabelId, IR_LABEL);
+    op = label_op_create(&node->token, elseLabelId, IR_LABEL);
     ir_write(ir, op);
 
     // FIXME: pop shouldn't live in IR
@@ -422,7 +424,7 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
     Operation *right = ast_walk(compiler, ir, expr->branches.right, activeScope,
                                 activeWorkUnit);
 
-    op = newLabelOperation(&node->token, afterLabelId, IR_LABEL);
+    op = label_op_create(&node->token, afterLabelId, IR_LABEL);
     ir_write(ir, op);
 
     break;
@@ -438,14 +440,14 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
 
     IROp opcode = symbol->type == SCOPE_GLOBAL ? IR_GET_GLOBAL : IR_GET_LOCAL;
 
-    op = operation_create(&node->token, opcode, newTokenOperand(node->token),
-                          NULL);
+    op = operation_create(&node->token, opcode,
+                          token_operand_create(node->token), NULL);
     ir_write(ir, op);
     break;
   }
   case EXPR_THIS: {
     op = operation_create(&node->token, IR_GET_LOCAL,
-                          newTokenOperand(syntheticToken("this")), NULL);
+                          token_operand_create(syntheticToken("this")), NULL);
     ir_write(ir, op);
     break;
   }
@@ -453,7 +455,7 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
     PrintStmtAstNode *stmt = AS_PRINT_STMT(node);
 
     op = ast_walk(compiler, ir, stmt->expr, activeScope, activeWorkUnit);
-    Operand *value = newRegisterOperand(op->destination);
+    Operand *value = register_operand_create(op->destination);
 
     op = operation_create(&node->token, IR_PRINT, value, NULL);
     ir_write(ir, op);
@@ -473,19 +475,19 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
         ast_walk(compiler, ir, stmt->condition, activeScope, activeWorkUnit);
 
     op = operation_create(&node->token, IR_COND,
-                          newRegisterOperand(expr->destination),
-                          newLabelOperand(elseLabelId));
+                          register_operand_create(expr->destination),
+                          label_operand_create(elseLabelId));
     ir_write(ir, op);
 
-    op = newLabelOperation(&node->token, thenLabelId, IR_LABEL);
+    op = label_op_create(&node->token, thenLabelId, IR_LABEL);
     ir_write(ir, op);
 
     ast_walk(compiler, ir, stmt->branches.then, activeScope, activeWorkUnit);
 
-    op = newGotoOperation(&node->token, afterLabelId);
+    op = goto_op_create(&node->token, afterLabelId);
     ir_write(ir, op);
 
-    op = newLabelOperation(&node->token, elseLabelId, IR_LABEL);
+    op = label_op_create(&node->token, elseLabelId, IR_LABEL);
     ir_write(ir, op);
 
     // FIXME: remove pop from IR
@@ -496,7 +498,7 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
       ast_walk(compiler, ir, stmt->branches.elseB, activeScope, activeWorkUnit);
     }
 
-    op = newLabelOperation(&node->token, afterLabelId, IR_LABEL);
+    op = label_op_create(&node->token, afterLabelId, IR_LABEL);
     ir_write(ir, op);
 
     op = operation_create(&node->token, IR_END_SCOPE, NULL, NULL);
@@ -510,7 +512,7 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
     LabelId ifLabelId = getLabelId();
     LabelId afterLabelId = getLabelId();
 
-    op = newLabelOperation(&node->token, exprLabelId, IR_LABEL);
+    op = label_op_create(&node->token, exprLabelId, IR_LABEL);
     ir_write(ir, op);
 
     op = operation_create(&node->token, IR_BEGIN_SCOPE, NULL, NULL);
@@ -520,20 +522,20 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
         ast_walk(compiler, ir, stmt->condition, activeScope, activeWorkUnit);
 
     op = operation_create(&node->token, IR_COND,
-                          newRegisterOperand(expr->destination),
-                          newLabelOperand(afterLabelId));
+                          register_operand_create(expr->destination),
+                          label_operand_create(afterLabelId));
     ir_write(ir, op);
 
-    op = newLabelOperation(&node->token, ifLabelId, IR_LABEL);
+    op = label_op_create(&node->token, ifLabelId, IR_LABEL);
     ir_write(ir, op);
 
     ast_walk(compiler, ir, stmt->branches.then, activeScope, activeWorkUnit);
 
-    op = operation_create(&node->token, IR_LOOP, newLabelOperand(exprLabelId),
-                          NULL);
+    op = operation_create(&node->token, IR_LOOP,
+                          label_operand_create(exprLabelId), NULL);
     ir_write(ir, op);
 
-    op = newLabelOperation(&node->token, afterLabelId, IR_ELSE_LABEL);
+    op = label_op_create(&node->token, afterLabelId, IR_ELSE_LABEL);
     ir_write(ir, op);
 
     op = operation_create(&node->token, IR_END_SCOPE, NULL, NULL);
@@ -550,7 +552,7 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
     LabelId afterLabelId = getLabelId();
     LabelId loopLabelId = getLabelId();
 
-    op = newLabelOperation(&node->token, preLabelId, IR_LABEL);
+    op = label_op_create(&node->token, preLabelId, IR_LABEL);
     ir_write(ir, op);
 
     op = operation_create(&node->token, IR_BEGIN_SCOPE, NULL, NULL);
@@ -561,7 +563,7 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
                node->scope != NULL ? node->scope : activeScope, activeWorkUnit);
     }
 
-    op = newLabelOperation(&node->token, condLabelId, IR_LABEL);
+    op = label_op_create(&node->token, condLabelId, IR_LABEL);
     ir_write(ir, op);
 
     if (stmt->branches.cond != NULL) {
@@ -569,22 +571,22 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
           compiler, ir, stmt->branches.cond,
           node->scope != NULL ? node->scope : activeScope, activeWorkUnit);
       op = operation_create(&node->token, IR_COND,
-                            newRegisterOperand(condExpr->destination),
-                            newLabelOperand(afterLabelId));
+                            register_operand_create(condExpr->destination),
+                            label_operand_create(afterLabelId));
       ir_write(ir, op);
     }
 
-    op = newLabelOperation(&node->token, bodyLabelId, IR_LABEL);
+    op = label_op_create(&node->token, bodyLabelId, IR_LABEL);
     ir_write(ir, op);
 
     ast_walk(compiler, ir, stmt->branches.body,
              node->scope != NULL ? node->scope : activeScope, activeWorkUnit);
 
-    op = newGotoOperation(&node->token, loopLabelId);
+    op = goto_op_create(&node->token, loopLabelId);
     ir_write(ir, op);
 
     if (stmt->branches.post != NULL) {
-      op = newLabelOperation(&node->token, postLabelId, IR_LABEL);
+      op = label_op_create(&node->token, postLabelId, IR_LABEL);
       ir_write(ir, op);
 
       ast_walk(compiler, ir, stmt->branches.post,
@@ -593,24 +595,24 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
       op = operation_create(&node->token, IR_POP, NULL, NULL);
       ir_write(ir, op);
 
-      op = operation_create(&node->token, IR_LOOP, newLabelOperand(condLabelId),
-                            NULL);
+      op = operation_create(&node->token, IR_LOOP,
+                            label_operand_create(condLabelId), NULL);
       ir_write(ir, op);
     }
 
-    op = newLabelOperation(&node->token, loopLabelId, IR_LABEL);
+    op = label_op_create(&node->token, loopLabelId, IR_LABEL);
     ir_write(ir, op);
 
     op = operation_create(&node->token, IR_LOOP,
-                          newLabelOperand(stmt->branches.post != NULL
-                                              ? postLabelId
-                                              : condLabelId),
+                          label_operand_create(stmt->branches.post != NULL
+                                                   ? postLabelId
+                                                   : condLabelId),
                           NULL);
     ir_write(ir, op);
 
-    op = newLabelOperation(&node->token, afterLabelId,
-                           stmt->branches.cond != NULL ? IR_ELSE_LABEL
-                                                       : IR_LABEL);
+    op =
+        label_op_create(&node->token, afterLabelId,
+                        stmt->branches.cond != NULL ? IR_ELSE_LABEL : IR_LABEL);
     ir_write(ir, op);
 
     op = operation_create(&node->token, IR_END_SCOPE, NULL, NULL);
@@ -638,7 +640,8 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
     IROp opcode =
         symbol->type == SCOPE_GLOBAL ? IR_DEFINE_GLOBAL : IR_DEFINE_LOCAL;
 
-    op = operation_create(&node->token, opcode, newSymbolOperand(symbol), NULL);
+    op = operation_create(&node->token, opcode, symbol_operand_create(symbol),
+                          NULL);
     ir_write(ir, op);
     break;
   }
@@ -656,8 +659,9 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
 
     IROp opcode = symbol->type == SCOPE_GLOBAL ? IR_SET_GLOBAL : IR_SET_LOCAL;
 
-    op = operation_create(&node->token, opcode, newTokenOperand(node->token),
-                          newRegisterOperand(op->destination));
+    op = operation_create(&node->token, opcode,
+                          token_operand_create(node->token),
+                          register_operand_create(op->destination));
     ir_write(ir, op);
     break;
   }
@@ -704,8 +708,8 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
               "FuncStmt: Symbol is not defined in current scope.");
       break;
     }
-    Operand *pointer = newLiteralOperand(POINTER_VAL(wu));
-    Operand *arityOperand = newLiteralOperand(NUMBER_VAL(symbol->arity));
+    Operand *pointer = literal_operand_create(POINTER_VAL(wu));
+    Operand *arityOperand = literal_operand_create(NUMBER_VAL(symbol->arity));
     op = operation_create(&node->token, IR_FUNCTION, pointer, arityOperand);
     ir_write(ir, op);
     break;
@@ -721,9 +725,9 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
                 "FuncExpr: Symbol is not defined in current scope.");
         break;
       }
-      Operand *pointer = newLiteralOperand(POINTER_VAL(node->scope));
+      Operand *pointer = literal_operand_create(POINTER_VAL(node->scope));
       op = operation_create(&node->token, IR_DEFINE_LOCAL,
-                            newSymbolOperand(symbol), pointer);
+                            symbol_operand_create(symbol), pointer);
       ir_write(ir, op);
     }
 
@@ -755,7 +759,7 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
       expr = ast_walk(compiler, ir, stmt->expr, activeScope, activeWorkUnit);
     }
     op = operation_create(&node->token, IR_RETURN,
-                          newRegisterOperand(expr->destination), NULL);
+                          register_operand_create(expr->destination), NULL);
     ir_write(ir, op);
     break;
   }
@@ -773,7 +777,7 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
              activeWorkUnit);
 
     op = operation_create(&node->token, IR_GET_PROPERTY,
-                          newTokenOperand(node->token), NULL);
+                          token_operand_create(node->token), NULL);
     ir_write(ir, op);
     break;
   }
@@ -784,7 +788,7 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
     ast_walk(compiler, ir, stmt->expr, activeScope, activeWorkUnit);
 
     op = operation_create(&node->token, IR_SET_PROPERTY,
-                          newTokenOperand(node->token), NULL);
+                          token_operand_create(node->token), NULL);
     ir_write(ir, op);
     break;
   }
@@ -795,7 +799,7 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
 
     int arity = walkParams(compiler, ir, node, activeWorkUnit, activeScope,
                            expr->params);
-    Operand *arityOperand = newLiteralOperand(NUMBER_VAL(arity));
+    Operand *arityOperand = literal_operand_create(NUMBER_VAL(arity));
 
     op = operation_create(&node->token, IR_CALL, arityOperand, NULL);
     ir_write(ir, op);
@@ -808,17 +812,17 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
 
     int arity = walkParams(compiler, ir, node, activeWorkUnit, activeScope,
                            expr->params);
-    Operand *arityOperand = newLiteralOperand(NUMBER_VAL(arity));
+    Operand *arityOperand = literal_operand_create(NUMBER_VAL(arity));
 
-    op = operation_create(&node->token, IR_INVOKE, newTokenOperand(node->token),
-                          arityOperand);
+    op = operation_create(&node->token, IR_INVOKE,
+                          token_operand_create(node->token), arityOperand);
     ir_write(ir, op);
     break;
   }
   case EXPR_SUPER_INVOKE: {
     SuperInvocationExprAstNode *expr = AS_SUPER_INVOCATION_EXPR(node);
     op = operation_create(&node->token, IR_GET_LOCAL,
-                          newTokenOperand(syntheticToken("this")), NULL);
+                          token_operand_create(syntheticToken("this")), NULL);
     ir_write(ir, op);
 
     ast_walk(compiler, ir, expr->target,
@@ -826,10 +830,10 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
 
     int arity = walkParams(compiler, ir, node, activeWorkUnit, activeScope,
                            expr->params);
-    Operand *arityOperand = newLiteralOperand(NUMBER_VAL(arity));
+    Operand *arityOperand = literal_operand_create(NUMBER_VAL(arity));
 
     op = operation_create(&node->token, IR_SUPER_INVOKE,
-                          newTokenOperand(node->token), arityOperand);
+                          token_operand_create(node->token), arityOperand);
     ir_write(ir, op);
     break;
   }
@@ -837,15 +841,15 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
     SuperExprAstNode *expr = AS_SUPER_EXPR(node);
     Token this = syntheticToken("this");
 
-    op = operation_create(&node->token, IR_GET_LOCAL, newTokenOperand(this),
-                          NULL);
+    op = operation_create(&node->token, IR_GET_LOCAL,
+                          token_operand_create(this), NULL);
     ir_write(ir, op);
 
     ast_walk(compiler, ir, expr->target,
              node->scope != NULL ? node->scope : activeScope, activeWorkUnit);
 
-    op = operation_create(&node->token, IR_SUPER, newTokenOperand(node->token),
-                          NULL);
+    op = operation_create(&node->token, IR_SUPER,
+                          token_operand_create(node->token), NULL);
     ir_write(ir, op);
     break;
   }
@@ -858,10 +862,11 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
                                 node->token, TYPE_CLASS);
     linkedList_append(activeWorkUnit->childWorkUnits, wu);
 
-    Operand *pointer = newLiteralOperand(POINTER_VAL(wu));
+    Operand *pointer = literal_operand_create(POINTER_VAL(wu));
     if (OPTIONAL_HAS_VALUE(stmt->superclass)) {
-      op = operation_create(&node->token, IR_CLASS, pointer,
-                            newTokenOperand(OPTIONAL_VALUE(stmt->superclass)));
+      op = operation_create(
+          &node->token, IR_CLASS, pointer,
+          token_operand_create(OPTIONAL_VALUE(stmt->superclass)));
     } else {
       op = operation_create(&node->token, IR_CLASS, pointer, NULL);
     }
@@ -895,8 +900,8 @@ static Operation *ast_walk(Compiler *compiler, IRList *ir, AstNode *node,
               "MethodStmt: Symbol is not defined in current scope.");
       break;
     }
-    Operand *pointer = newLiteralOperand(POINTER_VAL(wu));
-    Operand *arityOperand = newLiteralOperand(NUMBER_VAL(symbol->arity));
+    Operand *pointer = literal_operand_create(POINTER_VAL(wu));
+    Operand *arityOperand = literal_operand_create(NUMBER_VAL(symbol->arity));
     op = operation_create(&node->token, IR_METHOD, pointer, arityOperand);
     ir_write(ir, op);
     break;
@@ -910,7 +915,7 @@ static IRList *ir_create(AstNode *node) {
     return NULL;
   }
   IRList *ir = ir_allocate();
-  Operation *start = newStartOperation();
+  Operation *start = start_op_create();
   ir_write(ir, start);
 
   return ir;
@@ -1048,29 +1053,29 @@ char *opcodeString(IROp opcode) {
   }
 }
 
-void dfsWalk(BasicBlock *bb, Table *visitedSet, LinkedList *ordered) {
+void bb_walk_dfs(BasicBlock *bb, Table *visitedSet, LinkedList *ordered) {
   tableSet(visitedSet, NUMBER_VAL(bb->id), TRUE_VAL);
   Value unused;
   if (bb->edges[0] != NULL) {
     if (!tableGet(visitedSet, NUMBER_VAL(bb->edges[0]->id), &unused)) {
-      dfsWalk(bb->edges[0], visitedSet, ordered);
+      bb_walk_dfs(bb->edges[0], visitedSet, ordered);
     }
   }
   if (bb->edges[1] != NULL) {
     if (!tableGet(visitedSet, NUMBER_VAL(bb->edges[1]->id), &unused)) {
-      dfsWalk(bb->edges[1], visitedSet, ordered);
+      bb_walk_dfs(bb->edges[1], visitedSet, ordered);
     }
   }
   linkedList_append(ordered, bb);
 }
 
-LinkedList *postOrderTraverseBasicBlock(CFG *cfg) {
+LinkedList *cfg_post_order_traverse(CFG *cfg) {
   Table visitedSet;
   initTable(&visitedSet);
 
   LinkedList *ordered = linkedList_allocate();
 
-  dfsWalk(cfg->start, &visitedSet, ordered);
+  bb_walk_dfs(cfg->start, &visitedSet, ordered);
 
   freeTable(&visitedSet);
 
@@ -1078,7 +1083,7 @@ LinkedList *postOrderTraverseBasicBlock(CFG *cfg) {
 }
 
 // TODO: Free strings from writeString
-void printBasicBlock(BasicBlock *bb) {
+void bb_print(BasicBlock *bb) {
   int opcount = ir_length(bb->ir);
 
   printf("BB #%llu", bb->id);
@@ -1120,10 +1125,10 @@ void printBasicBlock(BasicBlock *bb) {
 
 void cfg_print(CFG *cfg) {
   printf("CFG: %.*s\n", cfg->name.length, cfg->name.start);
-  LinkedList *ordered = postOrderTraverseBasicBlock(cfg);
+  LinkedList *ordered = cfg_post_order_traverse(cfg);
   Node *tail = ordered->tail;
   while (tail != NULL) {
-    printBasicBlock(tail->data);
+    bb_print(tail->data);
     tail = tail->prev;
   }
 }

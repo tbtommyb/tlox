@@ -120,12 +120,11 @@ typedef struct WorkUnit {
   FunctionType functionType;
 } WorkUnit;
 
-BasicBlock *newBasicBlock(AstNode *node);
 Operation *operation_create(Token *token, IROp opcode, Operand *first,
                             Operand *second);
 WorkUnit *wu_create_main(Compiler *compiler, AstNode *root);
 
-LinkedList *postOrderTraverseBasicBlock(CFG *cfg);
+LinkedList *cfg_post_order_traverse(CFG *cfg);
 void cfg_print(CFG *cfg);
 void wu_print_all(WorkUnit *root);
 

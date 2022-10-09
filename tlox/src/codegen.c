@@ -639,7 +639,7 @@ static void generateClass(Compiler *compiler, WorkUnit *wu, Table *labels,
     local->isCaptured = false;
   }
 
-  LinkedList *postOrdered = postOrderTraverseBasicBlock(wu->cfg);
+  LinkedList *postOrdered = cfg_post_order_traverse(wu->cfg);
   Node *tail = postOrdered->tail;
   while (tail != NULL) {
     generateBasicBlockCode(compiler, f, tail->data, labels, wu->activeContext);
@@ -660,7 +660,7 @@ static void generateClass(Compiler *compiler, WorkUnit *wu, Table *labels,
 // FIXME: rename
 void generateChunk(Compiler *compiler, WorkUnit *wu, Table *labels,
                    ObjFunction *f) {
-  LinkedList *postOrdered = postOrderTraverseBasicBlock(wu->cfg);
+  LinkedList *postOrdered = cfg_post_order_traverse(wu->cfg);
   Node *tail = postOrdered->tail;
   while (tail != NULL) {
     generateBasicBlockCode(compiler, f, tail->data, labels, wu->activeContext);
