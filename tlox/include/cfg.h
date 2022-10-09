@@ -90,16 +90,18 @@ struct Operation {
   Register destination;
   Operand *first;
   Operand *second;
-  Operation *next;
+  /* Operation *next; */
   Token *token;
 };
+
+typedef struct IRList {
+  LinkedList *ops;
+} IRList;
 
 typedef struct BasicBlock {
   BasicBlockId id;
   LabelId labelId;
-  int opsCount;    // Keep this?
-  Operation *ops;  // Redo as LinkedList
-  Operation *curr; // Keep this?
+  IRList *ir;
   struct BasicBlock *trueEdge;
   struct BasicBlock *falseEdge;
 } BasicBlock;
@@ -120,12 +122,12 @@ typedef struct WorkUnit {
 } WorkUnit;
 
 BasicBlock *newBasicBlock(AstNode *node);
-Operation *newOperation(Token *token, IROp opcode, Operand *first,
-                        Operand *second);
-WorkUnit *createMainWorkUnit(Compiler *compiler, AstNode *root);
+Operation *operation_create(Token *token, IROp opcode, Operand *first,
+                            Operand *second);
+WorkUnit *wu_create_main(Compiler *compiler, AstNode *root);
 
 LinkedList *postOrderTraverseBasicBlock(CFG *cfg);
-void printCFG(CFG *cfg);
-void printWorkUnits(WorkUnit *root);
+void cfg_print(CFG *cfg);
+void wu_print_all(WorkUnit *root);
 
 #endif

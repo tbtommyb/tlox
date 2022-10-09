@@ -533,13 +533,11 @@ static void writeOperation(Compiler *compiler, Operation *op, ObjFunction *f,
 static void generateBasicBlockCode(Compiler *compiler, ObjFunction *f,
                                    BasicBlock *bb, Table *labels,
                                    ExecutionContext *context) {
-  Operation *curr = bb->ops;
-  int i = 0;
+  Node *curr = bb->ir->ops->head;
 
-  while (curr != NULL && i < bb->opsCount) {
-    writeOperation(compiler, curr, f, labels, context);
+  while (curr != NULL) {
+    writeOperation(compiler, curr->data, f, labels, context);
     curr = curr->next;
-    i++;
   }
 }
 

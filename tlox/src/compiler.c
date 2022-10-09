@@ -276,13 +276,10 @@ ObjFunction *compile(Compiler *compiler, const char *source) {
   initTable(&stringConstants);
   // should this still be global?
   initTable(&labels);
+  compiler->labels = &labels;
 
   Scope *scope = scope_allocate(TYPE_SCRIPT);
   scope_init(scope, compiler);
-
-  CompilerState state = {.stringConstants = &stringConstants,
-                         .functions = linkedList_allocate(),
-                         .labels = &labels};
 
   AstNode *ast = parse(compiler->parser);
 #ifdef DEBUG_PRINT_CODE
@@ -298,14 +295,14 @@ ObjFunction *compile(Compiler *compiler, const char *source) {
     return NULL;
   }
 
-  WorkUnit *mainWorkUnit = createMainWorkUnit(compiler, ast);
+  WorkUnit *mainWorkUnit = wu_create_main(compiler, ast);
 
   if (compiler->hadError) {
     return NULL;
   }
 
 #ifdef DEBUG_PRINT_CODE
-  printWorkUnits(mainWorkUnit);
+  wu_print_all(mainWorkUnit);
 #endif
 
   ObjFunction *mainFunction = compileWorkUnit(compiler, mainWorkUnit, &labels);
@@ -334,5 +331,6 @@ void initCompiler(Parser *parser, Compiler *compiler, FunctionType type,
   compiler->currentScope = NULL;
   compiler->type = type;
   parser->compiler = compiler; // FIXME: is this stack reference bad?
+  compiler->labels = NULL;
   return;
 }

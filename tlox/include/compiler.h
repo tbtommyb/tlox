@@ -10,12 +10,6 @@
 #include "vm.h"
 #include <stdio.h>
 
-typedef struct CompilerState {
-  Table *stringConstants;
-  Table *labels;
-  LinkedList *functions;
-} CompilerState;
-
 typedef struct Compiler {
   bool hadError;
   bool panicMode;
@@ -24,6 +18,7 @@ typedef struct Compiler {
   Parser *parser;
   Scope *currentScope;
   FunctionType type;
+  Table *labels;
 } Compiler;
 
 void errorAt(Compiler *compiler, Token *token, const char *message);
